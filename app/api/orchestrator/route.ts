@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { logger, logApiError } from "@/app/lib/logger";
 import { validateStockCode } from "@/app/lib/validation";
-import { assessDataQuality, generateDataQualityReport } from "@/app/lib/data-quality";
+import {
+  assessDataQuality,
+  generateDataQualityReport,
+} from "@/app/lib/data-quality";
+
+// 価格表示用の型（必要なキーだけ持たせるためオプショナル）
+type PriceInfo = {
+  current?: string;
+  range?: string;
+};
 
 interface AIResponse {
   analysis: string;
@@ -33,10 +42,7 @@ interface TechnicalMetrics {
 
 interface StructuredAnalysis {
   summary?: string;
-  price?: {
-    current?: string;
-    range?: string;
-  };
+  price?: PriceInfo;
   financialMetrics?: FinancialMetrics;
   technicalMetrics?: TechnicalMetrics;
   trend?: string;
@@ -251,14 +257,17 @@ function convertToAIResponse(result: {
     PER: extractNumberFromText(analysisText, /PER[:\s]+([0-9.]+)/i),
     PBR: extractNumberFromText(analysisText, /PBR[:\s]+([0-9.]+)/i),
     ROE: extractNumberFromText(analysisText, /ROE[:\s]+([0-9.]+)/i),
-    配当利回り: extractNumberFromText(analysisText, /配当利回り[:\s]+([0-9.]+)/i),
+    配当利回り: extractNumberFromText(
+      analysisText,
+      /配当利回り[:\s]+([0-9.]+)/i
+    ),
   };
 
-  const financialMetrics = financialMetricsObj || (
-    Object.values(extractedFinancials).some(v => v !== null)
+  const financialMetrics =
+    financialMetricsObj ||
+    (Object.values(extractedFinancials).some(v => v !== null)
       ? extractedFinancials
-      : undefined
-  );
+      : undefined);
 
   // テクニカル指標を抽出（オブジェクトまたはテキストから）
   const technicalMetricsObj = analysisContent.テクニカル指標サマリー as
@@ -273,11 +282,11 @@ function convertToAIResponse(result: {
     RSI: extractNumberFromText(analysisText, /RSI[:\s]+([0-9.]+)/i),
   };
 
-  const technicalMetrics = technicalMetricsObj || (
-    Object.values(extractedTechnicals).some(v => v !== null)
+  const technicalMetrics =
+    technicalMetricsObj ||
+    (Object.values(extractedTechnicals).some(v => v !== null)
       ? extractedTechnicals
-      : undefined
-  );
+      : undefined);
 
   // 株価情報を抽出（オブジェクトまたはテキストから）
   let priceInfo = stockInfo
@@ -294,22 +303,66 @@ function convertToAIResponse(result: {
 
   // テキストから株価情報を抽出
   if (!priceInfo) {
-    const currentPrice = extractNumberFromText(analysisText, /現在値[:\s]+([0-9,]+)/i) ||
-                        extractNumberFromText(analysisText, /株価[:\s]+([0-9,]+)/i);
-    const targetPriceLower = extractNumberFromText(analysisText, /目標株価[:\s]+([0-9,]+)/i) ||
-                             extractNumberFromText(analysisText, /¥([0-9,]+)\s*〜/i);
-    const targetPriceUpper = extractNumberFromText(analysisText, /〜\s*¥([0-9,]+)/i);
+    const currentPrice =
+      extractNumberFromText(analysisText, /現在値[:\s]+([0-9,]+)/i) ||
+      extractNumberFromText(analysisText, /株価[:\s]+([0-9,]+)/i);
+    const targetPriceLower =
+      extractNumberFromText(analysisText, /目標株価[:\s]+([0-9,]+)/i) ||
+      extractNumberFromText(analysisText, /¥([0-9,]+)\s*〜/i);
+    const targetPriceUpper = extractNumberFromText(
+      analysisText,
+      /〜\s*¥([0-9,]+)/i
+    );
 
-    if (currentPrice || targetPriceLower || targetPriceUpper || result.目標株価) {
-      priceInfo = {
-        current: currentPrice ? `${currentPrice.toLocaleString()}円` : undefined,
-        range:
-          result.目標株価?.下限 && result.目標株価?.上限
-            ? `${result.目標株価.下限.toLocaleString()}円〜${result.目標株価.上限.toLocaleString()}円`
-            : targetPriceLower && targetPriceUpper
-              ? `${targetPriceLower.toLocaleString()}円〜${targetPriceUpper.toLocaleString()}円`
-              : undefined,
-      };
+    // 値の存在を null/undefined で判定（0 を正しく許容）
+    const hasCurrent = currentPrice != null;
+    const hasTL = targetPriceLower != null;
+    const hasTU = targetPriceUpper != null;
+    const hasResultRange =
+      result?.目標株価?.下限 != null && result?.目標株価?.上限 != null;
+
+    if (hasCurrent || hasTL || hasTU || hasResultRange) {
+      const price: PriceInfo = {};
+
+      if (hasCurrent) {
+        // number 以外の可能性があるなら Number() で保険
+        const cur =
+          typeof currentPrice === "number"
+            ? currentPrice
+            : Number(currentPrice);
+        if (Number.isFinite(cur)) price.current = `${cur.toLocaleString()}円`;
+      }
+
+      if (hasResultRange) {
+        const lo =
+          typeof result.目標株価!.下限 === "number"
+            ? result.目標株価!.下限
+            : Number(result.目標株価!.下限);
+        const hi =
+          typeof result.目標株価!.上限 === "number"
+            ? result.目標株価!.上限
+            : Number(result.目標株価!.上限);
+        if (Number.isFinite(lo) && Number.isFinite(hi)) {
+          price.range = `${lo.toLocaleString()}円〜${hi.toLocaleString()}円`;
+        }
+      } else if (hasTL && hasTU) {
+        const lo =
+          typeof targetPriceLower === "number"
+            ? targetPriceLower
+            : Number(targetPriceLower);
+        const hi =
+          typeof targetPriceUpper === "number"
+            ? targetPriceUpper
+            : Number(targetPriceUpper);
+        if (Number.isFinite(lo) && Number.isFinite(hi)) {
+          price.range = `${lo.toLocaleString()}円〜${hi.toLocaleString()}円`;
+        }
+      }
+
+      // 値が一切入らなかった場合は代入しない（型安全）
+      if (Object.keys(price).length > 0) {
+        priceInfo = price;
+      }
     }
   }
 
@@ -421,4 +474,3 @@ function generateFinalJudgement(
 
   return { decision, reasoning, confidence };
 }
-
