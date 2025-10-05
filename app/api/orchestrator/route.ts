@@ -289,13 +289,15 @@ function convertToAIResponse(result: {
       : undefined);
 
   // 株価情報を抽出（オブジェクトまたはテキストから）
-  let priceInfo = stockInfo
+  let priceInfo: PriceInfo | undefined = stockInfo
     ? {
         current: stockInfo.前日比
           ? `${stockInfo.現在値}円 (${stockInfo.前日比})`
           : `${stockInfo.現在値}円`,
         range:
-          result.目標株価 && result.目標株価.下限 && result.目標株価.上限
+          result.目標株価 &&
+          result.目標株価.下限 != null &&
+          result.目標株価.上限 != null
             ? `${result.目標株価.下限}円〜${result.目標株価.上限}円`
             : undefined,
       }
