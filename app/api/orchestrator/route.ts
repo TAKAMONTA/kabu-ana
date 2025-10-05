@@ -40,6 +40,14 @@ interface TechnicalMetrics {
   } | null;
 }
 
+// テクニカル指標の抽出結果用の型（MACDがない場合もある）
+interface ExtractedTechnicalMetrics {
+  MA25?: number | null;
+  MA75?: number | null;
+  MA200?: number | null;
+  RSI?: number | null;
+}
+
 interface StructuredAnalysis {
   summary?: string;
   price?: PriceInfo;
@@ -274,8 +282,8 @@ function convertToAIResponse(result: {
     | TechnicalMetrics
     | undefined;
 
-  // テキストからテクニカル指標を抽出
-  const extractedTechnicals = {
+  // テキストからテクニカル指標を抽出（MACDは含まない）
+  const extractedTechnicals: ExtractedTechnicalMetrics = {
     MA25: extractNumberFromText(analysisText, /MA25[:\s]+([0-9,]+)/i),
     MA75: extractNumberFromText(analysisText, /MA75[:\s]+([0-9,]+)/i),
     MA200: extractNumberFromText(analysisText, /MA200[:\s]+([0-9,]+)/i),
@@ -386,7 +394,9 @@ function convertToAIResponse(result: {
           MA75: technicalMetrics.MA75 ?? null,
           MA200: technicalMetrics.MA200 ?? null,
           RSI: technicalMetrics.RSI ?? null,
-          MACD: technicalMetrics.MACD ?? null,
+          // MACDが存在する型の場合のみ代入（型安全性を確保）
+          MACD:
+            "MACD" in technicalMetrics ? (technicalMetrics.MACD ?? null) : null,
         }
       : undefined,
     trend:
