@@ -170,7 +170,16 @@ export class DataValidator {
   }
 
   private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-    return path.split(".").reduce((current, key) => current?.[key], obj);
+    // 修正版：reduce の型を明示し、unknown で統一
+    return path
+      .split(".")
+      .reduce<unknown>(
+        (current, key) =>
+          current && typeof current === "object" && key in current
+            ? (current as Record<string, unknown>)[key]
+            : undefined,
+        obj
+      );
   }
 
   private isValidISODate(dateString: string): boolean {
