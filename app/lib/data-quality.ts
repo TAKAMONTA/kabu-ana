@@ -3,6 +3,63 @@
  * データの欠損率を評価し、分析に十分なデータがあるかを判定
  */
 
+// 株価データの型定義
+interface StockPriceChange {
+  パーセント?: number | null;
+  円?: number | null;
+  ドル?: number | null;
+}
+
+interface StockPriceInfo {
+  現在値?: number | null;
+  前日比?: StockPriceChange;
+  出来高?: number | null;
+  始値?: number | null;
+  高値?: number | null;
+  安値?: number | null;
+  時価総額?: string | null;
+  情報源?: string;
+}
+
+interface TechnicalIndicators {
+  MA25?: number | null;
+  MA75?: number | null;
+  MA200?: number | null;
+  RSI?: number | null;
+  MACD?: {
+    値?: number | null;
+    シグナル?: number | null;
+    ヒストグラム?: number | null;
+  };
+  情報源?: string;
+}
+
+interface FinancialMetrics {
+  PER?: number | null;
+  PBR?: number | null;
+  ROE?: number | null;
+  配当利回り?: number | null;
+  直近決算?: string | null;
+  EPS?: number | null;
+  情報源?: string;
+}
+
+interface NewsItem {
+  タイトル?: string;
+  要約?: string;
+  日時?: string;
+  URL?: string;
+  信頼度?: "高" | "中" | "低";
+}
+
+interface StockData {
+  株価情報?: StockPriceInfo;
+  テクニカル指標?: TechnicalIndicators;
+  財務指標?: FinancialMetrics;
+  最新ニュース?: NewsItem[];
+  [key: string]: unknown;
+}
+
 export interface DataQualityResult {
   score: number; // 0-100のスコア
   isAdequate: boolean; // 分析に十分なデータがあるか
@@ -24,22 +81,24 @@ export function assessDataQuality(
   const missingFields: string[] = [];
   const availableFields: string[] = [];
 
+  // dataをStockData型として扱う
+  const stockData = data as StockData;
+
   // 株価情報のチェック
   let stockPriceComplete = true;
   const requiredStockFields = ["現在値", "前日比", "出来高"];
   for (const field of requiredStockFields) {
     if (field === "前日比") {
-      if (
-        !data?.株価情報?.前日比?.パーセント &&
-        data?.株価情報?.前日比?.パーセント !== 0
-      ) {
+      const changePercent = stockData?.株価情報?.前日比?.パーセント;
+      if (changePercent === undefined || changePercent === null) {
         missingFields.push(`株価情報.前日比.パーセント`);
         stockPriceComplete = false;
       } else {
         availableFields.push(`株価情報.前日比`);
       }
     } else {
-      if (!data?.株価情報?.[field] && data?.株価情報?.[field] !== 0) {
+      const fieldValue = stockData?.株価情報?.[field as keyof StockPriceInfo];
+      if (fieldValue === undefined || fieldValue === null) {
         missingFields.push(`株価情報.${field}`);
         stockPriceComplete = false;
       } else {
@@ -53,20 +112,17 @@ export function assessDataQuality(
   let technicalAvailable = 0;
   for (const field of technicalFields) {
     if (field === "MACD") {
-      if (
-        data?.テクニカル指標?.MACD?.値 ||
-        data?.テクニカル指標?.MACD?.値 === 0
-      ) {
+      const macdValue = stockData?.テクニカル指標?.MACD?.値;
+      if (macdValue !== undefined && macdValue !== null) {
         technicalAvailable++;
         availableFields.push(`テクニカル指標.MACD`);
       } else {
         missingFields.push(`テクニカル指標.MACD`);
       }
     } else {
-      if (
-        data?.テクニカル指標?.[field] ||
-        data?.テクニカル指標?.[field] === 0
-      ) {
+      const fieldValue =
+        stockData?.テクニカル指標?.[field as keyof TechnicalIndicators];
+      if (fieldValue !== undefined && fieldValue !== null) {
         technicalAvailable++;
         availableFields.push(`テクニカル指標.${field}`);
       } else {
@@ -81,7 +137,8 @@ export function assessDataQuality(
   const financialFields = ["PER", "PBR", "ROE", "配当利回り"];
   let financialAvailable = 0;
   for (const field of financialFields) {
-    if (data?.財務指標?.[field] || data?.財務指標?.[field] === 0) {
+    const fieldValue = stockData?.財務指標?.[field as keyof FinancialMetrics];
+    if (fieldValue !== undefined && fieldValue !== null) {
       financialAvailable++;
       availableFields.push(`財務指標.${field}`);
     } else {
@@ -93,7 +150,7 @@ export function assessDataQuality(
 
   // ニュースのチェック
   const newsAvailable =
-    Array.isArray(data?.最新ニュース) && data.最新ニュース.length > 0;
+    Array.isArray(stockData?.最新ニュース) && stockData.最新ニュース.length > 0;
   if (newsAvailable) {
     availableFields.push("最新ニュース");
   } else {
@@ -105,8 +162,11 @@ export function assessDataQuality(
   // 株価情報: 50点（最重要）
   if (stockPriceComplete) {
     score += 50;
-  } else if (data?.株価情報?.現在値 || data?.株価情報?.現在値 === 0) {
-    score += 25; // 現在値だけでもあれば半分
+  } else {
+    const currentPrice = stockData?.株価情報?.現在値;
+    if (currentPrice !== undefined && currentPrice !== null) {
+      score += 25; // 現在値だけでもあれば半分
+    }
   }
 
   // テクニカル指標: 25点
