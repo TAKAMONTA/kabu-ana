@@ -474,19 +474,19 @@ export default function HomePage() {
                           rel="nofollow"
                         >
                           <img
-                            border="0"
                             width="250"
                             height="250"
                             alt=""
                             src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                            style={{ border: "0" }}
                           />
                         </a>
                         <img
-                          border="0"
                           width="1"
                           height="1"
                           src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
                           alt=""
+                          style={{ border: "0" }}
                         />
                       </div>
                     </div>
@@ -557,19 +557,19 @@ export default function HomePage() {
               rel="nofollow"
             >
               <img
-                border="0"
                 width="250"
                 height="250"
                 alt=""
                 src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                style={{ border: "0" }}
               />
             </a>
             <img
-              border="0"
               width="1"
               height="1"
               src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
               alt=""
+              style={{ border: "0" }}
             />
           </div>
         </div>
