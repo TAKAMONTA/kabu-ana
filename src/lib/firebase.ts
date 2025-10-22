@@ -14,11 +14,16 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "demo-app-id",
 };
 
-// Firebase初期化
-const app = initializeApp(firebaseConfig);
+// Firebase初期化（ブラウザ環境でのみ）
+let app: any = null;
+let auth: any = null;
+let db: any = null;
 
-// 認証とFirestoreのインスタンスを取得
-export const auth = getAuth(app);
-export const db = getFirestore(app);
+if (typeof window !== "undefined") {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
 
+export { auth, db };
 export default app;

@@ -16,6 +16,7 @@ export function useAuth() {
   useEffect(() => {
     // Firebase設定が正しく設定されている場合のみ認証を有効化
     if (
+      auth &&
       process.env.NEXT_PUBLIC_FIREBASE_API_KEY &&
       process.env.NEXT_PUBLIC_FIREBASE_API_KEY !== "your_firebase_api_key_here"
     ) {
@@ -32,6 +33,7 @@ export function useAuth() {
   }, []);
 
   const login = async (email: string, password: string) => {
+    if (!auth) return { success: false, error: "Firebase not initialized" };
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: result.user };
@@ -41,6 +43,7 @@ export function useAuth() {
   };
 
   const register = async (email: string, password: string) => {
+    if (!auth) return { success: false, error: "Firebase not initialized" };
     try {
       const result = await createUserWithEmailAndPassword(
         auth,
@@ -54,6 +57,7 @@ export function useAuth() {
   };
 
   const logout = async () => {
+    if (!auth) return { success: false, error: "Firebase not initialized" };
     try {
       await signOut(auth);
       return { success: true };
@@ -63,6 +67,7 @@ export function useAuth() {
   };
 
   const resetPassword = async (email: string) => {
+    if (!auth) return { success: false, error: "Firebase not initialized" };
     try {
       await sendPasswordResetEmail(auth, email);
       return { success: true };
