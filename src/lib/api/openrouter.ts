@@ -18,6 +18,12 @@ export interface AnalysisResult {
   confidence: number;
   keyFactors: string[];
   recommendations: string[];
+  swot?: {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+  };
 }
 
 export interface OpenRouterResponse {
@@ -72,7 +78,7 @@ export class OpenRouterClient {
             },
           ],
           temperature: 0.3,
-          max_tokens: 2000,
+          max_tokens: 2500,
         },
         {
           headers: {
@@ -136,7 +142,13 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
   "riskLevel": "low|medium|high",
   "confidence": 信頼度(0-100),
   "keyFactors": ["重要な要因1", "重要な要因2", "..."],
-  "recommendations": ["推奨事項1", "推奨事項2", "..."]
+  "recommendations": ["推奨事項1", "推奨事項2", "..."],
+  "swot": {
+    "strengths": ["強み1", "強み2"],
+    "weaknesses": ["弱み1", "弱み2"],
+    "opportunities": ["機会1", "機会2"],
+    "threats": ["脅威1", "脅威2"]
+  }
 }
     `.trim();
   }
@@ -167,6 +179,12 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         confidence: result.confidence || 50,
         keyFactors: result.keyFactors || [],
         recommendations: result.recommendations || [],
+        swot: result.swot || {
+          strengths: [],
+          weaknesses: [],
+          opportunities: [],
+          threats: [],
+        },
       };
     } catch (error) {
       console.error("分析結果の解析エラー:", error);
@@ -179,6 +197,12 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         confidence: 0,
         keyFactors: [],
         recommendations: [],
+        swot: {
+          strengths: [],
+          weaknesses: [],
+          opportunities: [],
+          threats: [],
+        },
       };
     }
   }
