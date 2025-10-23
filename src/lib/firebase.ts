@@ -15,9 +15,9 @@ const firebaseConfig = {
 };
 
 // Firebase初期化（ブラウザ環境でのみ）
-let app: any = null;
-let auth: any = null;
-let db: any = null;
+let app: ReturnType<typeof initializeApp> | null = null;
+let auth: ReturnType<typeof getAuth> | null = null;
+let db: ReturnType<typeof getFirestore> | null = null;
 
 if (typeof window !== "undefined") {
   app = initializeApp(firebaseConfig);

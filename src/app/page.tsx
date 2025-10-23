@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -229,7 +230,9 @@ export default function HomePage() {
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base">会社概要</CardTitle>
                         <button
-                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          onClick={() =>
+                            setIsDescriptionExpanded(!isDescriptionExpanded)
+                          }
                           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                           {isDescriptionExpanded ? (
@@ -247,9 +250,11 @@ export default function HomePage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <p className={`text-sm text-muted-foreground leading-relaxed ${
-                        isDescriptionExpanded ? '' : 'line-clamp-10'
-                      }`}>
+                      <p
+                        className={`text-sm text-muted-foreground leading-relaxed ${
+                          isDescriptionExpanded ? "" : "line-clamp-10"
+                        }`}
+                      >
                         {searchResult.companyInfo.description}
                       </p>
                     </CardContent>
@@ -536,17 +541,17 @@ export default function HomePage() {
                           href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
                           rel="nofollow"
                         >
-                          <img
-                            width="250"
-                            height="250"
+                          <Image
+                            width={250}
+                            height={250}
                             alt=""
                             src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
                             style={{ border: "0" }}
                           />
                         </a>
-                        <img
-                          width="1"
-                          height="1"
+                        <Image
+                          width={1}
+                          height={1}
                           src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
                           alt=""
                           style={{ border: "0" }}
@@ -615,25 +620,25 @@ export default function HomePage() {
             <p className="text-sm text-orange-600 font-semibold mb-3">
               スポンサー
             </p>
-            <a
-              href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-              rel="nofollow"
-            >
-              <img
-                width="250"
-                height="250"
-                alt=""
-                src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
-                style={{ border: "0" }}
-              />
-            </a>
-            <img
-              width="1"
-              height="1"
-              src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-              alt=""
-              style={{ border: "0" }}
-            />
+                        <a
+                          href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
+                          rel="nofollow"
+                        >
+                          <Image
+                            width={250}
+                            height={250}
+                            alt=""
+                            src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                            style={{ border: "0" }}
+                          />
+                        </a>
+                        <Image
+                          width={1}
+                          height={1}
+                          src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
+                          alt=""
+                          style={{ border: "0" }}
+                        />
           </div>
         </div>
       </main>

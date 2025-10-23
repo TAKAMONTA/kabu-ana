@@ -36,16 +36,62 @@ export async function POST(request: NextRequest) {
       : null;
 
     // データ取得の結果を格納する変数
-    let companyInfo: any = null;
-    let stockData: any = null;
-    let newsData: any[] = [];
-    let chartData: any[] = [];
-    let financialData: any = null;
+    let companyInfo: {
+      name: string;
+      symbol: string;
+      market: string;
+      price?: number;
+      change?: number;
+      changePercent?: number;
+      description?: string;
+      website?: string;
+      employees?: string;
+      founded?: string;
+      headquarters?: string;
+    } | null = null;
+    let stockData: {
+      symbol: string;
+      price: number;
+      change: number;
+      changePercent: number;
+      volume: number;
+      marketCap: string;
+      pe: number;
+      eps: number;
+      dividend: number;
+      high52: number;
+      low52: number;
+    } | null = null;
+    let newsData: Array<{
+      title: string;
+      snippet: string;
+      link: string;
+      source: string;
+      date: string;
+    }> = [];
+    let chartData: Array<{
+      date: string;
+      price: number;
+      volume: number;
+      keyEvent?: {
+        title: string;
+        link: string;
+        source: string;
+      };
+    }> = [];
+    let financialData: {
+      revenue?: string;
+      netIncome?: string;
+      operatingIncome?: string;
+      totalAssets?: string;
+      cash?: string;
+      eps?: string;
+      period?: string;
+    } | null = null;
 
     // FMP APIを使用してデータを取得（優先）
     if (fmpApi) {
       try {
-        console.log("🔍 FMP APIを使用してデータを取得中...");
         
         // 企業検索
         const searchResults = await fmpApi.searchCompany(query);
@@ -112,7 +158,6 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          console.log("✅ FMP APIからデータを取得しました");
         }
       } catch (error) {
         console.error("FMP API エラー:", error);
@@ -122,7 +167,6 @@ export async function POST(request: NextRequest) {
     // SERPAPIをフォールバックとして使用
     if (serpApi && (!companyInfo || !stockData)) {
       try {
-        console.log("🔍 SERPAPIを使用してデータを取得中...");
         
         const serpCompanyInfo = await serpApi.searchCompany(query);
         if (serpCompanyInfo) {
@@ -135,7 +179,6 @@ export async function POST(request: NextRequest) {
           chartData = await serpApi.getChartData(serpCompanyInfo.symbol, chartPeriod);
           financialData = financialData || await serpApi.getFinancialData(serpCompanyInfo.symbol);
           
-          console.log("✅ SERPAPIからデータを取得しました");
         }
       } catch (error) {
         console.error("SERPAPI エラー:", error);

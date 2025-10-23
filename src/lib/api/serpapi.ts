@@ -140,21 +140,14 @@ export class SerpApiClient {
 
       if (data.summary) {
         const stats = data.knowledge_graph?.key_stats?.stats || [];
-        console.log("📊 取得した統計データ:", JSON.stringify(stats, null, 2));
-        console.log(
-          "📌 利用可能なラベル一覧:",
-          stats.map((s: any) => s.label)
-        );
 
         const getStatValue = (...labels: string[]) => {
           for (const label of labels) {
             const stat = stats.find((s: any) => s.label === label);
             if (stat?.value) {
-              console.log(`✓ ラベル "${label}" の値:`, stat.value);
               return stat.value;
             }
           }
-          console.log(`✗ ラベル ${labels.join(", ")} が見つかりません`);
           return "";
         };
 
@@ -224,8 +217,6 @@ export class SerpApiClient {
           low52: parseFloat(yearRangeParts[0]) || 0,
         };
 
-        console.log("💹 パース後の株価データ:", stockData);
-        console.log("📊 全統計データ:", stats);
         return stockData;
       }
 
@@ -317,11 +308,6 @@ export class SerpApiClient {
         return dataPoint;
       });
 
-      console.log("📈 チャートデータ件数:", chartData.length);
-      console.log(
-        "📌 イベント付きデータポイント数:",
-        chartData.filter(d => d.keyEvent).length
-      );
       return chartData;
     } catch (error: any) {
       console.error("SERPAPIチャートデータ取得エラー:", error.message);
@@ -363,7 +349,6 @@ export class SerpApiClient {
       );
 
       if (!incomeStatement) {
-        console.log("財務データが見つかりません");
         return null;
       }
 
@@ -426,7 +411,6 @@ export class SerpApiClient {
         })`,
       };
 
-      console.log("💰 財務データ:", financialData);
       return financialData;
     } catch (error: any) {
       console.error("SERPAPI財務データ取得エラー:", error.message);
