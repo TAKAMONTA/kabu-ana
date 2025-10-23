@@ -500,6 +500,20 @@ export default function HomePage() {
                             </div>
                           </div>
                         )}
+
+                        {/* AI感想セクション */}
+                        {analysisResult.aiReflection && (
+                          <div className="mt-6 p-4 border-2 rounded-lg bg-gradient-to-br from-purple-50 to-purple-100 border-purple-300">
+                            <h4 className="font-bold text-purple-900 mb-3 text-base flex items-center gap-2">
+                              🤖 AIの感想
+                            </h4>
+                            <div className="bg-white p-4 rounded-lg border border-purple-200">
+                              <p className="text-sm text-gray-700 leading-relaxed italic">
+                                "{analysisResult.aiReflection}"
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8">

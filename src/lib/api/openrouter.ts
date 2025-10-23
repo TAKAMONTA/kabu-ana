@@ -24,6 +24,7 @@ export interface AnalysisResult {
     opportunities: string[];
     threats: string[];
   };
+  aiReflection?: string; // AIの感想・考察
 }
 
 export interface OpenRouterResponse {
@@ -97,7 +98,13 @@ export class OpenRouterClient {
         throw new Error("AI分析結果が取得できませんでした");
       }
 
-      return this.parseAnalysisResult(content);
+      const analysisResult = this.parseAnalysisResult(content);
+      
+      // AI感想を生成
+      const reflection = await this.generateReflection(companyInfo, stockData, newsData);
+      analysisResult.aiReflection = reflection;
+
+      return analysisResult;
     } catch (error) {
       console.error("OpenRouter分析エラー:", error);
       throw error;
@@ -150,6 +157,84 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
     "threats": ["脅威1", "脅威2"]
   }
 }
+    `.trim();
+  }
+
+  private async generateReflection(
+    companyInfo: any,
+    stockData: any,
+    newsData: any[]
+  ): Promise<string> {
+    try {
+      const reflectionPrompt = this.buildReflectionPrompt(companyInfo, stockData, newsData);
+
+      const response = await axios.post(
+        `${this.baseURL}/chat/completions`,
+        {
+          model: "anthropic/claude-3.5-sonnet",
+          messages: [
+            {
+              role: "system",
+              content: `あなたは経験豊富な投資家です。企業の情報を基に、個人的な感想や考察を自然な日本語で述べてください。分析とは違った角度から、直感的な印象や長期的な視点での考えを共有してください。`,
+            },
+            {
+              role: "user",
+              content: reflectionPrompt,
+            },
+          ],
+          temperature: 0.7, // より創造的で自然な文章のため
+          max_tokens: 800,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://ai-market-analyzer.com",
+            "X-Title": "AI Market Analyzer",
+          },
+        }
+      );
+
+      const data: OpenRouterResponse = response.data;
+      const content = data.choices[0]?.message?.content;
+
+      return content || "感想を生成できませんでした。";
+    } catch (error) {
+      console.error("AI感想生成エラー:", error);
+      return "感想の生成中にエラーが発生しました。";
+    }
+  }
+
+  private buildReflectionPrompt(
+    companyInfo: any,
+    stockData: any,
+    newsData: any[]
+  ): string {
+    return `
+以下の企業について、私ならこう考えるという観点から、自然な感想を述べてください。
+
+【企業情報】
+- 企業名: ${companyInfo?.name || "N/A"}
+- シンボル: ${companyInfo?.symbol || "N/A"}
+- 市場: ${companyInfo?.market || "N/A"}
+- 現在価格: ${stockData?.price || "N/A"}
+- 変動: ${stockData?.change || "N/A"} (${stockData?.changePercent || "N/A"}%)
+- 時価総額: ${stockData?.marketCap || "N/A"}
+- PER: ${stockData?.pe || "N/A"}
+- EPS: ${stockData?.eps || "N/A"}
+- 配当: ${stockData?.dividend || "N/A"}
+
+【最新ニュース】
+${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
+
+以下の観点から、個人的な感想を述べてください：
+- この企業の印象や直感
+- 長期的な成長性への期待
+- 投資家としての興味深い点
+- 市場での位置づけや競争優位性
+- 将来性やリスクへの個人的な見解
+
+自然で親しみやすい日本語で、200-300文字程度で述べてください。
     `.trim();
   }
 
