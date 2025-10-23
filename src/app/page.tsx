@@ -17,6 +17,8 @@ import {
   Brain,
   AlertCircle,
   ExternalLink,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
@@ -31,6 +33,7 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
@@ -218,6 +221,40 @@ export default function HomePage() {
                   currency={getCurrencySymbol()}
                   onPeriodChange={handleChartPeriodChange}
                 />
+
+                {/* 会社概要セクション */}
+                {searchResult.companyInfo.description && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-base">会社概要</CardTitle>
+                        <button
+                          onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {isDescriptionExpanded ? (
+                            <>
+                              <ChevronUp className="h-3 w-3" />
+                              折りたたむ
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-3 w-3" />
+                              続きを読む
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className={`text-sm text-muted-foreground leading-relaxed ${
+                        isDescriptionExpanded ? '' : 'line-clamp-10'
+                      }`}>
+                        {searchResult.companyInfo.description}
+                      </p>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* AI分析セクション */}
                 <Card>

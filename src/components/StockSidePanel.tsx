@@ -9,9 +9,8 @@ import {
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
-import { useState } from "react";
 
 interface CompanyInfo {
   name: string;
@@ -60,8 +59,6 @@ export function StockSidePanel({
   financialData,
   currency = "$",
 }: StockSidePanelProps) {
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-
   const getCurrencySymbol = () => {
     return companyInfo.market === "TYO" ? "¥" : currency;
   };
@@ -209,39 +206,6 @@ export function StockSidePanel({
         </Card>
       )}
 
-      {/* 会社概要 */}
-      {companyInfo.description && (
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">会社概要</CardTitle>
-              <button
-                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                {isDescriptionExpanded ? (
-                  <>
-                    <ChevronUp className="h-3 w-3" />
-                    折りたたむ
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="h-3 w-3" />
-                    続きを読む
-                  </>
-                )}
-              </button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <p className={`text-sm text-muted-foreground leading-relaxed ${
-              isDescriptionExpanded ? '' : 'line-clamp-10'
-            }`}>
-              {companyInfo.description}
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
