@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -30,6 +30,7 @@ export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
+  const [shouldAutoAnalyze, setShouldAutoAnalyze] = useState(false);
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
@@ -39,23 +40,27 @@ export default function HomePage() {
   } = useAIAnalysis();
   const { user, logout } = useAuth();
 
+  // 検索結果が更新された時に自動分析を実行
+  useEffect(() => {
+    if (searchResult && shouldAutoAnalyze && !isAnalyzing) {
+      analyzeStock(
+        searchResult.companyInfo,
+        searchResult.stockData,
+        searchResult.newsData
+      );
+      setShouldAutoAnalyze(false);
+    }
+  }, [searchResult, shouldAutoAnalyze, isAnalyzing, analyzeStock]);
+
   const handleSearchAndAnalyze = async () => {
     if (!searchQuery.trim()) return;
     const normalizedQuery = normalizeQuery(searchQuery);
     
+    // 自動分析フラグを設定
+    setShouldAutoAnalyze(true);
+    
     // 検索を実行
     await searchCompany(normalizedQuery, chartPeriod);
-    
-    // 検索完了後、少し待ってから分析を実行
-    setTimeout(async () => {
-      if (searchResult) {
-        await analyzeStock(
-          searchResult.companyInfo,
-          searchResult.stockData,
-          searchResult.newsData
-        );
-      }
-    }, 1000);
   };
 
   const handleAnalyze = async () => {
@@ -75,17 +80,9 @@ export default function HomePage() {
   const handleChartPeriodChange = async (period: string) => {
     setChartPeriod(period);
     if (searchResult) {
+      // 自動分析フラグを設定
+      setShouldAutoAnalyze(true);
       await searchCompany(searchResult.companyInfo.symbol, period);
-      // 期間変更後も自動的に分析を実行
-      setTimeout(async () => {
-        if (searchResult) {
-          await analyzeStock(
-            searchResult.companyInfo,
-            searchResult.stockData,
-            searchResult.newsData
-          );
-        }
-      }, 1000);
     }
   };
 

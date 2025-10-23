@@ -10,6 +10,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
   name: string;
@@ -47,24 +48,9 @@ interface StockSidePanelProps {
   currency?: string;
 }
 
-// ヘルパー関数：数値をフォーマット
+// ヘルパー関数：数値をフォーマット（後方互換性のため残す）
 function formatLargeNumber(value: string | number | undefined): string {
-  if (!value) return "N/A";
-  if (typeof value === "string") {
-    // すでにフォーマット済みならそのまま返す
-    if (value.includes("M") || value.includes("B") || value.includes("T")) {
-      return value;
-    }
-    value = parseFloat(value);
-  }
-  if (isNaN(value as number)) return "N/A";
-
-  const num = value as number;
-  if (num >= 1e12) return `${(num / 1e12).toFixed(1)}T`;
-  if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
-  if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
-  if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
-  return num.toFixed(0);
+  return formatNumber(value, { compact: true });
 }
 
 export function StockSidePanel({
@@ -148,7 +134,7 @@ export function StockSidePanel({
         <CardContent className="space-y-3">
           <StatsCard
             label="時価総額"
-            value={formatLargeNumber(stockData.marketCap)}
+            value={formatMarketCap(stockData.marketCap)}
             highlight
           />
           <StatsCard
@@ -164,12 +150,12 @@ export function StockSidePanel({
           />
           <StatsCard
             label="配当利回り"
-            value={`${stockData.dividend.toFixed(2)}%`}
+            value={formatPercentage(stockData.dividend)}
             trend={stockData.dividend >= 2 ? "up" : stockData.dividend > 0 ? "neutral" : undefined}
           />
           <StatsCard
             label="出来高"
-            value={formatLargeNumber(stockData.volume)}
+            value={formatNumber(stockData.volume, { compact: true })}
             description={
               stockData.volume > 0
                 ? `${(stockData.volume / 1000000).toFixed(1)}M`
@@ -193,21 +179,27 @@ export function StockSidePanel({
           </CardHeader>
           <CardContent className="space-y-2">
             {financialData.revenue && (
-              <StatsCard label="売上高" value={financialData.revenue} />
+              <StatsCard 
+                label="売上高" 
+                value={formatNumber(financialData.revenue, { currency: currencySymbol, compact: true })} 
+              />
             )}
             {financialData.netIncome && (
-              <StatsCard label="純利益" value={financialData.netIncome} />
+              <StatsCard 
+                label="純利益" 
+                value={formatNumber(financialData.netIncome, { currency: currencySymbol, compact: true })} 
+              />
             )}
             {financialData.cash && (
               <StatsCard
                 label="現金・短期投資"
-                value={financialData.cash}
+                value={formatNumber(financialData.cash, { currency: currencySymbol, compact: true })}
               />
             )}
             {financialData.eps && (
               <StatsCard
                 label="EPS"
-                value={`${currencySymbol}${financialData.eps}`}
+                value={formatNumber(financialData.eps, { currency: currencySymbol, decimals: 2 })}
               />
             )}
           </CardContent>
