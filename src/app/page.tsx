@@ -509,7 +509,7 @@ export default function HomePage() {
                             </h4>
                             <div className="bg-white p-4 rounded-lg border border-purple-200">
                               <p className="text-sm text-gray-700 leading-relaxed italic">
-                                "{analysisResult.aiReflection}"
+                                &ldquo;{analysisResult.aiReflection}&rdquo;
                               </p>
                             </div>
                           </div>
