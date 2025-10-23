@@ -39,10 +39,21 @@ export default function HomePage() {
   } = useAIAnalysis();
   const { user, logout } = useAuth();
 
-  const handleSearch = async () => {
+  const handleSearchAndAnalyze = async () => {
     if (!searchQuery.trim()) return;
     const normalizedQuery = normalizeQuery(searchQuery);
-    await searchCompany(normalizedQuery, chartPeriod);
+    
+    // 検索を実行
+    const searchResult = await searchCompany(normalizedQuery, chartPeriod);
+    
+    // 検索が成功した場合、自動的に分析も実行
+    if (searchResult) {
+      await analyzeStock(
+        searchResult.companyInfo,
+        searchResult.stockData,
+        searchResult.newsData
+      );
+    }
   };
 
   const handleAnalyze = async () => {
@@ -62,7 +73,15 @@ export default function HomePage() {
   const handleChartPeriodChange = async (period: string) => {
     setChartPeriod(period);
     if (searchResult) {
-      await searchCompany(searchResult.companyInfo.symbol, period);
+      const newSearchResult = await searchCompany(searchResult.companyInfo.symbol, period);
+      // 期間変更後も自動的に分析を実行
+      if (newSearchResult) {
+        await analyzeStock(
+          newSearchResult.companyInfo,
+          newSearchResult.stockData,
+          newSearchResult.newsData
+        );
+      }
     }
   };
 
@@ -118,18 +137,18 @@ export default function HomePage() {
                     placeholder="証券コード、ティッカーシンボル、または企業名で検索（例: 7203, AAPL, トヨタ自動車）"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    onKeyPress={e => e.key === "Enter" && handleSearch()}
+                    onKeyPress={e => e.key === "Enter" && handleSearchAndAnalyze()}
                     className="h-11"
                   />
                 </div>
                 <Button
-                  onClick={handleSearch}
-                  disabled={!searchQuery.trim() || isLoading}
+                  onClick={handleSearchAndAnalyze}
+                  disabled={!searchQuery.trim() || isLoading || isAnalyzing}
                   size="lg"
                   className="px-8"
                 >
-                  <Search className="h-4 w-4 mr-2" />
-                  {isLoading ? "検索中..." : "検索"}
+                  <Brain className="h-4 w-4 mr-2" />
+                  {isLoading ? "検索中..." : isAnalyzing ? "分析中..." : "検索&分析"}
                 </Button>
               </div>
             </CardContent>
@@ -447,12 +466,12 @@ export default function HomePage() {
                           {isAnalyzing ? (
                             <>
                               <Brain className="h-4 w-4 mr-2 animate-spin" />
-                              分析中...
+                              再分析中...
                             </>
                           ) : (
                             <>
                               <Brain className="h-4 w-4 mr-2" />
-                              この企業を分析する
+                              再分析する
                             </>
                           )}
                         </Button>
