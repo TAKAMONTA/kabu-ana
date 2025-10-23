@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
               revenue: latest.revenue?.toString(),
               netIncome: latest.netIncome?.toString(),
               operatingIncome: latest.operatingIncome?.toString(),
-              totalAssets: null,
-              cash: null,
+              totalAssets: undefined,
+              cash: undefined,
               eps: latest.eps?.toString(),
               period: `${latest.calendarYear} (${latest.period})`,
             };
