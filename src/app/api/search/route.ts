@@ -36,11 +36,11 @@ export async function POST(request: NextRequest) {
       : null;
 
     // データ取得の結果を格納する変数
-    let companyInfo = null;
-    let stockData = null;
-    let newsData = [];
-    let chartData = [];
-    let financialData = null;
+    let companyInfo: any = null;
+    let stockData: any = null;
+    let newsData: any[] = [];
+    let chartData: any[] = [];
+    let financialData: any = null;
 
     // FMP APIを使用してデータを取得（優先）
     if (fmpApi) {
