@@ -44,16 +44,18 @@ export default function HomePage() {
     const normalizedQuery = normalizeQuery(searchQuery);
     
     // 検索を実行
-    const searchResult = await searchCompany(normalizedQuery, chartPeriod);
+    await searchCompany(normalizedQuery, chartPeriod);
     
-    // 検索が成功した場合、自動的に分析も実行
-    if (searchResult) {
-      await analyzeStock(
-        searchResult.companyInfo,
-        searchResult.stockData,
-        searchResult.newsData
-      );
-    }
+    // 検索完了後、少し待ってから分析を実行
+    setTimeout(async () => {
+      if (searchResult) {
+        await analyzeStock(
+          searchResult.companyInfo,
+          searchResult.stockData,
+          searchResult.newsData
+        );
+      }
+    }, 1000);
   };
 
   const handleAnalyze = async () => {
@@ -73,15 +75,17 @@ export default function HomePage() {
   const handleChartPeriodChange = async (period: string) => {
     setChartPeriod(period);
     if (searchResult) {
-      const newSearchResult = await searchCompany(searchResult.companyInfo.symbol, period);
+      await searchCompany(searchResult.companyInfo.symbol, period);
       // 期間変更後も自動的に分析を実行
-      if (newSearchResult) {
-        await analyzeStock(
-          newSearchResult.companyInfo,
-          newSearchResult.stockData,
-          newSearchResult.newsData
-        );
-      }
+      setTimeout(async () => {
+        if (searchResult) {
+          await analyzeStock(
+            searchResult.companyInfo,
+            searchResult.stockData,
+            searchResult.newsData
+          );
+        }
+      }, 1000);
     }
   };
 
@@ -137,7 +141,9 @@ export default function HomePage() {
                     placeholder="証券コード、ティッカーシンボル、または企業名で検索（例: 7203, AAPL, トヨタ自動車）"
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    onKeyPress={e => e.key === "Enter" && handleSearchAndAnalyze()}
+                    onKeyPress={e =>
+                      e.key === "Enter" && handleSearchAndAnalyze()
+                    }
                     className="h-11"
                   />
                 </div>
@@ -148,7 +154,11 @@ export default function HomePage() {
                   className="px-8"
                 >
                   <Brain className="h-4 w-4 mr-2" />
-                  {isLoading ? "検索中..." : isAnalyzing ? "分析中..." : "検索&分析"}
+                  {isLoading
+                    ? "検索中..."
+                    : isAnalyzing
+                    ? "分析中..."
+                    : "検索&分析"}
                 </Button>
               </div>
             </CardContent>
