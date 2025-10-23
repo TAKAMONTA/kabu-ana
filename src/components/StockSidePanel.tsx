@@ -235,7 +235,7 @@ export function StockSidePanel({
           </CardHeader>
           <CardContent>
             <p className={`text-sm text-muted-foreground leading-relaxed ${
-              isDescriptionExpanded ? '' : 'line-clamp-4'
+              isDescriptionExpanded ? '' : 'line-clamp-10'
             }`}>
               {companyInfo.description}
             </p>
