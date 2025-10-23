@@ -55,10 +55,10 @@ export default function HomePage() {
   const handleSearchAndAnalyze = async () => {
     if (!searchQuery.trim()) return;
     const normalizedQuery = normalizeQuery(searchQuery);
-    
+
     // 自動分析フラグを設定
     setShouldAutoAnalyze(true);
-    
+
     // 検索を実行
     await searchCompany(normalizedQuery, chartPeriod);
   };

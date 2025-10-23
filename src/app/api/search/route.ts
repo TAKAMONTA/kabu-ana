@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SerpApiClient } from "@/lib/api/serpapi";
+import { FMPClient } from "@/lib/api/fmp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,22 +13,134 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.SERPAPI_API_KEY;
+    const serpApiKey = process.env.SERPAPI_API_KEY;
+    const fmpApiKey = process.env.FMP_API_KEY;
 
-    if (!apiKey || apiKey === "your_serpapi_key_here") {
+    // 少なくとも一つのAPIキーが必要
+    if ((!serpApiKey || serpApiKey === "your_serpapi_key_here") && 
+        (!fmpApiKey || fmpApiKey === "your_fmp_api_key_here")) {
       return NextResponse.json(
         {
           error:
-            "SERPAPI APIキーが設定されていません。.env.localファイルでSERPAPI_API_KEYを設定してください。",
+            "APIキーが設定されていません。SERPAPI_API_KEYまたはFMP_API_KEYのいずれかを設定してください。",
         },
         { status: 400 }
       );
     }
 
-    const serpApi = new SerpApiClient(apiKey);
+    const serpApi = serpApiKey && serpApiKey !== "your_serpapi_key_here" 
+      ? new SerpApiClient(serpApiKey) 
+      : null;
+    const fmpApi = fmpApiKey && fmpApiKey !== "your_fmp_api_key_here" 
+      ? new FMPClient(fmpApiKey) 
+      : null;
 
-    // 企業情報を検索
-    const companyInfo = await serpApi.searchCompany(query);
+    // データ取得の結果を格納する変数
+    let companyInfo = null;
+    let stockData = null;
+    let newsData = [];
+    let chartData = [];
+    let financialData = null;
+
+    // FMP APIを使用してデータを取得（優先）
+    if (fmpApi) {
+      try {
+        console.log("🔍 FMP APIを使用してデータを取得中...");
+        
+        // 企業検索
+        const searchResults = await fmpApi.searchCompany(query);
+        if (searchResults && searchResults.length > 0) {
+          const company = searchResults[0];
+          
+          // 企業プロファイルを取得
+          const profile = await fmpApi.getCompanyProfile(company.symbol);
+          if (profile) {
+            companyInfo = {
+              name: profile.companyName,
+              symbol: profile.symbol,
+              market: profile.exchangeShortName,
+              price: profile.price,
+              change: profile.changes,
+              changePercent: (profile.changes / profile.price) * 100,
+              description: profile.description,
+              website: profile.website,
+              employees: profile.fullTimeEmployees,
+              founded: profile.ipoDate,
+              headquarters: `${profile.city}, ${profile.country}`,
+            };
+          }
+
+          // 株価データを取得
+          const quote = await fmpApi.getQuote(company.symbol);
+          if (quote) {
+            stockData = {
+              symbol: quote.symbol,
+              price: quote.price,
+              change: quote.change,
+              changePercent: quote.changesPercentage,
+              volume: quote.volume,
+              marketCap: quote.marketCap.toString(),
+              pe: quote.pe,
+              eps: quote.eps,
+              dividend: 0, // FMPでは別途取得が必要
+              high52: quote.yearHigh,
+              low52: quote.yearLow,
+            };
+          }
+
+          // 財務諸表を取得
+          const financialStatements = await fmpApi.getFinancialStatements(company.symbol, 1);
+          if (financialStatements && financialStatements.length > 0) {
+            const latest = financialStatements[0];
+            financialData = {
+              revenue: latest.revenue?.toString(),
+              netIncome: latest.netIncome?.toString(),
+              operatingIncome: latest.operatingIncome?.toString(),
+              totalAssets: null,
+              cash: null,
+              eps: latest.eps?.toString(),
+              period: `${latest.calendarYear} (${latest.period})`,
+            };
+          }
+
+          // 主要指標を取得
+          const keyMetrics = await fmpApi.getKeyMetrics(company.symbol, 1);
+          if (keyMetrics && keyMetrics.length > 0) {
+            const metrics = keyMetrics[0];
+            if (stockData) {
+              stockData.dividend = metrics.dividendYield || 0;
+            }
+          }
+
+          console.log("✅ FMP APIからデータを取得しました");
+        }
+      } catch (error) {
+        console.error("FMP API エラー:", error);
+      }
+    }
+
+    // SERPAPIをフォールバックとして使用
+    if (serpApi && (!companyInfo || !stockData)) {
+      try {
+        console.log("🔍 SERPAPIを使用してデータを取得中...");
+        
+        const serpCompanyInfo = await serpApi.searchCompany(query);
+        if (serpCompanyInfo) {
+          companyInfo = companyInfo || serpCompanyInfo;
+          
+          const serpStockData = await serpApi.getStockData(serpCompanyInfo.symbol);
+          stockData = stockData || serpStockData;
+          
+          newsData = await serpApi.getCompanyNews(serpCompanyInfo.symbol, 5);
+          chartData = await serpApi.getChartData(serpCompanyInfo.symbol, chartPeriod);
+          financialData = financialData || await serpApi.getFinancialData(serpCompanyInfo.symbol);
+          
+          console.log("✅ SERPAPIからデータを取得しました");
+        }
+      } catch (error) {
+        console.error("SERPAPI エラー:", error);
+      }
+    }
 
     if (!companyInfo) {
       return NextResponse.json(
@@ -35,21 +148,6 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
-
-    // 株価データを取得
-    const stockData = await serpApi.getStockData(companyInfo.symbol);
-
-    // 最新ニュースを取得
-    const newsData = await serpApi.getCompanyNews(companyInfo.symbol, 5);
-
-    // チャートデータを取得
-    const chartData = await serpApi.getChartData(
-      companyInfo.symbol,
-      chartPeriod
-    );
-
-    // 財務データを取得
-    const financialData = await serpApi.getFinancialData(companyInfo.symbol);
 
     return NextResponse.json({
       companyInfo,

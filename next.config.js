@@ -3,6 +3,7 @@ const nextConfig = {
   // 環境変数の明示的な設定
   env: {
     SERPAPI_API_KEY: process.env.SERPAPI_API_KEY,
+    FMP_API_KEY: process.env.FMP_API_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
   },
   // 実験的機能の設定
