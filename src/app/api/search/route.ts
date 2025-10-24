@@ -1,24 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SerpApiClient } from "@/lib/api/serpapi";
 import { FMPClient } from "@/lib/api/fmp";
+import { searchSchema } from "@/lib/validation/schemas";
+import { withRateLimit } from "@/lib/utils/rateLimiter";
 
-export async function POST(request: NextRequest) {
+async function searchHandler(request: NextRequest) {
   try {
-    const { query, chartPeriod = "1M" } = await request.json();
+    // 入力データの検証
+    const body = await request.json();
+    const validationResult = searchSchema.safeParse(body);
 
-    if (!query) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "検索クエリが必要です" },
+        {
+          error: "入力データが無効です",
+          details: validationResult.error.errors.map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        },
         { status: 400 }
       );
     }
+
+    const { query, chartPeriod } = validationResult.data;
 
     const serpApiKey = process.env.SERPAPI_API_KEY;
     const fmpApiKey = process.env.FMP_API_KEY;
 
     // 少なくとも一つのAPIキーが必要
-    if ((!serpApiKey || serpApiKey === "your_serpapi_key_here") && 
-        (!fmpApiKey || fmpApiKey === "your_fmp_api_key_here")) {
+    if (
+      (!serpApiKey || serpApiKey === "your_serpapi_key_here") &&
+      (!fmpApiKey || fmpApiKey === "your_fmp_api_key_here")
+    ) {
       return NextResponse.json(
         {
           error:
@@ -28,12 +42,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const serpApi = serpApiKey && serpApiKey !== "your_serpapi_key_here" 
-      ? new SerpApiClient(serpApiKey) 
-      : null;
-    const fmpApi = fmpApiKey && fmpApiKey !== "your_fmp_api_key_here" 
-      ? new FMPClient(fmpApiKey) 
-      : null;
+    const serpApi =
+      serpApiKey && serpApiKey !== "your_serpapi_key_here"
+        ? new SerpApiClient(serpApiKey)
+        : null;
+    const fmpApi =
+      fmpApiKey && fmpApiKey !== "your_fmp_api_key_here"
+        ? new FMPClient(fmpApiKey)
+        : null;
 
     // データ取得の結果を格納する変数
     let companyInfo: {
@@ -92,12 +108,11 @@ export async function POST(request: NextRequest) {
     // FMP APIを使用してデータを取得（優先）
     if (fmpApi) {
       try {
-        
         // 企業検索
         const searchResults = await fmpApi.searchCompany(query);
         if (searchResults && searchResults.length > 0) {
           const company = searchResults[0];
-          
+
           // 企業プロファイルを取得
           const profile = await fmpApi.getCompanyProfile(company.symbol);
           if (profile) {
@@ -135,7 +150,10 @@ export async function POST(request: NextRequest) {
           }
 
           // 財務諸表を取得
-          const financialStatements = await fmpApi.getFinancialStatements(company.symbol, 1);
+          const financialStatements = await fmpApi.getFinancialStatements(
+            company.symbol,
+            1
+          );
           if (financialStatements && financialStatements.length > 0) {
             const latest = financialStatements[0];
             financialData = {
@@ -157,7 +175,6 @@ export async function POST(request: NextRequest) {
               stockData.dividend = metrics.dividendYield || 0;
             }
           }
-
         }
       } catch (error) {
         console.error("FMP API エラー:", error);
@@ -167,18 +184,23 @@ export async function POST(request: NextRequest) {
     // SERPAPIをフォールバックとして使用
     if (serpApi && (!companyInfo || !stockData)) {
       try {
-        
         const serpCompanyInfo = await serpApi.searchCompany(query);
         if (serpCompanyInfo) {
           companyInfo = companyInfo || serpCompanyInfo;
-          
-          const serpStockData = await serpApi.getStockData(serpCompanyInfo.symbol);
+
+          const serpStockData = await serpApi.getStockData(
+            serpCompanyInfo.symbol
+          );
           stockData = stockData || serpStockData;
-          
+
           newsData = await serpApi.getCompanyNews(serpCompanyInfo.symbol, 5);
-          chartData = await serpApi.getChartData(serpCompanyInfo.symbol, chartPeriod);
-          financialData = financialData || await serpApi.getFinancialData(serpCompanyInfo.symbol);
-          
+          chartData = await serpApi.getChartData(
+            serpCompanyInfo.symbol,
+            chartPeriod
+          );
+          financialData =
+            financialData ||
+            (await serpApi.getFinancialData(serpCompanyInfo.symbol));
         }
       } catch (error) {
         console.error("SERPAPI エラー:", error);
@@ -200,10 +222,13 @@ export async function POST(request: NextRequest) {
       financialData,
     });
   } catch (error) {
-    console.error("検索エラー:", error);
-    return NextResponse.json(
-      { error: "検索中にエラーが発生しました" },
-      { status: 500 }
+    // セキュアなエラーハンドリング
+    const { createErrorResponse, logError } = await import(
+      "@/lib/utils/errorHandler"
     );
+    logError(error, "Search API");
+    return createErrorResponse(error, "検索中にエラーが発生しました");
   }
 }
+
+export const POST = withRateLimit(searchHandler);

@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import { analysisSchema } from "@/lib/validation/schemas";
+import { withRateLimit } from "@/lib/utils/rateLimiter";
 
-export async function POST(request: NextRequest) {
+async function analyzeHandler(request: NextRequest) {
   try {
-    const { companyInfo, stockData, newsData } = await request.json();
+    // 入力データの検証
+    const body = await request.json();
+    const validationResult = analysisSchema.safeParse(body);
 
-    if (!companyInfo || !stockData) {
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "企業情報と株価データが必要です" },
+        {
+          error: "入力データが無効です",
+          details: validationResult.error.errors.map(err => ({
+            field: err.path.join("."),
+            message: err.message,
+          })),
+        },
         { status: 400 }
       );
     }
+
+    const { companyInfo, stockData, newsData } = validationResult.data;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || apiKey === "your_openrouter_key_here") {
@@ -37,10 +49,13 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("分析エラー:", error);
-    return NextResponse.json(
-      { error: "分析中にエラーが発生しました" },
-      { status: 500 }
+    // セキュアなエラーハンドリング
+    const { createErrorResponse, logError } = await import(
+      "@/lib/utils/errorHandler"
     );
+    logError(error, "Analysis API");
+    return createErrorResponse(error, "分析中にエラーが発生しました");
   }
 }
+
+export const POST = withRateLimit(analyzeHandler);

@@ -1,10 +1,34 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // 環境変数の明示的な設定
-  env: {
-    SERPAPI_API_KEY: process.env.SERPAPI_API_KEY,
-    FMP_API_KEY: process.env.FMP_API_KEY,
-    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+  // セキュリティヘッダーの設定
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
+          },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "origin-when-cross-origin",
+          },
+        ],
+      },
+    ];
   },
   // 実験的機能の設定
   experimental: {
