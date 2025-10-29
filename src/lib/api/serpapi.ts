@@ -252,9 +252,74 @@ export class SerpApiClient {
       // Google Finance APIからニュースを取得
       const newsResults = response.data.news_results || [];
       const news = newsResults.flatMap((result: any) => result.items || []);
-      return news.slice(0, limit);
+
+      // ニュースデータを整形
+      const formattedNews = news.map((item: any) => ({
+        title: item.title || item.snippet,
+        snippet: item.snippet || item.title,
+        source: item.source || "Google Finance",
+        date: item.date
+          ? new Date(item.date).toLocaleDateString("ja-JP")
+          : "不明",
+        link: item.link,
+      }));
+
+      return formattedNews.slice(0, limit);
     } catch (error: any) {
       console.error("SERPAPIニュース取得エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Google検索から企業関連ニュースを取得
+   */
+  async getCompanyNewsFromGoogle(
+    symbol: string,
+    companyName: string,
+    limit: number = 10
+  ): Promise<any[]> {
+    try {
+      // より具体的な検索クエリを作成
+      const searchQuery = `"${companyName}" OR "${symbol}" ニュース 株価 決算 業績 2024 2025`;
+
+      const response = await axios.get(SERPAPI_BASE_URL, {
+        params: {
+          engine: "google",
+          q: searchQuery,
+          api_key: this.apiKey,
+          hl: "ja",
+          num: limit * 2, // フィルタリング前により多くの結果を取得
+          tbs: "qdr:w", // 過去1週間のニュースに限定
+        },
+      });
+
+      const organicResults = response.data.organic_results || [];
+
+      // 関連性フィルタリング：企業名またはシンボルが含まれているニュースのみ
+      const relevantResults = organicResults.filter((result: any) => {
+        const title = (result.title || "").toLowerCase();
+        const snippet = (result.snippet || "").toLowerCase();
+        const companyNameLower = companyName.toLowerCase();
+        const symbolLower = symbol.toLowerCase();
+
+        return (
+          title.includes(companyNameLower) ||
+          snippet.includes(companyNameLower) ||
+          title.includes(symbolLower) ||
+          snippet.includes(symbolLower)
+        );
+      });
+
+      return relevantResults.map((result: any) => ({
+        title: result.title,
+        snippet: result.snippet,
+        source: result.source || "Google検索",
+        date: result.date || "不明",
+        link: result.link,
+      }));
+    } catch (error: any) {
+      console.error("Google検索ニュース取得エラー:", error.message);
       return [];
     }
   }

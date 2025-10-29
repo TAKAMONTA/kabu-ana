@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { SerpApiClient } from "@/lib/api/serpapi";
 import { FMPClient } from "@/lib/api/fmp";
+import { FreeNewsClient } from "@/lib/api/freeNews";
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 
@@ -108,8 +109,8 @@ async function searchHandler(request: NextRequest) {
     // FMP APIを使用してデータを取得（優先）
     if (fmpApi) {
       try {
-        // 企業検索
-        const searchResults = await fmpApi.searchCompany(query);
+        // 統合検索を実行
+        const searchResults = await fmpApi.comprehensiveSearch(query);
         if (searchResults && searchResults.length > 0) {
           const company = searchResults[0];
 
@@ -175,6 +176,17 @@ async function searchHandler(request: NextRequest) {
               stockData.dividend = metrics.dividendYield || 0;
             }
           }
+
+          // ニュースを取得（無料の代替手段を使用）
+          const freeNewsClient = new FreeNewsClient();
+          const freeNews = await freeNewsClient.getComprehensiveNews(
+            company.name || company.companyName,
+            company.symbol,
+            5
+          );
+          if (freeNews && freeNews.length > 0) {
+            newsData = freeNews;
+          }
         }
       } catch (error) {
         console.error("FMP API エラー:", error);
@@ -193,7 +205,24 @@ async function searchHandler(request: NextRequest) {
           );
           stockData = stockData || serpStockData;
 
-          newsData = await serpApi.getCompanyNews(serpCompanyInfo.symbol, 5);
+          // SERPAPIからニュースを取得
+          const serpNews = await serpApi.getCompanyNews(
+            serpCompanyInfo.symbol,
+            5
+          );
+          if (serpNews && serpNews.length > 0) {
+            newsData = serpNews;
+          } else {
+            // Google検索からもニュースを取得
+            const googleNews = await serpApi.getCompanyNewsFromGoogle(
+              serpCompanyInfo.symbol,
+              serpCompanyInfo.name,
+              5
+            );
+            if (googleNews && googleNews.length > 0) {
+              newsData = googleNews;
+            }
+          }
           chartData = await serpApi.getChartData(
             serpCompanyInfo.symbol,
             chartPeriod

@@ -38,6 +38,12 @@ const nextConfig = {
   images: {
     domains: ["www24.a8.net", "www17.a8.net"],
   },
+  // 本番環境での最適化
+  // output: "standalone", // Vercelデプロイエラーのため一時的に無効化
+  // 環境変数の検証
+  env: {
+    CUSTOM_KEY: process.env.CUSTOM_KEY,
+  },
 };
 
 module.exports = nextConfig;

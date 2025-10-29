@@ -245,14 +245,20 @@ export class FMPClient {
   /**
    * 主要指標を取得
    */
-  async getKeyMetrics(symbol: string, limit: number = 1): Promise<FMPKeyMetrics[]> {
+  async getKeyMetrics(
+    symbol: string,
+    limit: number = 1
+  ): Promise<FMPKeyMetrics[]> {
     try {
-      const response = await axios.get(`${FMP_BASE_URL}/key-metrics/${symbol}`, {
-        params: {
-          apikey: this.apiKey,
-          limit,
-        },
-      });
+      const response = await axios.get(
+        `${FMP_BASE_URL}/key-metrics/${symbol}`,
+        {
+          params: {
+            apikey: this.apiKey,
+            limit,
+          },
+        }
+      );
 
       return response.data || [];
     } catch (error: any) {
@@ -262,7 +268,7 @@ export class FMPClient {
   }
 
   /**
-   * 企業検索
+   * 企業検索（名前検索）
    */
   async searchCompany(query: string): Promise<FMPCompanyProfile[]> {
     try {
@@ -279,6 +285,179 @@ export class FMPClient {
       console.error("FMP企業検索エラー:", error.message);
       return [];
     }
+  }
+
+  /**
+   * シンボル検索
+   */
+  async searchBySymbol(symbol: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${FMP_BASE_URL}/search-symbol`, {
+        params: {
+          query: symbol,
+          apikey: this.apiKey,
+          limit: 10,
+        },
+      });
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error("FMPシンボル検索エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 企業名検索
+   */
+  async searchByName(name: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${FMP_BASE_URL}/search-name`, {
+        params: {
+          query: name,
+          apikey: this.apiKey,
+          limit: 10,
+        },
+      });
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error("FMP企業名検索エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * CIK検索
+   */
+  async searchByCIK(cik: string): Promise<any[]> {
+    try {
+      const response = await axios.get(`${FMP_BASE_URL}/search-cik`, {
+        params: {
+          cik,
+          apikey: this.apiKey,
+        },
+      });
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error("FMP CIK検索エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 統合検索（複数の検索方法を試行）
+   */
+  async comprehensiveSearch(query: string): Promise<any[]> {
+    const results: any[] = [];
+
+    try {
+      // 1. 通常の企業検索
+      const companyResults = await this.searchCompany(query);
+      results.push(
+        ...companyResults.map(item => ({
+          ...item,
+          searchType: "company",
+          score: this.calculateRelevanceScore(query, item),
+        }))
+      );
+
+      // 2. シンボル検索
+      const symbolResults = await this.searchBySymbol(query);
+      results.push(
+        ...symbolResults.map(item => ({
+          ...item,
+          searchType: "symbol",
+          score: this.calculateRelevanceScore(query, item),
+        }))
+      );
+
+      // 3. 企業名検索
+      const nameResults = await this.searchByName(query);
+      results.push(
+        ...nameResults.map(item => ({
+          ...item,
+          searchType: "name",
+          score: this.calculateRelevanceScore(query, item),
+        }))
+      );
+
+      // 4. CIK検索（数値のみの場合）
+      if (/^\d+$/.test(query)) {
+        const cikResults = await this.searchByCIK(query);
+        results.push(
+          ...cikResults.map(item => ({
+            ...item,
+            searchType: "cik",
+            score: this.calculateRelevanceScore(query, item),
+          }))
+        );
+      }
+
+      // 重複を除去し、スコア順にソート
+      const uniqueResults = results
+        .filter(
+          (item, index, self) =>
+            index === self.findIndex(t => t.symbol === item.symbol)
+        )
+        .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+      return uniqueResults.slice(0, 10);
+    } catch (error: any) {
+      console.error("FMP統合検索エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * 検索結果の関連性スコアを計算
+   */
+  private calculateRelevanceScore(query: string, item: any): number {
+    let score = 0;
+    const queryLower = query.toLowerCase();
+
+    // シンボル完全一致（最高スコア）
+    if (item.symbol && item.symbol.toLowerCase() === queryLower) {
+      score += 100;
+    }
+
+    // シンボル部分一致
+    if (item.symbol && item.symbol.toLowerCase().includes(queryLower)) {
+      score += 50;
+    }
+
+    // 企業名完全一致
+    if (item.companyName && item.companyName.toLowerCase() === queryLower) {
+      score += 80;
+    }
+
+    // 企業名部分一致
+    if (
+      item.companyName &&
+      item.companyName.toLowerCase().includes(queryLower)
+    ) {
+      score += 30;
+    }
+
+    // 検索タイプによる重み付け
+    if (item.searchType === "symbol") {
+      score += 20;
+    } else if (item.searchType === "company") {
+      score += 15;
+    } else if (item.searchType === "name") {
+      score += 10;
+    }
+
+    // 市場による重み付け（主要市場を優先）
+    if (item.exchange) {
+      const majorExchanges = ["NASDAQ", "NYSE", "TYO", "LSE"];
+      if (majorExchanges.some(ex => item.exchange.includes(ex))) {
+        score += 5;
+      }
+    }
+
+    return score;
   }
 
   /**

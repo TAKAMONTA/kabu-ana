@@ -27,6 +27,23 @@ export interface AnalysisResult {
   aiReflection?: string; // AIの感想・考察
 }
 
+export interface NewsAnalysisResult {
+  impact: "positive" | "negative" | "neutral";
+  impactScore: number; // -100 to 100
+  analysis: string;
+  keyPoints: string[];
+  recommendations: string[];
+}
+
+export interface FinancialEvaluationResult {
+  bs: { score: 1 | 2 | 3 | 4 | 5; summary: string };
+  pl: { score: 1 | 2 | 3 | 4 | 5; summary: string };
+  cf: { score: 1 | 2 | 3 | 4 | 5; summary: string };
+  overall: { score: 1 | 2 | 3 | 4 | 5; label: string };
+  analysis: string;
+  recommendations: string[];
+}
+
 export interface OpenRouterResponse {
   id: string;
   object: string;
@@ -99,9 +116,13 @@ export class OpenRouterClient {
       }
 
       const analysisResult = this.parseAnalysisResult(content);
-      
+
       // AI感想を生成
-      const reflection = await this.generateReflection(companyInfo, stockData, newsData);
+      const reflection = await this.generateReflection(
+        companyInfo,
+        stockData,
+        newsData
+      );
       analysisResult.aiReflection = reflection;
 
       return analysisResult;
@@ -166,7 +187,11 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
     newsData: any[]
   ): Promise<string> {
     try {
-      const reflectionPrompt = this.buildReflectionPrompt(companyInfo, stockData, newsData);
+      const reflectionPrompt = this.buildReflectionPrompt(
+        companyInfo,
+        stockData,
+        newsData
+      );
 
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
@@ -290,5 +315,184 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         },
       };
     }
+  }
+
+  async analyzeNewsImpact(
+    companyName: string,
+    symbol: string,
+    newsData: any[]
+  ): Promise<NewsAnalysisResult> {
+    try {
+      const prompt = this.buildNewsAnalysisPrompt(
+        companyName,
+        symbol,
+        newsData
+      );
+
+      const response = await axios.post(
+        `${this.baseURL}/chat/completions`,
+        {
+          model: "anthropic/claude-3.5-sonnet",
+          messages: [
+            {
+              role: "system",
+              content: `あなたは経験豊富な株式アナリストです。最新のニュースを分析し、企業の株価に与える影響を評価してください。`,
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 1000,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://kabu-ana.com",
+            "X-Title": "AI Market Analyzer",
+          },
+        }
+      );
+
+      const content = response.data.choices[0].message.content;
+      const analysisResult = JSON.parse(content);
+
+      return {
+        impact: analysisResult.impact,
+        impactScore: analysisResult.impactScore,
+        analysis: analysisResult.analysis,
+        keyPoints: analysisResult.keyPoints,
+        recommendations: analysisResult.recommendations,
+      };
+    } catch (error: any) {
+      console.error("ニュース分析エラー:", error);
+      return {
+        impact: "neutral",
+        impactScore: 0,
+        analysis: "ニュース分析中にエラーが発生しました。",
+        keyPoints: [],
+        recommendations: [],
+      };
+    }
+  }
+
+  private buildNewsAnalysisPrompt(
+    companyName: string,
+    symbol: string,
+    newsData: any[]
+  ): string {
+    const newsText = newsData
+      .map((news, index) => {
+        return `${index + 1}. ${news.title || news.snippet || "タイトルなし"}
+       概要: ${news.snippet || "概要なし"}
+       ソース: ${news.source || "不明"}
+       日付: ${news.date || "不明"}`;
+      })
+      .join("\n\n");
+
+    return `
+企業名: ${companyName}
+証券コード: ${symbol}
+
+以下の最新ニュースを分析し、この企業の株価に与える影響を評価してください：
+
+${newsText}
+
+以下のJSON形式で分析結果を返してください：
+{
+  "impact": "positive|negative|neutral",
+  "impactScore": 数値(-100から100の間で、正の値は株価上昇要因、負の値は下落要因を示す),
+  "analysis": "ニュースの総合的な分析と株価への影響の詳細説明",
+  "keyPoints": ["重要なポイント1", "重要なポイント2", "..."],
+  "recommendations": ["投資家への推奨事項1", "推奨事項2", "..."]
+}
+    `.trim();
+  }
+
+  async analyzeFinancials(
+    companyName: string,
+    symbol: string,
+    financialData: any
+  ) {
+    try {
+      const prompt = this.buildFinancialsPrompt(
+        companyName,
+        symbol,
+        financialData
+      );
+      const response = await axios.post(
+        `${this.baseURL}/chat/completions`,
+        {
+          model: "anthropic/claude-3.5-sonnet",
+          messages: [
+            {
+              role: "system",
+              content:
+                "あなたは熟練の財務アナリストです。BS/PL/CFを観点に、企業の財務健全性を5段階(1=弱い,5=強い)で評価し、日本語で簡潔に説明してください。必ず有効なJSONのみを返してください。",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.2,
+          max_tokens: 1200,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://kabu-ana.com",
+            "X-Title": "AI Market Analyzer",
+          },
+        }
+      );
+
+      const content = response.data?.choices?.[0]?.message?.content as string;
+      const json = JSON.parse(content);
+      const toScore = (n: any) => {
+        const v = Math.max(1, Math.min(5, Number(n) || 3));
+        return Math.round(v) as 1 | 2 | 3 | 4 | 5;
+      };
+      return {
+        bs: { score: toScore(json.bs?.score), summary: json.bs?.summary || "" },
+        pl: { score: toScore(json.pl?.score), summary: json.pl?.summary || "" },
+        cf: { score: toScore(json.cf?.score), summary: json.cf?.summary || "" },
+        overall: {
+          score: toScore(json.overall?.score),
+          label: json.overall?.label || "総合評価",
+        },
+        analysis: json.analysis || "",
+        recommendations: json.recommendations || [],
+      };
+    } catch (error) {
+      console.error("財務評価エラー:", error);
+      return {
+        bs: { score: 3, summary: "BSの評価を取得できませんでした。" },
+        pl: { score: 3, summary: "PLの評価を取得できませんでした。" },
+        cf: { score: 3, summary: "CFの評価を取得できませんでした。" },
+        overall: { score: 3, label: "総合評価" },
+        analysis: "財務評価中にエラーが発生しました。",
+        recommendations: [],
+      };
+    }
+  }
+
+  private buildFinancialsPrompt(
+    companyName: string,
+    symbol: string,
+    financialData: any
+  ) {
+    const fd = financialData || {};
+    return `企業名: ${companyName}\nシンボル: ${symbol}\n\n以下の財務データ（存在する場合のみ）を参考に、BS/PL/CFを5段階で評価してください。指標が無い場合は一般的な水準を仮定せず、保守的に評価してください。\n\n【財務データの例】\n- 総資産: ${
+      fd.totalAssets ?? "N/A"
+    }\n- 自己資本比率: ${fd.equityRatio ?? "N/A"}\n- 負債比率: ${
+      fd.debtRatio ?? "N/A"
+    }\n- 売上高: ${fd.revenue ?? "N/A"}\n- 営業利益: ${
+      fd.operatingIncome ?? "N/A"
+    }\n- 当期純利益: ${fd.netIncome ?? "N/A"}\n- 営業CF: ${
+      fd.operatingCashFlow ?? "N/A"
+    }\n- 投資CF: ${fd.investingCashFlow ?? "N/A"}\n- 財務CF: ${
+      fd.financingCashFlow ?? "N/A"
+    }\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["投資家への提言1", "提言2"]\n}`;
   }
 }

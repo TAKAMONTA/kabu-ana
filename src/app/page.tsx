@@ -28,6 +28,8 @@ import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
 import { StockSidePanel } from "@/components/StockSidePanel";
 import { normalizeQuery } from "@/lib/utils/textUtils";
+import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
+import { useFinancialEvaluation } from "@/hooks/useFinancialEvaluation";
 
 export default function HomePage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -43,6 +45,20 @@ export default function HomePage() {
     analyzeStock,
   } = useAIAnalysis();
   const { user, logout } = useAuth();
+  const {
+    isLoading: isNewsAnalyzing,
+    error: newsError,
+    newsData: analyzedNews,
+    analysis: newsAnalysis,
+    analyzeNews,
+    clearAnalysis,
+  } = useNewsAnalysis();
+  const {
+    isLoading: isFinancialLoading,
+    error: financialError,
+    result: financialEval,
+    evaluate: evaluateFinancials,
+  } = useFinancialEvaluation();
 
   // 検索結果が更新された時に自動分析を実行
   useEffect(() => {
@@ -87,6 +103,57 @@ export default function HomePage() {
       // 自動分析フラグを設定
       setShouldAutoAnalyze(true);
       await searchCompany(searchResult.companyInfo.symbol, period);
+    }
+  };
+
+  const handleNewsAnalysis = async () => {
+    if (!searchResult) return;
+    await analyzeNews(
+      searchResult.companyInfo.symbol,
+      searchResult.companyInfo.name
+    );
+  };
+
+  const handleFinancialEvaluation = async () => {
+    if (!searchResult) return;
+    await evaluateFinancials({
+      symbol: searchResult.companyInfo.symbol,
+      companyName: searchResult.companyInfo.name,
+      financialData: searchResult.financialData,
+    });
+  };
+
+  const getScoreLabel = (score: number) => {
+    switch (score) {
+      case 5:
+        return "非常に優秀";
+      case 4:
+        return "優秀";
+      case 3:
+        return "標準";
+      case 2:
+        return "やや劣る";
+      case 1:
+        return "劣る";
+      default:
+        return "標準";
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    switch (score) {
+      case 5:
+        return "text-green-700 bg-green-100";
+      case 4:
+        return "text-blue-700 bg-blue-100";
+      case 3:
+        return "text-gray-700 bg-gray-100";
+      case 2:
+        return "text-orange-700 bg-orange-100";
+      case 1:
+        return "text-red-700 bg-red-100";
+      default:
+        return "text-gray-700 bg-gray-100";
     }
   };
 
@@ -167,14 +234,16 @@ export default function HomePage() {
         </div>
 
         {/* エラー表示 */}
-        {(error || analysisError) && (
+        {(error || analysisError || newsError) && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold">エラーが発生しました</p>
-                  <p className="text-sm mt-1">{error || analysisError}</p>
+                  <p className="text-sm mt-1">
+                    {error || analysisError || newsError}
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -276,13 +345,35 @@ export default function HomePage() {
                     {analysisResult ? (
                       <div className="space-y-6">
                         {/* 投資アドバイス */}
-                        <div className="p-5 bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-lg border-2 border-blue-300 shadow-sm">
-                          <h4 className="font-bold text-blue-950 mb-3 text-base">
-                            📊 投資アドバイス
-                          </h4>
-                          <p className="text-sm text-blue-900 leading-relaxed">
-                            {analysisResult.investmentAdvice}
-                          </p>
+                        <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-lg border-2 border-blue-300 shadow-sm">
+                          <div className="flex items-start gap-3 mb-4">
+                            <div className="p-2 bg-blue-200 rounded-lg">
+                              <TrendingUp className="h-5 w-5 text-blue-800" />
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-blue-950 text-lg">
+                                📊 投資アドバイス
+                              </h4>
+                              <p className="text-sm text-blue-700 mt-1">
+                                総合的な投資判断とリスク評価
+                              </p>
+                            </div>
+                          </div>
+                          <div className="bg-white p-4 rounded-lg border border-blue-200 shadow-sm">
+                            <p className="text-sm text-blue-900 leading-relaxed">
+                              {analysisResult.investmentAdvice}
+                            </p>
+                          </div>
+                          <div className="mt-4 flex items-center justify-between text-xs text-blue-600">
+                            <span className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                              信頼度: {analysisResult.confidence}%
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
+                              最終更新: {new Date().toLocaleDateString("ja-JP")}
+                            </span>
+                          </div>
                         </div>
 
                         {/* 目標株価 */}
@@ -379,41 +470,46 @@ export default function HomePage() {
                           </span>
                         </div>
 
-                        {/* 重要な要因 */}
-                        {analysisResult.keyFactors.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold mb-3">重要な要因</h4>
-                            <ul className="space-y-2">
-                              {analysisResult.keyFactors.map((factor, idx) => (
-                                <li
-                                  key={idx}
-                                  className="text-sm text-muted-foreground pl-5 relative before:content-['•'] before:absolute before:left-0 before:text-primary"
-                                >
-                                  {factor}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
+                        {/* 重要な要因と推奨事項を横並びに配置 */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* 重要な要因 */}
+                          {analysisResult.keyFactors.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold mb-3">重要な要因</h4>
+                              <ul className="space-y-2">
+                                {analysisResult.keyFactors.map(
+                                  (factor, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-sm text-muted-foreground pl-5 relative before:content-['•'] before:absolute before:left-0 before:text-primary"
+                                    >
+                                      {factor}
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
 
-                        {/* 推奨事項 */}
-                        {analysisResult.recommendations.length > 0 && (
-                          <div>
-                            <h4 className="font-semibold mb-3">推奨事項</h4>
-                            <ul className="space-y-2">
-                              {analysisResult.recommendations.map(
-                                (rec, idx) => (
-                                  <li
-                                    key={idx}
-                                    className="text-sm text-muted-foreground pl-5 relative before:content-['→'] before:absolute before:left-0 before:text-primary"
-                                  >
-                                    {rec}
-                                  </li>
-                                )
-                              )}
-                            </ul>
-                          </div>
-                        )}
+                          {/* 推奨事項 */}
+                          {analysisResult.recommendations.length > 0 && (
+                            <div>
+                              <h4 className="font-semibold mb-3">推奨事項</h4>
+                              <ul className="space-y-2">
+                                {analysisResult.recommendations.map(
+                                  (rec, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-sm text-muted-foreground pl-5 relative before:content-['→'] before:absolute before:left-0 before:text-primary"
+                                    >
+                                      {rec}
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
 
                         {/* SWOT分析 */}
                         {analysisResult.swot && (
@@ -543,47 +639,273 @@ export default function HomePage() {
                   </CardContent>
                 </Card>
 
-                {/* 広告セクション */}
-                <Card className="bg-gradient-to-r from-indigo-50 to-indigo-100 border-indigo-300">
-                  <CardContent className="pt-6">
-                    <div className="text-center py-8">
-                      <p className="text-sm text-indigo-600 font-semibold mb-2">
-                        広告
-                      </p>
-                      <div className="bg-indigo-200 rounded-lg p-6 border-2 border-indigo-400">
-                        <a
-                          href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                          rel="nofollow"
-                        >
-                          <Image
-                            width={250}
-                            height={250}
-                            alt=""
-                            src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
-                            style={{ border: "0" }}
-                          />
-                        </a>
-                        <Image
-                          width={1}
-                          height={1}
-                          src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                          alt=""
-                          style={{ border: "0" }}
-                        />
-                      </div>
+                {/* 財務健全性（BS/PL/CF）評価 */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        財務健全性評価（BS/PL/CF）
+                      </CardTitle>
+                      <Button
+                        onClick={handleFinancialEvaluation}
+                        disabled={!searchResult || isFinancialLoading}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {isFinancialLoading ? (
+                          <>
+                            <Brain className="h-4 w-4 mr-2 animate-spin" />
+                            分析中...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="h-4 w-4 mr-2" />
+                            財務をAI評価
+                          </>
+                        )}
+                      </Button>
                     </div>
+                  </CardHeader>
+                  <CardContent>
+                    {financialEval ? (
+                      <div className="space-y-5">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                          {[
+                            {
+                              label: "BS",
+                              data: financialEval.bs,
+                              color: "blue",
+                            },
+                            {
+                              label: "PL",
+                              data: financialEval.pl,
+                              color: "green",
+                            },
+                            {
+                              label: "CF",
+                              data: financialEval.cf,
+                              color: "purple",
+                            },
+                          ].map(item => (
+                            <div
+                              key={item.label}
+                              className={`p-4 border-2 rounded-lg bg-gradient-to-br from-${""} to-${""}`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold">
+                                  {item.label}
+                                </span>
+                                <span
+                                  className={`px-3 py-1 rounded-full text-sm font-bold ${getScoreColor(
+                                    item.data.score
+                                  )}`}
+                                >
+                                  {getScoreLabel(item.data.score)}
+                                </span>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {item.data.summary}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="p-4 border rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-sm font-semibold">
+                              総合評価
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${getScoreColor(
+                                financialEval.overall.score
+                              )}`}
+                            >
+                              {financialEval.overall.label} -{" "}
+                              {getScoreLabel(financialEval.overall.score)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {financialEval.analysis}
+                          </p>
+                          {financialEval.recommendations?.length > 0 && (
+                            <ul className="space-y-1">
+                              {financialEval.recommendations.map((rec, i) => (
+                                <li
+                                  key={i}
+                                  className="text-sm text-muted-foreground pl-5 relative before:content-['→'] before:absolute before:left-0 before:text-primary"
+                                >
+                                  {rec}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-sm text-muted-foreground">
+                        財務三表（BS/PL/CF）をAIが5段階で評価します。
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 
                 {/* ニュースセクション */}
-                {searchResult.newsData && searchResult.newsData.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">最新ニュース</CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Brain className="h-5 w-5" />
+                        関連ニュース分析
+                      </CardTitle>
+                      <Button
+                        onClick={handleNewsAnalysis}
+                        disabled={!searchResult || isNewsAnalyzing}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {isNewsAnalyzing ? (
+                          <>
+                            <Brain className="h-4 w-4 mr-2 animate-spin" />
+                            分析中...
+                          </>
+                        ) : (
+                          <>
+                            <Brain className="h-4 w-4 mr-2" />
+                            関連ニュースをAI分析
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {newsAnalysis ? (
+                      <div className="space-y-6">
+                        {/* ニュース影響分析結果 */}
+                        <div className="p-5 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-lg border-2 border-purple-300 shadow-sm">
+                          <div className="flex items-start gap-3 mb-4">
+                            <div className="p-2 bg-purple-200 rounded-lg">
+                              <TrendingUp className="h-5 w-5 text-purple-800" />
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-bold text-purple-950 text-lg">
+                                  📈 ニュース影響分析
+                                </h4>
+                                <span
+                                  className={`px-3 py-1 rounded-full text-sm font-bold ${
+                                    newsAnalysis.impact === "positive"
+                                      ? "bg-green-200 text-green-900"
+                                      : newsAnalysis.impact === "negative"
+                                      ? "bg-red-200 text-red-900"
+                                      : "bg-gray-200 text-gray-900"
+                                  }`}
+                                >
+                                  {newsAnalysis.impact === "positive"
+                                    ? "📈 ポジティブ"
+                                    : newsAnalysis.impact === "negative"
+                                    ? "📉 ネガティブ"
+                                    : "➡️ ニュートラル"}
+                                  ({newsAnalysis.impactScore > 0 ? "+" : ""}
+                                  {newsAnalysis.impactScore})
+                                </span>
+                              </div>
+                              <p className="text-sm text-purple-700 mb-3">
+                                AIによる最新ニュースの株価影響評価
+                              </p>
+                            </div>
+                          </div>
+                          <div className="bg-white p-4 rounded-lg border border-purple-200 shadow-sm">
+                            <p className="text-sm text-purple-900 leading-relaxed mb-4">
+                              {newsAnalysis.analysis}
+                            </p>
+
+                            {/* 重要なポイント */}
+                            {newsAnalysis.keyPoints.length > 0 && (
+                              <div className="mb-4">
+                                <h5 className="font-semibold text-purple-800 mb-2 text-sm">
+                                  🔍 重要なポイント
+                                </h5>
+                                <ul className="space-y-1">
+                                  {newsAnalysis.keyPoints.map((point, idx) => (
+                                    <li
+                                      key={idx}
+                                      className="text-xs text-purple-800 pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-purple-600"
+                                    >
+                                      {point}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+
+                            {/* 推奨事項 */}
+                            {newsAnalysis.recommendations.length > 0 && (
+                              <div>
+                                <h5 className="font-semibold text-purple-800 mb-2 text-sm">
+                                  💡 投資家への推奨事項
+                                </h5>
+                                <ul className="space-y-1">
+                                  {newsAnalysis.recommendations.map(
+                                    (rec, idx) => (
+                                      <li
+                                        key={idx}
+                                        className="text-xs text-purple-800 pl-4 relative before:content-['→'] before:absolute before:left-0 before:text-purple-600"
+                                      >
+                                        {rec}
+                                      </li>
+                                    )
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 分析されたニュース一覧 */}
+                        {analyzedNews && analyzedNews.length > 0 && (
+                          <div>
+                            <h5 className="font-semibold mb-3 text-base">
+                              📰 分析対象ニュース ({analyzedNews.length}件)
+                            </h5>
+                            <div className="space-y-3">
+                              {analyzedNews.slice(0, 5).map((news, idx) => (
+                                <a
+                                  key={idx}
+                                  href={news.link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block p-3 border rounded-lg hover:bg-accent transition-colors group"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-2">
+                                        {news.title || news.snippet}
+                                      </p>
+                                      <div className="flex items-center gap-2 mt-2">
+                                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                                          {news.source}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {news.date}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
+                                  </div>
+                                </a>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : searchResult.newsData &&
+                      searchResult.newsData.length > 0 ? (
                       <div className="space-y-3">
-                        {searchResult.newsData.slice(0, 5).map((news, idx) => (
+                        <p className="text-sm text-muted-foreground mb-4">
+                          最新ニュースを取得済みです。「関連ニュースを取得」ボタンをクリックしてAI分析を実行してください。
+                        </p>
+                        {searchResult.newsData.slice(0, 3).map((news, idx) => (
                           <a
                             key={idx}
                             href={news.link}
@@ -610,9 +932,16 @@ export default function HomePage() {
                           </a>
                         ))}
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                    ) : (
+                      <div className="text-center py-8">
+                        <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                        <p className="text-sm text-muted-foreground mb-4">
+                          企業を検索してから、関連ニュースの分析を実行してください
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </div>
 
