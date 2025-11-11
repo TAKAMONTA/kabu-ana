@@ -56,10 +56,16 @@ export async function GET() {
     });
 
     if (!response.ok) {
+      console.error(`Failed to fetch ranking: ${response.status} ${response.statusText}`);
       throw new Error(`failed to fetch ranking: ${response.status}`);
     }
 
     const html = await response.text();
+    if (!html || html.length === 0) {
+      console.error("Empty HTML response from kabutan.jp");
+      throw new Error("empty HTML response");
+    }
+
     const $ = load(html);
 
     const items: RankingItem[] = [];
@@ -90,6 +96,8 @@ export async function GET() {
     });
 
     if (!targetTable) {
+      console.error(`Table not found. Found ${$tables.length} table(s) in HTML`);
+      console.error("HTML preview:", html.substring(0, 1000));
       throw new Error("ranking table not found");
     }
 
@@ -190,7 +198,12 @@ export async function GET() {
 
     return NextResponse.json({ items });
   } catch (error: any) {
-    console.error("top-trading-value エラー:", error?.message || error);
+    const errorMessage = error?.message || String(error);
+    const errorStack = error?.stack;
+    console.error("top-trading-value エラー:", errorMessage);
+    if (errorStack) {
+      console.error("Error stack:", errorStack);
+    }
     return NextResponse.json(
       { items: [], error: "ranking_fetch_failed" },
       { status: 500 }
