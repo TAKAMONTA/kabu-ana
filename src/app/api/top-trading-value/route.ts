@@ -72,9 +72,39 @@ export async function GET() {
 
     const $tables = $("table");
     let targetTable: any = null;
+    
+    // まず、thead tr thでヘッダーを探す
     $tables.each((_: number, tableEl: any) => {
       if (targetTable) return;
       const headers = $(tableEl).find("thead tr th");
+      if (headers.length === 0) {
+        // theadがない場合は、最初の行をヘッダーとして扱う
+        const firstRow = $(tableEl).find("tbody tr:first-child, tr:first-child");
+        if (firstRow.length > 0) {
+          const firstRowCells = $(firstRow[0]).find("th, td");
+          const headerTexts = firstRowCells
+            .map((__: number, cell: any) =>
+              $(cell)
+                .text()
+                .replace(/\s+/g, "")
+                .trim()
+            )
+            .get();
+
+          const hasTradingValue = headerTexts.some((text: string) =>
+            text.includes("売買代金")
+          );
+          const hasCode = headerTexts.some((text: string) => text.includes("コード"));
+          const hasName = headerTexts.some((text: string) => text.includes("銘柄"));
+
+          if (hasTradingValue && hasCode && hasName) {
+            targetTable = $(tableEl);
+            return false; // 見つかったのでループを抜ける
+          }
+        }
+        return;
+      }
+
       const headerTexts = headers
         .map((__: number, th: any) =>
           $(th)
@@ -92,12 +122,34 @@ export async function GET() {
 
       if (hasTradingValue && hasCode && hasName) {
         targetTable = $(tableEl);
+        return false; // 見つかったのでループを抜ける
       }
     });
 
+    // まだ見つからない場合は、より緩い条件で検索
+    if (!targetTable) {
+      $tables.each((_: number, tableEl: any) => {
+        if (targetTable) return false;
+        const tableText = $(tableEl).text();
+        // 売買代金とコードが含まれていれば候補とする
+        if (tableText.includes("売買代金") && tableText.includes("コード")) {
+          // リンクが含まれているか確認（銘柄リンクがあるはず）
+          const links = $(tableEl).find("a[href*='/stock/?code=']");
+          if (links.length > 0) {
+            targetTable = $(tableEl);
+            return false;
+          }
+        }
+      });
+    }
+
     if (!targetTable) {
       console.error(`Table not found. Found ${$tables.length} table(s) in HTML`);
-      console.error("HTML preview:", html.substring(0, 1000));
+      // 各テーブルの内容をログに出力
+      $tables.each((idx: number, tableEl: any) => {
+        const tableText = $(tableEl).text().substring(0, 200);
+        console.error(`Table ${idx}:`, tableText);
+      });
       throw new Error("ranking table not found");
     }
 
@@ -115,26 +167,43 @@ export async function GET() {
       value: -1,
     };
 
-    targetTable
-      .find("thead tr th")
-      .each((index: number, th: any) => {
-        const text = $(th)
-          .text()
-          .replace(/\s+/g, "")
-          .trim();
-        if (text.includes("順位")) headerIndexMap.rank = index;
-        else if (text.includes("コード")) headerIndexMap.code = index;
-        else if (text.includes("銘柄")) headerIndexMap.name = index;
-        else if (text.includes("株価")) headerIndexMap.price = index;
-        else if (text.includes("前日比") || text.includes("値上率"))
-          headerIndexMap.change = index;
-        else if (text.includes("比") && text.includes("%"))
-          headerIndexMap.changePercent = index;
-        else if (text.includes("出来高")) headerIndexMap.volume = index;
-        else if (text.includes("売買代金")) headerIndexMap.value = index;
-      });
+    // ヘッダーを検索（theadがある場合とない場合の両方に対応）
+    let headerCells = targetTable.find("thead tr th");
+    if (headerCells.length === 0) {
+      // theadがない場合は、最初の行をヘッダーとして扱う
+      const firstRow = targetTable.find("tbody tr:first-child, tr:first-child");
+      if (firstRow.length > 0) {
+        headerCells = $(firstRow[0]).find("th, td");
+      }
+    }
 
-    const rows = targetTable.find("tbody > tr");
+    headerCells.each((index: number, cell: any) => {
+      const text = $(cell)
+        .text()
+        .replace(/\s+/g, "")
+        .trim();
+      if (text.includes("順位")) headerIndexMap.rank = index;
+      else if (text.includes("コード")) headerIndexMap.code = index;
+      else if (text.includes("銘柄")) headerIndexMap.name = index;
+      else if (text.includes("株価")) headerIndexMap.price = index;
+      else if (text.includes("前日比") || text.includes("値上率"))
+        headerIndexMap.change = index;
+      else if (text.includes("比") && text.includes("%"))
+        headerIndexMap.changePercent = index;
+      else if (text.includes("出来高")) headerIndexMap.volume = index;
+      else if (text.includes("売買代金")) headerIndexMap.value = index;
+    });
+
+    // データ行を取得（theadがない場合は最初の行をスキップ）
+    let rows = targetTable.find("tbody > tr");
+    const hasThead = targetTable.find("thead").length > 0;
+    if (rows.length === 0) {
+      rows = targetTable.find("tr");
+      // 最初の行がヘッダーの場合はスキップ
+      if (!hasThead && rows.length > 0) {
+        rows = rows.not(rows.first());
+      }
+    }
 
     rows.each((index: number, element: any) => {
       if (items.length >= 5) return false;
