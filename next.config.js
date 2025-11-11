@@ -36,7 +36,12 @@ const nextConfig = {
   },
   // 画像最適化の設定
   images: {
-    domains: ["www24.a8.net", "www17.a8.net"],
+    domains: [
+      "www24.a8.net",
+      "www17.a8.net",
+      "www25.a8.net",
+      "www10.a8.net",
+    ],
   },
   // 本番環境での最適化
   // output: "standalone", // Vercelデプロイエラーのため一時的に無効化

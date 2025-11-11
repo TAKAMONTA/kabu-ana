@@ -196,7 +196,11 @@ async function searchHandler(request: NextRequest) {
     // SERPAPIをフォールバックとして使用
     if (serpApi && (!companyInfo || !stockData)) {
       try {
-        const serpCompanyInfo = await serpApi.searchCompany(query);
+        let serpCompanyInfo = await serpApi.searchCompany(query);
+        // 企業名検索で見つからない場合のフォールバック
+        if (!serpCompanyInfo) {
+          serpCompanyInfo = await serpApi.searchCompanyByGoogle(query);
+        }
         if (serpCompanyInfo) {
           companyInfo = companyInfo || serpCompanyInfo;
 

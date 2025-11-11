@@ -24,10 +24,10 @@ import { AuthModal } from "@/components/AuthModal";
 import { StockSidePanel } from "@/components/StockSidePanel";
 import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
 import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
-import { useTodayPicks } from "@/hooks/useTodayPicks";
+import { useTopTradingValue } from "@/hooks/useTopTradingValue";
 import { useFinancialEvaluation } from "@/hooks/useFinancialEvaluation";
 import { SearchSection } from "@/components/SearchSection";
-import { TodayPicksSection } from "@/components/TodayPicksSection";
+import { TopTradingValueSection } from "@/components/TopTradingValueSection";
 import { AnalysisSection } from "@/components/AnalysisSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { NewsSection } from "@/components/NewsSection";
@@ -62,7 +62,11 @@ export default function HomePage() {
     searchSuggestions,
     clearSuggestions,
   } = useSearchSuggestions();
-  const { jp, us, isLoading: isPicksLoading, error: picksError } = useTodayPicks();
+  const {
+    items: tradingRanking,
+    isLoading: isRankingLoading,
+    error: rankingError,
+  } = useTopTradingValue();
   const {
     isLoading: isFinancialLoading,
     error: financialError,
@@ -280,13 +284,12 @@ export default function HomePage() {
           renderHighlighted={renderHighlighted}
         />
 
-        {/* 今日の注目銘柄（ニュースベース） */}
-        <TodayPicksSection
-          jp={jp}
-          us={us}
-          isPicksLoading={isPicksLoading}
-          picksError={picksError}
-          onSelectPick={handlePickSelect}
+        {/* 本日の売買代金ランキング */}
+        <TopTradingValueSection
+          items={tradingRanking}
+          isLoading={isRankingLoading}
+          error={rankingError}
+          onSelect={handlePickSelect}
         />
 
         {/* エラー表示 */}

@@ -199,9 +199,10 @@ export class FreeNewsClient {
 
       while ((match = itemRegex.exec(xmlData)) !== null) {
         const itemXml = match[1];
-        const titleMatch = itemXml.match(
-          /<title><!\[CDATA\[(.*?)\]\]><\/title>/
-        );
+        // CDATA あり/なし両対応
+        const titleMatch =
+          itemXml.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) ||
+          itemXml.match(/<title>(.*?)<\/title>/);
         const linkMatch = itemXml.match(/<link>(.*?)<\/link>/);
         const pubDateMatch = itemXml.match(/<pubDate>(.*?)<\/pubDate>/);
 

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { normalizeQuery } from "@/lib/utils/textUtils";
+import { normalizeQuery, toHalfWidth } from "@/lib/utils/textUtils";
 
 const SERPAPI_BASE_URL = "https://serpapi.com/search";
 
@@ -62,17 +62,25 @@ export class SerpApiClient {
 
   async searchCompany(query: string): Promise<CompanyInfo | null> {
     try {
-      // 全角→半角変換 & クエリの形式を整える
-      let formattedQuery = normalizeQuery(query).toUpperCase();
+      // 全角→半角。企業名検索時はスペースを保持し、ティッカー時のみスペース除去＋大文字化
+      let half = toHalfWidth(query).trim();
+      let formattedQuery = half;
 
-      // すでに取引所が含まれていない場合は、デフォルトでNASDAQを追加
-      if (!formattedQuery.includes(":")) {
-        // 日本株かどうかを判定（4桁の数字のみ）
-        if (/^\d{4}$/.test(formattedQuery)) {
-          formattedQuery = `${formattedQuery}:TYO`; // Tokyo Stock Exchange
+      if (!half.includes(":")) {
+        const compactUpper = half.replace(/\s+/g, "").toUpperCase();
+        const isFourDigitJapaneseCode = /^\d{4}$/.test(compactUpper);
+        const isLikelyTicker = /^[A-Z.]+$/.test(compactUpper);
+
+        if (isFourDigitJapaneseCode) {
+          formattedQuery = `${compactUpper}:TYO`;
+        } else if (isLikelyTicker) {
+          formattedQuery = `${compactUpper}:NASDAQ`;
         } else {
-          formattedQuery = `${formattedQuery}:NASDAQ`; // デフォルトはNASDAQ
+          // 企業名想定。大文字化のみ（日本語は影響なし）、スペース保持
+          formattedQuery = half.toUpperCase();
         }
+      } else {
+        formattedQuery = half.toUpperCase();
       }
 
       const response = await axios.get(SERPAPI_BASE_URL, {
@@ -110,6 +118,86 @@ export class SerpApiClient {
       if (error.response) {
         console.error("Response status:", error.response.status);
       }
+      return null;
+    }
+  }
+
+  /**
+   * Google 検索エンジンで企業名から会社情報を推定（フォールバック用）
+   */
+  async searchCompanyByGoogle(query: string): Promise<CompanyInfo | null> {
+    try {
+      const response = await axios.get(SERPAPI_BASE_URL, {
+        params: {
+          engine: "google",
+          q: query,
+          api_key: this.apiKey,
+          hl: "ja",
+          num: 5,
+        },
+      });
+
+      const data = response.data || {};
+      const kg = data.knowledge_graph || {};
+
+      // knowledge_graph に株式情報があれば優先
+      if (kg && (kg.title || kg.name)) {
+        const title = kg.title || kg.name;
+        const symbol = kg.stock || kg.ticker || "";
+        const exchange = kg.exchange || "";
+        if (symbol) {
+          return {
+            name: title,
+            symbol,
+            market: exchange,
+          };
+        }
+      }
+
+      // organic_results から Google Finance へのリンクを拾い、シンボルを推定
+      const results = data.organic_results || [];
+      for (const r of results) {
+        const link: string = r.link || "";
+        if (link.includes("google.com/finance")) {
+          // 例: https://www.google.com/finance/quote/AAPL:NASDAQ
+          const m = link.match(/quote\/([A-Z0-9.]+):([A-Z]+)/i);
+          if (m) {
+            return {
+              name: r.title || query,
+              symbol: m[1].toUpperCase(),
+              market: m[2].toUpperCase(),
+            };
+          }
+        }
+      }
+
+      // 追加の試行: Google Finance を優先するクエリで再検索
+      const altQuery = `${query} 株価 site:google.com/finance`;
+      const response2 = await axios.get(SERPAPI_BASE_URL, {
+        params: {
+          engine: "google",
+          q: altQuery,
+          api_key: this.apiKey,
+          hl: "ja",
+          num: 10,
+        },
+      });
+      const org2 = response2.data?.organic_results || [];
+      for (const r of org2) {
+        const link: string = r.link || "";
+        const m = link.match(/quote\/([A-Z0-9.]+):([A-Z]+)/i);
+        if (m) {
+          return {
+            name: r.title || query,
+            symbol: m[1].toUpperCase(),
+            market: m[2].toUpperCase(),
+          };
+        }
+      }
+
+      return null;
+    } catch (error: any) {
+      console.error("SERPAPI Google名称検索エラー:", error.message);
       return null;
     }
   }
