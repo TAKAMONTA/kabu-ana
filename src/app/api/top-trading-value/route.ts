@@ -63,23 +63,108 @@ export async function GET() {
     const $ = load(html);
 
     const items: RankingItem[] = [];
-    const rows = $("table").first().find("tbody > tr");
 
-    rows.each((index, element) => {
+    const $tables = $("table");
+    let targetTable: any = null;
+    $tables.each((_: number, tableEl: any) => {
+      if (targetTable) return;
+      const headers = $(tableEl).find("thead tr th");
+      const headerTexts = headers
+        .map((__: number, th: any) =>
+          $(th)
+            .text()
+            .replace(/\s+/g, "")
+            .trim()
+        )
+        .get();
+
+      const hasTradingValue = headerTexts.some((text: string) =>
+        text.includes("売買代金")
+      );
+      const hasCode = headerTexts.some((text: string) => text.includes("コード"));
+      const hasName = headerTexts.some((text: string) => text.includes("銘柄"));
+
+      if (hasTradingValue && hasCode && hasName) {
+        targetTable = $(tableEl);
+      }
+    });
+
+    if (!targetTable) {
+      throw new Error("ranking table not found");
+    }
+
+    const headerIndexMap: Record<
+      "code" | "name" | "price" | "change" | "changePercent" | "volume" | "value" | "rank",
+      number
+    > = {
+      rank: 0,
+      code: -1,
+      name: -1,
+      price: -1,
+      change: -1,
+      changePercent: -1,
+      volume: -1,
+      value: -1,
+    };
+
+    targetTable
+      .find("thead tr th")
+      .each((index: number, th: any) => {
+        const text = $(th)
+          .text()
+          .replace(/\s+/g, "")
+          .trim();
+        if (text.includes("順位")) headerIndexMap.rank = index;
+        else if (text.includes("コード")) headerIndexMap.code = index;
+        else if (text.includes("銘柄")) headerIndexMap.name = index;
+        else if (text.includes("株価")) headerIndexMap.price = index;
+        else if (text.includes("前日比") || text.includes("値上率"))
+          headerIndexMap.change = index;
+        else if (text.includes("比") && text.includes("%"))
+          headerIndexMap.changePercent = index;
+        else if (text.includes("出来高")) headerIndexMap.volume = index;
+        else if (text.includes("売買代金")) headerIndexMap.value = index;
+      });
+
+    const rows = targetTable.find("tbody > tr");
+
+    rows.each((index: number, element: any) => {
       if (items.length >= 5) return false;
 
       const cells = $(element).find("td");
-      if (cells.length < 8) return;
+      if (cells.length === 0) return;
 
-      const rankText = $(cells[0]).text().trim();
-      const rank = parseInt(rankText, 10) || index + 1;
-      const code = $(cells[1]).text().trim();
-      const name = $(cells[2]).text().trim();
-      const priceRaw = $(cells[3]).text();
-      const changeRaw = $(cells[4]).text();
-      const changePercentRaw = $(cells[5]).text();
-      const volumeRaw = $(cells[6]).text();
-      const valueRaw = $(cells[7]).text();
+      const link = $(element)
+        .find("a[href*='/stock/?code=']")
+        .first();
+      if (!link.length) return;
+
+      const name = link.text().trim();
+      if (!name) return;
+
+      const href = link.attr("href") || "";
+      const codeMatch = href.match(/code=(\d{4})/);
+
+      const getCellText = (idx: number) =>
+        idx >= 0 && idx < cells.length
+          ? $(cells[idx])
+              .text()
+              .replace(/\s+/g, " ")
+              .trim()
+          : "";
+
+      const rankText = getCellText(headerIndexMap.rank);
+      const priceRaw = getCellText(headerIndexMap.price);
+      const changeRaw = getCellText(headerIndexMap.change);
+      const changePercentRaw = getCellText(headerIndexMap.changePercent);
+      const volumeRaw = getCellText(headerIndexMap.volume);
+      const valueRaw = getCellText(headerIndexMap.value);
+
+      const rank =
+        parseInt(rankText.replace(/\D/g, ""), 10) || items.length + 1;
+      const code =
+        codeMatch?.[1] ||
+        getCellText(headerIndexMap.code).replace(/\D/g, "");
 
       const price = normalizeNumber(priceRaw);
       const change = normalizeNumber(changeRaw);
