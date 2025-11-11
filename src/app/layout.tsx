@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/react";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,6 +39,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Kabuana" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        {/* ServiceWorkerは一時的に無効化
+            理由: Next.jsの動的ビルド構造と互換性の問題、株式分析アプリは常に最新データが必要なため
+            将来的にPWAが必要になった場合は、next-pwaプラグインの使用を推奨
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -55,9 +59,11 @@ export default function RootLayout({
             `,
           }}
         />
+        */}
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
