@@ -43,7 +43,7 @@ interface FinancialData {
 
 interface StockSidePanelProps {
   companyInfo: CompanyInfo;
-  stockData: StockData;
+  stockData: StockData | null;
   financialData?: FinancialData | null;
   currency?: string;
 }
@@ -64,6 +64,33 @@ export function StockSidePanel({
   };
 
   const currencySymbol = getCurrencySymbol();
+
+  // stockDataがnullの場合はローディング表示
+  if (!stockData) {
+    return (
+      <div className="space-y-4">
+        <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
+          <CardContent className="pt-6">
+            <div className="space-y-3">
+              <div>
+                <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+                  {companyInfo.symbol}
+                </h2>
+                <h1 className="text-2xl font-bold text-foreground line-clamp-2">
+                  {companyInfo.name}
+                </h1>
+              </div>
+              <Separator className="my-3" />
+              <div className="text-center py-8 text-muted-foreground">
+                株価データを読み込み中...
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const isUp = stockData.change >= 0;
 
   // 52週レンジが有効な場合のみプログレスバーを表示
