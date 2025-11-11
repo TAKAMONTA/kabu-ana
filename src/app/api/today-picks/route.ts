@@ -50,18 +50,72 @@ export async function GET(_req: NextRequest) {
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { jp: [], us: [] };
 
-    let jpPicks = Array.isArray(parsed.jp) ? parsed.jp : [];
-    let usPicks = Array.isArray(parsed.us) ? parsed.us : [];
+    const sanitizePicks = (
+      picks: Array<{ name?: string; symbol?: string }>,
+      news: Array<{ title: string }>
+    ) => {
+      const valid = (Array.isArray(picks) ? picks : [])
+        .filter(item => {
+          if (!item || typeof item.name !== "string") return false;
+          const trimmed = item.name.trim();
+          if (!trimmed) return false;
+          const lower = trimmed.toLowerCase();
+          return !["該当なし", "不明", "なし", "n/a"].some(ng =>
+            lower.includes(ng)
+          );
+        })
+        .map(item => ({
+          name: item.name!.trim(),
+          symbol: item.symbol ? item.symbol.trim().toUpperCase() : "",
+        }));
 
-    // 最終フォールバック：空ならニュース見出し上位を使用
-    if (jpPicks.length === 0) {
-      jpPicks = jpNews.slice(0, 3).map(n => ({ name: n.title || "該当なし", symbol: "" }));
-    }
-    if (usPicks.length === 0) {
-      usPicks = usNews.slice(0, 3).map(n => ({ name: n.title || "該当なし", symbol: "" }));
-    }
+      const needed = 3 - valid.length;
+      if (needed > 0) {
+        const fallback = news
+          .filter(n => typeof n.title === "string" && n.title.trim().length > 0)
+          .map(n => ({
+            name: n.title.trim(),
+            symbol: "",
+          }))
+          .filter(candidate => !valid.some(v => v.name === candidate.name))
+          .slice(0, needed);
 
-    return NextResponse.json({ jp: jpPicks, us: usPicks, source: "ai" });
+        valid.push(...fallback);
+      }
+
+      return valid.slice(0, 3);
+    };
+
+    const jpPicks = sanitizePicks(parsed.jp, jpNews);
+    const usPicks = sanitizePicks(parsed.us, usNews);
+
+    const usedFallback =
+      jpPicks.length < 3 ||
+      usPicks.length < 3 ||
+      (Array.isArray(parsed.jp) &&
+        jpPicks.some(
+          item =>
+            !parsed.jp?.some(
+              original =>
+                original?.name &&
+                original.name.trim().toLowerCase() === item.name.toLowerCase()
+            )
+        )) ||
+      (Array.isArray(parsed.us) &&
+        usPicks.some(
+          item =>
+            !parsed.us?.some(
+              original =>
+                original?.name &&
+                original.name.trim().toLowerCase() === item.name.toLowerCase()
+            )
+        ));
+
+    return NextResponse.json({
+      jp: jpPicks,
+      us: usPicks,
+      source: usedFallback ? "mixed" : "ai",
+    });
   } catch (error: any) {
     console.error("today-picks エラー:", error?.message || error);
     // エラー時に固定のフォールバックデータを返す
