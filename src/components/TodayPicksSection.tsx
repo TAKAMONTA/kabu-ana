@@ -44,6 +44,14 @@ export function TodayPicksSection({
           </div>
         </CardHeader>
         <CardContent>
+          {/* デバッグ情報 */}
+          {!isPicksLoading && (!jp || jp.length === 0) && (!us || us.length === 0) && (
+            <div className="text-sm text-muted-foreground mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              注目銘柄データが取得できませんでした。
+              {picksError && <div className="mt-1 text-red-600">エラー: {picksError}</div>}
+            </div>
+          )}
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="text-sm font-semibold mb-2">日本株</h4>
@@ -65,6 +73,11 @@ export function TodayPicksSection({
                     </Button>
                   </li>
                 ))}
+                {(!jp || jp.length === 0) && !isPicksLoading && (
+                  <li className="p-2 text-sm text-muted-foreground">
+                    データを取得できませんでした
+                  </li>
+                )}
               </ul>
             </div>
             <div>
@@ -87,6 +100,11 @@ export function TodayPicksSection({
                     </Button>
                   </li>
                 ))}
+                {(!us || us.length === 0) && !isPicksLoading && (
+                  <li className="p-2 text-sm text-muted-foreground">
+                    データを取得できませんでした
+                  </li>
+                )}
               </ul>
             </div>
           </div>

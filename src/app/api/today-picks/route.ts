@@ -64,7 +64,20 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ jp: jpPicks, us: usPicks, source: "ai" });
   } catch (error: any) {
     console.error("today-picks エラー:", error?.message || error);
-    return NextResponse.json({ jp: [], us: [], error: "failed" }, { status: 200 });
+    // エラー時に固定のフォールバックデータを返す
+    return NextResponse.json({ 
+      jp: [
+        { name: "日経平均株価", symbol: "^N225" },
+        { name: "TOPIX", symbol: "^TOPX" },
+        { name: "東証プライム市場", symbol: "" }
+      ], 
+      us: [
+        { name: "S&P 500", symbol: "^GSPC" },
+        { name: "NASDAQ", symbol: "^IXIC" },
+        { name: "Dow Jones", symbol: "^DJI" }
+      ],
+      source: "fallback"
+    }, { status: 200 });
   }
 }
 
