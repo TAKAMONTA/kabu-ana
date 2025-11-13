@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import { load } from "cheerio";
+import axios from "axios";
+import { FreeNewsClient } from "@/lib/api/freeNews";
 
 interface RankingItem {
   rank: number;
   code: string;
   name: string;
+  reason: string;
+  confidence: number;
+  sources: string[];
   price: number;
   change: number;
   changePercent: number;
@@ -16,267 +20,290 @@ interface RankingItem {
   valueDisplay: string;
 }
 
+interface OpenRouterRecommendation {
+  name: string;
+  code?: string;
+  reason: string;
+  confidence?: number;
+  sources?: string[];
+}
+
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
+export const revalidate = 60 * 30; // 30分ごとに更新
 
-const TARGET_URL = "https://kabutan.jp/warning/?mode=3_1&market=1";
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
+const NEWS_TOPICS = [
+  "日本株 市況",
+  "トヨタ自動車",
+  "ソニーグループ",
+  "半導体 日本株",
+  "ソフトバンクグループ AI",
+];
+const NEWS_LIMIT_PER_TOPIC = 5;
 
-const normalizeNumber = (raw: string) => {
-  const trimmed = raw
-    .replace(/[\s,+円株％%万円百万円億万株出来高]/g, "")
-    .replace(/[^\d.\-]/g, "");
+const POPULAR_FALLBACK_STOCKS: Array<{
+  code: string;
+  name: string;
+  reason: string;
+}> = [
+  {
+    code: "7203",
+    name: "トヨタ自動車",
+    reason: "自動車業界の世界的リーダーとして堅調な販売を維持し、電動化や自動運転への取り組みも進む代表的銘柄。",
+  },
+  {
+    code: "6758",
+    name: "ソニーグループ",
+    reason: "エンタメ・半導体・金融など複数の柱を持つ大型株。ゲームやAI向けイメージセンサーに注目。",
+  },
+  {
+    code: "8035",
+    name: "東京エレクトロン",
+    reason: "半導体製造装置で世界シェア上位。生成AI需要による半導体投資拡大が追い風。",
+  },
+  {
+    code: "7974",
+    name: "任天堂",
+    reason: "世界的な人気IPとハードを持つゲーム企業。新ハード発表や大型タイトルに常に注目が集まる。",
+  },
+  {
+    code: "9984",
+    name: "ソフトバンクグループ",
+    reason: "投資事業を通じてAIやテック関連のニュースが多く、マーケットの話題を集めやすい。",
+  },
+];
 
-  if (!trimmed) return 0;
+const buildFallbackItems = (): RankingItem[] =>
+  POPULAR_FALLBACK_STOCKS.map((stock, index) => ({
+    rank: index + 1,
+    code: stock.code,
+    name: stock.name,
+    reason: stock.reason,
+    confidence: 0.5,
+    sources: [],
+    price: 0,
+    change: 0,
+    changePercent: 0,
+    volume: 0,
+    value: 0,
+    priceDisplay: "-",
+    changeDisplay: "-",
+    volumeDisplay: "-",
+    valueDisplay: "-",
+  }));
 
-  if (raw.includes("億")) {
-    return parseFloat(trimmed) * 100_000_000;
+const sanitizeRecommendations = (
+  recs: OpenRouterRecommendation[]
+): RankingItem[] => {
+  return recs.slice(0, 5).map((rec, index) => ({
+    rank: index + 1,
+    code: rec.code?.replace(/[^0-9A-Za-z]/g, "") || "",
+    name: rec.name?.trim() || `銘柄${index + 1}`,
+    reason: rec.reason?.trim() || "注目理由を取得できませんでした。",
+    confidence: Math.max(0, Math.min(1, rec.confidence ?? 0.5)),
+    sources: Array.isArray(rec.sources)
+      ? rec.sources.filter(src => typeof src === "string" && src.length > 0)
+      : [],
+    price: 0,
+    change: 0,
+    changePercent: 0,
+    volume: 0,
+    value: 0,
+    priceDisplay: "-",
+    changeDisplay: "-",
+    volumeDisplay: "-",
+    valueDisplay: "-",
+  }));
+};
+
+const fetchMarketNews = async () => {
+  const newsClient = new FreeNewsClient();
+  const allNews: any[] = [];
+  
+  // 複数のトピックからニュースを収集
+  for (const topic of NEWS_TOPICS) {
+    try {
+      const news = await newsClient.getComprehensiveNews(topic, undefined, NEWS_LIMIT_PER_TOPIC);
+      allNews.push(...news);
+    } catch (error) {
+      console.warn(`⚠️ トピック「${topic}」のニュース取得失敗:`, error);
+    }
   }
-  if (raw.includes("百万円")) {
-    return parseFloat(trimmed) * 1_000_000;
-  }
-  if (raw.includes("万円")) {
-    return parseFloat(trimmed) * 10_000;
-  }
-  if (raw.includes("万株")) {
-    return parseFloat(trimmed) * 10_000;
+  
+  // 重複を除去（タイトルベース）
+  const uniqueNews = Array.from(
+    new Map(allNews.map(item => [item.title, item])).values()
+  );
+  
+  console.log(`📰 収集したニュース数: ${uniqueNews.length}件`);
+  return uniqueNews.slice(0, 20); // 最大20件に制限
+};
+
+const buildNewsPrompt = (news: any[]): string => {
+  const newsText = news
+    .map((item, idx) => {
+      const date = item.date || "不明";
+      return `${idx + 1}. タイトル: ${item.title || "タイトルなし"}
+概要: ${item.snippet || "概要なし"}
+ソース: ${item.source || "不明"}
+日付: ${date}`;
+    })
+    .join("\n\n");
+
+  return `あなたは日本株マーケットをウォッチしているプロのアナリストです。
+
+以下のニュースをもとに、**今日特に注目すべき日本株銘柄を5つ**選んでください。
+
+【選定基準】
+- ニュースで具体的に言及されている企業を優先
+- 業績好調、新製品発表、M&A、政策の恩恵など、株価上昇の材料がある銘柄
+- 投資家が「この銘柄調べてみたい」と思うような話題性のある銘柄
+
+【出力形式】（必ずこのJSON形式のみで回答）
+{
+  "recommendations": [
+    {
+      "name": "企業名（例: トヨタ自動車）",
+      "code": "4桁の証券コード（例: 7203。不明な場合は空文字）",
+      "reason": "注目理由を50文字程度で簡潔に（ニュースの内容に基づく）",
+      "confidence": 0.0〜1.0の小数（確信度）,
+      "sources": ["参照したニュースのタイトル（最大2つ）"]
+    }
+  ]
+}
+
+【ニュース一覧】
+${newsText}
+
+**必ず5銘柄を選び、上記JSON形式のみで回答してください。**`;
+};
+
+const callOpenRouter = async (news: any[]) => {
+  if (!OPENROUTER_API_KEY) {
+    throw new Error("openrouter_api_key_missing");
   }
 
-  return parseFloat(trimmed);
+  const prompt = buildNewsPrompt(news);
+
+  const response = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model: "anthropic/claude-3.5-sonnet",
+      temperature: 0.4,
+      max_tokens: 1200,
+      messages: [
+        {
+          role: "system",
+          content:
+            "あなたは日本株市場を分析するプロのアナリストです。与えられたニュースから、投資家が興味を持ちそうな注目銘柄を必ず5つ選び、指定したJSON形式のみで回答してください。",
+        },
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://ai-market-analyzer.com",
+        "X-Title": "AI Market Analyzer",
+      },
+    }
+  );
+
+  const content: string | undefined = response.data?.choices?.[0]?.message?.content;
+  console.log("🔍 OpenRouter生レスポンス:", content);
+  
+  if (!content) {
+    throw new Error("openrouter_empty_response");
+  }
+
+  const match = content.match(/\{[\s\S]*\}/);
+  if (!match) {
+    console.error("❌ JSON抽出失敗。content:", content);
+    throw new Error("openrouter_invalid_json");
+  }
+
+  const parsed = JSON.parse(match[0]);
+  console.log("✅ パース成功:", JSON.stringify(parsed, null, 2));
+  
+  if (!Array.isArray(parsed.recommendations)) {
+    console.error("❌ recommendations配列が見つかりません:", parsed);
+    throw new Error("openrouter_missing_recommendations");
+  }
+
+  return parsed.recommendations as OpenRouterRecommendation[];
 };
 
 export async function GET() {
   try {
-    const response = await fetch(TARGET_URL, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123 Safari/537.36",
-        "Accept-Language": "ja-JP,ja;q=0.9",
-      },
-      next: { revalidate: 0 },
-    });
+    const news = await fetchMarketNews();
 
-    if (!response.ok) {
-      console.error(`Failed to fetch ranking: ${response.status} ${response.statusText}`);
-      throw new Error(`failed to fetch ranking: ${response.status}`);
-    }
-
-    const html = await response.text();
-    if (!html || html.length === 0) {
-      console.error("Empty HTML response from kabutan.jp");
-      throw new Error("empty HTML response");
-    }
-
-    const $ = load(html);
-
-    const items: RankingItem[] = [];
-
-    const $tables = $("table");
-    let targetTable: any = null;
-    
-    // まず、thead tr thでヘッダーを探す
-    $tables.each((_: number, tableEl: any) => {
-      if (targetTable) return;
-      const headers = $(tableEl).find("thead tr th");
-      if (headers.length === 0) {
-        // theadがない場合は、最初の行をヘッダーとして扱う
-        const firstRow = $(tableEl).find("tbody tr:first-child, tr:first-child");
-        if (firstRow.length > 0) {
-          const firstRowCells = $(firstRow[0]).find("th, td");
-          const headerTexts = firstRowCells
-            .map((__: number, cell: any) =>
-              $(cell)
-                .text()
-                .replace(/\s+/g, "")
-                .trim()
-            )
-            .get();
-
-          const hasTradingValue = headerTexts.some((text: string) =>
-            text.includes("売買代金")
-          );
-          const hasCode = headerTexts.some((text: string) => text.includes("コード"));
-          const hasName = headerTexts.some((text: string) => text.includes("銘柄"));
-
-          if (hasTradingValue && hasCode && hasName) {
-            targetTable = $(tableEl);
-            return false; // 見つかったのでループを抜ける
-          }
-        }
-        return;
-      }
-
-      const headerTexts = headers
-        .map((__: number, th: any) =>
-          $(th)
-            .text()
-            .replace(/\s+/g, "")
-            .trim()
-        )
-        .get();
-
-      const hasTradingValue = headerTexts.some((text: string) =>
-        text.includes("売買代金")
-      );
-      const hasCode = headerTexts.some((text: string) => text.includes("コード"));
-      const hasName = headerTexts.some((text: string) => text.includes("銘柄"));
-
-      if (hasTradingValue && hasCode && hasName) {
-        targetTable = $(tableEl);
-        return false; // 見つかったのでループを抜ける
-      }
-    });
-
-    // まだ見つからない場合は、より緩い条件で検索
-    if (!targetTable) {
-      $tables.each((_: number, tableEl: any) => {
-        if (targetTable) return false;
-        const tableText = $(tableEl).text();
-        // 売買代金とコードが含まれていれば候補とする
-        if (tableText.includes("売買代金") && tableText.includes("コード")) {
-          // リンクが含まれているか確認（銘柄リンクがあるはず）
-          const links = $(tableEl).find("a[href*='/stock/?code=']");
-          if (links.length > 0) {
-            targetTable = $(tableEl);
-            return false;
-          }
-        }
+    if (news.length === 0) {
+      console.warn("ニュースが取得できませんでした。フォールバックを使用します。");
+      return NextResponse.json({
+        items: buildFallbackItems(),
+        error: "news_unavailable",
       });
     }
 
-    if (!targetTable) {
-      console.error(`Table not found. Found ${$tables.length} table(s) in HTML`);
-      // 各テーブルの内容をログに出力
-      $tables.each((idx: number, tableEl: any) => {
-        const tableText = $(tableEl).text().substring(0, 200);
-        console.error(`Table ${idx}:`, tableText);
-      });
-      throw new Error("ranking table not found");
-    }
-
-    const headerIndexMap: Record<
-      "code" | "name" | "price" | "change" | "changePercent" | "volume" | "value" | "rank",
-      number
-    > = {
-      rank: 0,
-      code: -1,
-      name: -1,
-      price: -1,
-      change: -1,
-      changePercent: -1,
-      volume: -1,
-      value: -1,
-    };
-
-    // ヘッダーを検索（theadがある場合とない場合の両方に対応）
-    let headerCells = targetTable.find("thead tr th");
-    if (headerCells.length === 0) {
-      // theadがない場合は、最初の行をヘッダーとして扱う
-      const firstRow = targetTable.find("tbody tr:first-child, tr:first-child");
-      if (firstRow.length > 0) {
-        headerCells = $(firstRow[0]).find("th, td");
+    try {
+      const recommendations = await callOpenRouter(news);
+      
+      // 結果が少ない場合はフォールバックと混在させる
+      if (recommendations.length === 0) {
+        console.warn("OpenRouterから推奨銘柄が返りませんでした。フォールバックに切り替えます。");
+        return NextResponse.json({
+          items: buildFallbackItems(),
+          error: "openrouter_empty",
+        });
       }
-    }
-
-    headerCells.each((index: number, cell: any) => {
-      const text = $(cell)
-        .text()
-        .replace(/\s+/g, "")
-        .trim();
-      if (text.includes("順位")) headerIndexMap.rank = index;
-      else if (text.includes("コード")) headerIndexMap.code = index;
-      else if (text.includes("銘柄")) headerIndexMap.name = index;
-      else if (text.includes("株価")) headerIndexMap.price = index;
-      else if (text.includes("前日比") || text.includes("値上率"))
-        headerIndexMap.change = index;
-      else if (text.includes("比") && text.includes("%"))
-        headerIndexMap.changePercent = index;
-      else if (text.includes("出来高")) headerIndexMap.volume = index;
-      else if (text.includes("売買代金")) headerIndexMap.value = index;
-    });
-
-    // データ行を取得（theadがない場合は最初の行をスキップ）
-    let rows = targetTable.find("tbody > tr");
-    const hasThead = targetTable.find("thead").length > 0;
-    if (rows.length === 0) {
-      rows = targetTable.find("tr");
-      // 最初の行がヘッダーの場合はスキップ
-      if (!hasThead && rows.length > 0) {
-        rows = rows.not(rows.first());
+      
+      const sanitized = sanitizeRecommendations(recommendations);
+      
+      // 5件未満の場合はフォールバックで補完
+      if (sanitized.length < 5) {
+        console.warn(`⚠️ LLM推奨が${sanitized.length}件のみ。フォールバックで補完します。`);
+        const fallbackItems = buildFallbackItems();
+        const combined = [
+          ...sanitized,
+          ...fallbackItems.slice(0, 5 - sanitized.length)
+        ].map((item, index) => ({ ...item, rank: index + 1 }));
+        
+        return NextResponse.json({
+          items: combined,
+          metadata: {
+            source: "openrouter_with_fallback",
+            newsCount: news.length,
+            llmCount: sanitized.length,
+          },
+        });
       }
-    }
 
-    rows.each((index: number, element: any) => {
-      if (items.length >= 5) return false;
-
-      const cells = $(element).find("td");
-      if (cells.length === 0) return;
-
-      const link = $(element)
-        .find("a[href*='/stock/?code=']")
-        .first();
-      if (!link.length) return;
-
-      const name = link.text().trim();
-      if (!name) return;
-
-      const href = link.attr("href") || "";
-      const codeMatch = href.match(/code=(\d{4})/);
-
-      const getCellText = (idx: number) =>
-        idx >= 0 && idx < cells.length
-          ? $(cells[idx])
-              .text()
-              .replace(/\s+/g, " ")
-              .trim()
-          : "";
-
-      const rankText = getCellText(headerIndexMap.rank);
-      const priceRaw = getCellText(headerIndexMap.price);
-      const changeRaw = getCellText(headerIndexMap.change);
-      const changePercentRaw = getCellText(headerIndexMap.changePercent);
-      const volumeRaw = getCellText(headerIndexMap.volume);
-      const valueRaw = getCellText(headerIndexMap.value);
-
-      const rank =
-        parseInt(rankText.replace(/\D/g, ""), 10) || items.length + 1;
-      const code =
-        codeMatch?.[1] ||
-        getCellText(headerIndexMap.code).replace(/\D/g, "");
-
-      const price = normalizeNumber(priceRaw);
-      const change = normalizeNumber(changeRaw);
-      const changePercent = normalizeNumber(changePercentRaw);
-      const volume = normalizeNumber(volumeRaw);
-      const value = normalizeNumber(valueRaw);
-
-      items.push({
-        rank,
-        code,
-        name,
-        price,
-        change,
-        changePercent,
-        volume,
-        value,
-        priceDisplay: `${price.toLocaleString()}円`,
-        changeDisplay: `${change >= 0 ? "+" : ""}${change.toLocaleString()} (${changePercent.toFixed(2)}%)`,
-        volumeDisplay: `${volume.toLocaleString()}株`,
-        valueDisplay: `${value.toLocaleString()}円`,
+      return NextResponse.json({
+        items: sanitized,
+        metadata: {
+          source: "openrouter_news_analysis",
+          newsCount: news.length,
+        },
       });
-    });
-
-    return NextResponse.json({ items });
+    } catch (openRouterError: any) {
+      console.error("OpenRouter呼び出しエラー:", openRouterError?.message || openRouterError);
+      return NextResponse.json({
+        items: buildFallbackItems(),
+        error:
+          openRouterError?.message === "openrouter_api_key_missing"
+            ? "openrouter_api_key_missing"
+            : "openrouter_failed",
+      });
+    }
   } catch (error: any) {
-    const errorMessage = error?.message || String(error);
-    const errorStack = error?.stack;
-    console.error("top-trading-value エラー:", errorMessage);
-    if (errorStack) {
-      console.error("Error stack:", errorStack);
-    }
-    return NextResponse.json(
-      { items: [], error: "ranking_fetch_failed" },
-      { status: 500 }
-    );
+    console.error("top-trading-value エラー:", error?.message || error);
+    return NextResponse.json({
+      items: buildFallbackItems(),
+      error: "ranking_fetch_failed",
+    });
   }
 }
-

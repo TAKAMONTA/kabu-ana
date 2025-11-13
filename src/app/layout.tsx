@@ -12,8 +12,6 @@ export const metadata: Metadata = {
   title: "AI Market Analyzer - 株式分析アプリ",
   description: "AIを活用した株式分析と投資アドバイスを提供するアプリケーション",
   manifest: "/manifest.json",
-  themeColor: "#3b82f6",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -35,7 +33,7 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#3b82f6" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Kabuana" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />

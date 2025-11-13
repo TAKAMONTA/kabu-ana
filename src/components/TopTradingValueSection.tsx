@@ -30,7 +30,7 @@ export function TopTradingValueSection({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">
-              本日の売買代金ランキング（TOP5）
+              今日の注目銘柄（TOP5）
             </CardTitle>
             <span className="text-xs text-muted-foreground">
               {isLoading ? "更新中..." : "取得済み"}
@@ -64,22 +64,18 @@ export function TopTradingValueSection({
                       <p className="truncate text-sm font-semibold">
                         {item.rank}. {item.name}
                       </p>
-                      <p className="truncate text-xs text-muted-foreground">
-                        {item.code} ／ 売買代金 {item.valueDisplay} ／ 出来高{" "}
-                        {item.volumeDisplay}
+                      <p className="text-xs text-muted-foreground">
+                        {item.code && <span>{item.code} ／ </span>}
+                        {item.reason}
                       </p>
+                      {item.sources.length > 0 && (
+                        <p className="mt-1 text-[11px] text-muted-foreground line-clamp-1">
+                          情報源: {item.sources.join("、 ")}
+                        </p>
+                      )}
                     </div>
-                    <div className="mr-3 text-right">
-                      <p className="text-sm font-semibold">
-                        {item.priceDisplay}
-                      </p>
-                      <p
-                        className={`text-xs ${
-                          item.change >= 0 ? "text-red-500" : "text-blue-500"
-                        }`}
-                      >
-                        {item.changeDisplay}
-                      </p>
+                    <div className="mr-3 text-right text-xs text-muted-foreground">
+                      <p>注目度: {(item.confidence * 100).toFixed(0)}%</p>
                     </div>
                     <Button
                       variant="outline"

@@ -159,19 +159,27 @@ export class FreeNewsClient {
           index === self.findIndex(t => t.link === item.link)
       );
 
-      // 関連性フィルタリング：企業名またはシンボルが含まれているニュースのみ
+      const normalizedKeywords = query
+        .toLowerCase()
+        .split(/\s+/)
+        .filter(Boolean);
+
       const relevantNews = uniqueNews.filter(item => {
         const title = (item.title || "").toLowerCase();
         const snippet = (item.snippet || "").toLowerCase();
-        const queryLower = query.toLowerCase();
         const symbolLower = symbol ? symbol.toLowerCase() : "";
 
-        return (
-          title.includes(queryLower) ||
-          snippet.includes(queryLower) ||
-          (symbolLower &&
-            (title.includes(symbolLower) || snippet.includes(symbolLower)))
-        );
+        const matchesKeyword =
+          normalizedKeywords.length === 0 ||
+          normalizedKeywords.every(keyword =>
+            title.includes(keyword) || snippet.includes(keyword)
+          );
+
+        const matchesSymbol =
+          symbolLower &&
+          (title.includes(symbolLower) || snippet.includes(symbolLower));
+
+        return matchesKeyword || matchesSymbol;
       });
 
       // 日付順にソート（直近のニュースを優先）
