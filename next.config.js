@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: "export",
-  // 注意: output: "export" を使用する場合、headers() は使用できません
+  // 注意: output: "export" を削除しました
+  // 静的エクスポートではAPI Routesが動作しないため、動的モードを使用します
   // セキュリティヘッダーはサーバー側（Vercel/ホスティング）で設定してください
   // 実験的機能の設定
   experimental: {
