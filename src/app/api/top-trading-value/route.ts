@@ -20,6 +20,8 @@ interface RankingItem {
   valueDisplay: string;
 }
 
+const ESCAPED_DOUBLE_QUOTE = '\\"';
+
 interface OpenRouterRecommendation {
   name: string;
   code?: string;
@@ -28,7 +30,7 @@ interface OpenRouterRecommendation {
   sources?: string[];
 }
 
-export const dynamic = "force-dynamic";
+// export const dynamic = "force-dynamic";
 export const revalidate = 60 * 30; // 30分ごとに更新
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
@@ -116,6 +118,64 @@ const sanitizeRecommendations = (
   }));
 };
 
+const sanitizeOpenRouterJson = (input: string): string => {
+  let insideString = false;
+  let escaped = false;
+  let result = "";
+
+  const isStructural = (char: string | undefined) =>
+    char === undefined ||
+    char === "," ||
+    char === "]" ||
+    char === "}" ||
+    char === ":";
+
+  for (let i = 0; i < input.length; i++) {
+    const char = input[i];
+
+    if (!insideString) {
+      if (char === '"') {
+        insideString = true;
+      }
+      result += char;
+      continue;
+    }
+
+    if (escaped) {
+      result += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      result += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === '"') {
+      let j = i + 1;
+      while (j < input.length && /\s/.test(input[j])) {
+        j++;
+      }
+      const nextChar = input[j];
+
+      if (!isStructural(nextChar)) {
+        result += '\\"';
+        continue;
+      }
+
+      insideString = false;
+      result += char;
+      continue;
+    }
+
+    result += char;
+  }
+
+  return result;
+};
+
 const fetchMarketNews = async () => {
   const newsClient = new FreeNewsClient();
   const allNews: any[] = [];
@@ -159,6 +219,11 @@ const buildNewsPrompt = (news: any[]): string => {
 - 業績好調、新製品発表、M&A、政策の恩恵など、株価上昇の材料がある銘柄
 - 投資家が「この銘柄調べてみたい」と思うような話題性のある銘柄
 
+【表記ルール】
+- JSON構造（キーや配列括弧）以外の場所に出現するダブルクォート（"）はすべて バックスラッシュとダブルクォート（\\"）のようにエスケープしてください。
+- 可能であれば引用には全角の「」を使い、ASCIIのダブルクォートは構造部分（キー・配列）に限定してください。
+- reason / sources に含めるテキストは記事タイトルや要約に留め、改行やURL・HTMLタグ・特殊記号は含めないでください。
+
 【出力形式】（必ずこのJSON形式のみで回答）
 {
   "recommendations": [
@@ -179,62 +244,120 @@ ${newsText}
 };
 
 const callOpenRouter = async (news: any[]) => {
-  if (!OPENROUTER_API_KEY) {
+  console.log("🔑 OpenRouter APIキーチェック...");
+  if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY.trim() === "") {
+    console.error("❌ OPENROUTER_API_KEYが設定されていません");
     throw new Error("openrouter_api_key_missing");
   }
+  console.log("✅ OpenRouter APIキーが設定されています（長さ:", OPENROUTER_API_KEY.length, "）");
 
   const prompt = buildNewsPrompt(news);
+  console.log("📝 プロンプトを構築しました（ニュース数:", news.length, "）");
 
-  const response = await axios.post(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      model: "anthropic/claude-3.5-sonnet",
-      temperature: 0.4,
-      max_tokens: 1200,
-      messages: [
-        {
-          role: "system",
-          content:
-            "あなたは日本株市場を分析するプロのアナリストです。与えられたニュースから、投資家が興味を持ちそうな注目銘柄を必ず5つ選び、指定したJSON形式のみで回答してください。",
-        },
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://ai-market-analyzer.com",
-        "X-Title": "AI Market Analyzer",
+  try {
+    console.log("🚀 OpenRouter APIを呼び出します...");
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "anthropic/claude-3.5-sonnet",
+        temperature: 0.4,
+        max_tokens: 1200,
+        messages: [
+          {
+            role: "system",
+            content:
+              "あなたは日本株市場を分析するプロのアナリストです。与えられたニュースから、投資家が興味を持ちそうな注目銘柄を必ず5つ選び、指定したJSON形式のみで回答してください。",
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
       },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://ai-market-analyzer.com",
+          "X-Title": "AI Market Analyzer",
+        },
+        timeout: 30000, // 30秒のタイムアウト
+      }
+    );
+
+    console.log("📥 OpenRouter APIレスポンスを受信しました");
+    console.log("レスポンスステータス:", response.status);
+    
+    if (response.data?.error) {
+      console.error("❌ OpenRouter APIエラー:", response.data.error);
+      throw new Error(`openrouter_api_error: ${JSON.stringify(response.data.error)}`);
     }
-  );
 
-  const content: string | undefined = response.data?.choices?.[0]?.message?.content;
-  console.log("🔍 OpenRouter生レスポンス:", content);
-  
-  if (!content) {
-    throw new Error("openrouter_empty_response");
+    const content: string | undefined = response.data?.choices?.[0]?.message?.content;
+    console.log("🔍 OpenRouter生レスポンス:", content?.substring(0, 200) + "...");
+    
+    if (!content) {
+      console.error("❌ レスポンスにcontentが含まれていません");
+      console.error("レスポンス全体:", JSON.stringify(response.data, null, 2));
+      throw new Error("openrouter_empty_response");
+    }
+
+    const match = content.match(/\{[\s\S]*\}/);
+    if (!match) {
+      console.error("❌ JSON抽出失敗。content:", content);
+      throw new Error("openrouter_invalid_json");
+    }
+
+    let parsed;
+    try {
+      const cleaned = sanitizeOpenRouterJson(match[0]);
+      parsed = JSON.parse(cleaned);
+      console.log("✅ パース成功:", JSON.stringify(parsed, null, 2));
+    } catch (parseError: any) {
+      console.error("❌ JSONパースエラー:", parseError);
+      console.error("エラーメッセージ:", parseError?.message);
+      console.error("パースしようとした文字列（最初の500文字）:", match[0].substring(0, 500));
+      console.error("パースしようとした文字列（最後の500文字）:", match[0].substring(Math.max(0, match[0].length - 500)));
+      // パースエラーの詳細をログに記録
+      if (parseError instanceof SyntaxError) {
+        console.error("SyntaxErrorの詳細:", {
+          message: parseError.message,
+          stack: parseError.stack,
+        });
+      }
+      throw new Error("openrouter_parse_error");
+    }
+    
+    if (!Array.isArray(parsed.recommendations)) {
+      console.error("❌ recommendations配列が見つかりません:", parsed);
+      throw new Error("openrouter_missing_recommendations");
+    }
+
+    console.log("✅ 推奨銘柄数:", parsed.recommendations.length);
+    return parsed.recommendations as OpenRouterRecommendation[];
+  } catch (axiosError: any) {
+    if (axios.isAxiosError(axiosError)) {
+      console.error("❌ OpenRouter API呼び出しエラー:");
+      console.error("ステータス:", axiosError.response?.status);
+      console.error("ステータステキスト:", axiosError.response?.statusText);
+      console.error("レスポンスデータ:", axiosError.response?.data);
+      console.error("エラーメッセージ:", axiosError.message);
+      
+      if (axiosError.code === 'ECONNABORTED') {
+        throw new Error("openrouter_timeout");
+      }
+      
+      const status = axiosError.response?.status;
+      if (status === 401) {
+        throw new Error("openrouter_unauthorized");
+      } else if (status === 429) {
+        throw new Error("openrouter_rate_limit");
+      } else if (status !== undefined && status >= 500) {
+        throw new Error("openrouter_server_error");
+      }
+    }
+    throw axiosError;
   }
-
-  const match = content.match(/\{[\s\S]*\}/);
-  if (!match) {
-    console.error("❌ JSON抽出失敗。content:", content);
-    throw new Error("openrouter_invalid_json");
-  }
-
-  const parsed = JSON.parse(match[0]);
-  console.log("✅ パース成功:", JSON.stringify(parsed, null, 2));
-  
-  if (!Array.isArray(parsed.recommendations)) {
-    console.error("❌ recommendations配列が見つかりません:", parsed);
-    throw new Error("openrouter_missing_recommendations");
-  }
-
-  return parsed.recommendations as OpenRouterRecommendation[];
 };
 
 export async function GET() {
@@ -290,20 +413,49 @@ export async function GET() {
         },
       });
     } catch (openRouterError: any) {
-      console.error("OpenRouter呼び出しエラー:", openRouterError?.message || openRouterError);
+      const errorMessage = openRouterError?.message || String(openRouterError);
+      console.error("❌ OpenRouter呼び出しエラー:");
+      console.error("エラーメッセージ:", errorMessage);
+      console.error("エラーオブジェクト:", openRouterError);
+      
+      // エラーコードを抽出
+      let errorCode = "openrouter_failed";
+      if (errorMessage.includes("openrouter_api_key_missing")) {
+        errorCode = "openrouter_api_key_missing";
+      } else if (errorMessage.includes("openrouter_timeout")) {
+        errorCode = "openrouter_timeout";
+      } else if (errorMessage.includes("openrouter_unauthorized")) {
+        errorCode = "openrouter_unauthorized";
+      } else if (errorMessage.includes("openrouter_rate_limit")) {
+        errorCode = "openrouter_rate_limit";
+      } else if (errorMessage.includes("openrouter_server_error")) {
+        errorCode = "openrouter_server_error";
+      } else if (errorMessage.includes("openrouter_empty_response")) {
+        errorCode = "openrouter_empty";
+      } else if (errorMessage.includes("openrouter_invalid_json") || errorMessage.includes("openrouter_parse_error")) {
+        errorCode = "openrouter_invalid_response";
+      }
+      
       return NextResponse.json({
         items: buildFallbackItems(),
-        error:
-          openRouterError?.message === "openrouter_api_key_missing"
-            ? "openrouter_api_key_missing"
-            : "openrouter_failed",
+        error: errorCode,
+        errorDetails: process.env.NODE_ENV === "development" ? errorMessage : undefined,
       });
     }
   } catch (error: any) {
     console.error("top-trading-value エラー:", error?.message || error);
-    return NextResponse.json({
-      items: buildFallbackItems(),
-      error: "ranking_fetch_failed",
+    console.error("エラーの詳細:", {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name,
     });
+    // エラーレスポンスを確実にJSON形式で返す
+    return NextResponse.json(
+      {
+        items: buildFallbackItems(),
+        error: "ranking_fetch_failed",
+      },
+      { status: 200 } // エラーでも200を返して、クライアント側でエラーメッセージを表示
+    );
   }
 }

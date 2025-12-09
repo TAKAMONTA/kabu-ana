@@ -1,41 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // セキュリティヘッダーの設定
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "X-DNS-Prefetch-Control",
-            value: "on",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=63072000; includeSubDomains; preload",
-          },
-          {
-            key: "X-Frame-Options",
-            value: "SAMEORIGIN",
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
-          {
-            key: "Referrer-Policy",
-            value: "origin-when-cross-origin",
-          },
-        ],
-      },
-    ];
-  },
+  output: "export",
+  // 注意: output: "export" を使用する場合、headers() は使用できません
+  // セキュリティヘッダーはサーバー側（Vercel/ホスティング）で設定してください
   // 実験的機能の設定
   experimental: {
     serverComponentsExternalPackages: ["@firebase/auth", "@firebase/firestore"],
   },
   // 画像最適化の設定
   images: {
+    unoptimized: true,
     domains: [
       "www24.a8.net",
       "www17.a8.net",

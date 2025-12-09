@@ -159,7 +159,7 @@ export class FreeNewsClient {
           index === self.findIndex(t => t.link === item.link)
       );
 
-      const normalizedKeywords = query
+      const normalizedKeywords = (query || "")
         .toLowerCase()
         .split(/\s+/)
         .filter(Boolean);
