@@ -23,6 +23,12 @@ if (typeof window !== "undefined") {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
+  
+  // 開発環境でのみ、Consoleテスト用にグローバルに公開
+  if (process.env.NODE_ENV === "development") {
+    (window as any).__firebaseAuth = auth;
+    (window as any).__firebaseDb = db;
+  }
 }
 
 export { auth, db };
