@@ -56,15 +56,33 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { idToken, planType = "monthly" } = body;
 
-    // プランタイプに応じてVariant IDを取得
+    // 環境変数のチェック
+    const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
+    const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
     const variantId = planType === "yearly"
       ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
       : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
 
+    if (!apiKey) {
+      console.error("LEMON_SQUEEZY_API_KEY is not set");
+      return NextResponse.json(
+        { error: "LEMON_SQUEEZY_API_KEY環境変数が設定されていません" },
+        { status: 500 }
+      );
+    }
+
+    if (!storeId) {
+      console.error("LEMON_SQUEEZY_STORE_ID is not set");
+      return NextResponse.json(
+        { error: "LEMON_SQUEEZY_STORE_ID環境変数が設定されていません" },
+        { status: 500 }
+      );
+    }
+
     if (!variantId) {
       console.error(`LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`);
       return NextResponse.json(
-        { error: "課金システムが設定されていません" },
+        { error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません` },
         { status: 500 }
       );
     }
@@ -117,8 +135,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error("チェックアウト作成エラー:", error);
+    const errorMessage = error.message || "チェックアウトの作成に失敗しました";
+    
+    // 404エラーの場合は、環境変数やIDが間違っている可能性がある
+    if (errorMessage.includes("404")) {
+      return NextResponse.json(
+        { 
+          error: "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
+          details: errorMessage 
+        },
+        { status: 404 }
+      );
+    }
+    
     return NextResponse.json(
-      { error: error.message || "チェックアウトの作成に失敗しました" },
+      { error: errorMessage },
       { status: 500 }
     );
   }

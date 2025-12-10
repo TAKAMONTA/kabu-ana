@@ -104,8 +104,16 @@ export async function createCheckout(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error("Lemon Squeezy API Error:", errorData);
-    throw new Error(`Failed to create checkout: ${response.status}`);
+    console.error("Lemon Squeezy API Error:", {
+      status: response.status,
+      statusText: response.statusText,
+      errorData,
+      variantId: options.variantId,
+      storeId,
+    });
+    
+    const errorMessage = errorData?.errors?.[0]?.detail || errorData?.error || `Failed to create checkout: ${response.status}`;
+    throw new Error(errorMessage);
   }
 
   return response.json();
@@ -179,4 +187,5 @@ export async function cancelSubscription(subscriptionId: string) {
 
   return response.json();
 }
+
 
