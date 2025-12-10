@@ -40,6 +40,7 @@ function getAdminApp() {
  * リクエストボディ:
  * {
  *   idToken: string,  // Firebase Auth ID Token
+ *   planType: "monthly" | "yearly"  // プランタイプ
  * }
  * 
  * レスポンス:
@@ -50,12 +51,15 @@ function getAdminApp() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { idToken } = body;
+    const { idToken, planType = "monthly" } = body;
 
-    // 環境変数のチェック
-    const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
+    // プランタイプに応じてVariant IDを取得
+    const variantId = planType === "yearly"
+      ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
+      : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
+
     if (!variantId) {
-      console.error("LEMON_SQUEEZY_VARIANT_ID is not set");
+      console.error(`LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`);
       return NextResponse.json(
         { error: "課金システムが設定されていません" },
         { status: 500 }

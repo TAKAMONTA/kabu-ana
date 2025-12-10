@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { usePurchase } from "@/hooks/usePurchase";
@@ -10,6 +11,7 @@ export function SubscriptionStatus() {
   const { user } = useAuth();
   const { subscription, loading, isPremium, hasExpired } = useSubscription();
   const { isLoading: isPurchasing, error: purchaseError, startCheckout } = usePurchase();
+  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "yearly">("monthly");
 
   if (!user) {
     return (
@@ -87,14 +89,35 @@ export function SubscriptionStatus() {
                 期限切れ日: {new Date(subscription.expiryDate).toLocaleDateString("ja-JP")}
               </p>
             )}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={startCheckout}
-              disabled={isPurchasing}
-            >
-              {isPurchasing ? "処理中..." : "再購入する"}
-            </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  variant={selectedPlan === "monthly" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedPlan("monthly")}
+                  className="flex-1"
+                >
+                  月額 ¥700
+                </Button>
+                <Button
+                  variant={selectedPlan === "yearly" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedPlan("yearly")}
+                  className="flex-1"
+                >
+                  年額 ¥7,000
+                </Button>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => startCheckout(selectedPlan)}
+                disabled={isPurchasing}
+                className="w-full"
+              >
+                {isPurchasing ? "処理中..." : "再購入する"}
+              </Button>
+            </div>
             {purchaseError && (
               <p className="text-xs text-red-600">{purchaseError}</p>
             )}
@@ -123,15 +146,50 @@ export function SubscriptionStatus() {
             <li>✨ 広告なしの快適な利用体験</li>
           </ul>
           
-          <Button 
-            variant="default" 
-            size="sm"
-            onClick={startCheckout}
-            disabled={isPurchasing}
-            className="w-full"
-          >
-            {isPurchasing ? "処理中..." : "プレミアムプランを購入"}
-          </Button>
+          {/* プラン選択 */}
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedPlan("monthly")}
+                className={`flex-1 rounded-md border p-3 text-sm transition-colors ${
+                  selectedPlan === "monthly"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background hover:bg-muted"
+                }`}
+              >
+                <div className="font-semibold">月額プラン</div>
+                <div className="mt-1 text-lg font-bold">¥700</div>
+                <div className="text-xs text-muted-foreground">/月</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedPlan("yearly")}
+                className={`flex-1 rounded-md border p-3 text-sm transition-colors ${
+                  selectedPlan === "yearly"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background hover:bg-muted"
+                }`}
+              >
+                <div className="font-semibold">年額プラン</div>
+                <div className="mt-1 text-lg font-bold">¥7,000</div>
+                <div className="text-xs text-muted-foreground">/年</div>
+                <div className="mt-1 text-xs font-semibold text-green-600">
+                  約¥583/月（17%お得）
+                </div>
+              </button>
+            </div>
+            
+            <Button 
+              variant="default" 
+              size="sm"
+              onClick={() => startCheckout(selectedPlan)}
+              disabled={isPurchasing}
+              className="w-full"
+            >
+              {isPurchasing ? "処理中..." : `${selectedPlan === "monthly" ? "月額" : "年額"}プランを購入`}
+            </Button>
+          </div>
           
           {purchaseError && (
             <p className="text-xs text-red-600">{purchaseError}</p>

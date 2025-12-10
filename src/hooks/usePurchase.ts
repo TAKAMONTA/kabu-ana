@@ -12,8 +12,9 @@ export function usePurchase() {
 
   /**
    * Lemon Squeezyのチェックアウトページに遷移
+   * @param planType - "monthly" または "yearly"
    */
-  const startCheckout = async () => {
+  const startCheckout = async (planType: "monthly" | "yearly" = "monthly") => {
     setIsLoading(true);
     setError(null);
 
@@ -32,6 +33,7 @@ export function usePurchase() {
         },
         body: JSON.stringify({
           idToken,
+          planType,
         }),
       });
 
