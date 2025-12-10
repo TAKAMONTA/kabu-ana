@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -34,17 +34,10 @@ import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSect
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 
-export default function HomePage() {
+function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [chartPeriod, setChartPeriod] = useState("1M");
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [purchaseSuccess, setPurchaseSuccess] = useState(false);
 
-  // 購入成功時のメッセージ表示
   useEffect(() => {
     if (searchParams.get("purchase") === "success") {
       setPurchaseSuccess(true);
@@ -55,6 +48,26 @@ export default function HomePage() {
       return () => clearTimeout(timer);
     }
   }, [searchParams]);
+
+  if (!purchaseSuccess) return null;
+
+  return (
+    <div className="mb-6 rounded-md border border-green-500 bg-green-100 p-4 text-green-800">
+      <p className="font-semibold">🎉 ご購入ありがとうございます！</p>
+      <p className="text-sm mt-1">
+        プレミアム機能がまもなく有効化されます。反映まで数秒お待ちください。
+      </p>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestion, setActiveSuggestion] = useState<number>(-1);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [chartPeriod, setChartPeriod] = useState("1M");
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
@@ -279,14 +292,9 @@ export default function HomePage() {
       {/* メインコンテンツ */}
       <main className="container mx-auto px-4 py-6">
         {/* 購入成功メッセージ */}
-        {purchaseSuccess && (
-          <div className="mb-6 rounded-md border border-green-500 bg-green-100 p-4 text-green-800">
-            <p className="font-semibold">🎉 ご購入ありがとうございます！</p>
-            <p className="text-sm mt-1">
-              プレミアム機能がまもなく有効化されます。反映まで数秒お待ちください。
-            </p>
-          </div>
-        )}
+        <Suspense fallback={null}>
+          <PurchaseSuccessHandler />
+        </Suspense>
 
         {/* 無料プラン案内 */}
         <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">

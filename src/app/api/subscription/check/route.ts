@@ -34,6 +34,9 @@ function getAdminApp() {
   }
 }
 
+// このルートは動的レンダリングが必要（searchParamsを使用するため）
+export const dynamic = 'force-dynamic';
+
 /**
  * 購入状態を確認するAPI
  * GET /api/subscription/check

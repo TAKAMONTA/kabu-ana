@@ -33,6 +33,9 @@ function getAdminApp() {
   }
 }
 
+// このルートは動的レンダリングが必要
+export const dynamic = 'force-dynamic';
+
 /**
  * チェックアウトセッションを作成
  * POST /api/lemon-squeezy/checkout

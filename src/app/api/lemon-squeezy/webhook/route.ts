@@ -51,6 +51,9 @@ function verifyWebhookSignature(
   }
 }
 
+// このルートは動的レンダリングが必要
+export const dynamic = 'force-dynamic';
+
 /**
  * Lemon Squeezy Webhook処理
  * POST /api/lemon-squeezy/webhook
@@ -254,4 +257,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 

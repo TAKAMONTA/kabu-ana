@@ -34,6 +34,9 @@ function getAdminApp() {
   }
 }
 
+// このルートは動的レンダリングが必要
+export const dynamic = 'force-dynamic';
+
 /**
  * Android版から購入状態を更新するAPI
  * POST /api/subscription/update
