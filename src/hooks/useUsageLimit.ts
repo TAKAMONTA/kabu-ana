@@ -58,6 +58,7 @@ export function useUsageLimit() {
     }
 
     const fetchUsage = async () => {
+      if (!db) return;
       try {
         const usageRef = doc(db, "usage", user.uid);
         const snapshot = await getDoc(usageRef);
