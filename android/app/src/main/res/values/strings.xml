@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kabuana</string>
+    <string name="title_activity_main">Kabuana</string>
+    <string name="package_name">app.vercel.kabu_9t7mdgybz_takamontas_projects.twa</string>
+    <string name="custom_url_scheme">app.vercel.kabu_9t7mdgybz_takamontas_projects.twa</string>
+</resources>

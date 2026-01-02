@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "framework": "nextjs",
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
