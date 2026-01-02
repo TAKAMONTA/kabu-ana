@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -17,10 +17,12 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
+  Crown,
 } from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
+import { useUsageLimit } from "@/hooks/useUsageLimit";
 import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
 import { StockSidePanel } from "@/components/StockSidePanel";
@@ -69,6 +71,8 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const subscriptionRef = useRef<HTMLDivElement>(null);
+
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
@@ -78,6 +82,13 @@ export default function HomePage() {
     clearAnalysis: clearAiAnalysis,
   } = useAIAnalysis();
   const { user, logout } = useAuth();
+  const {
+    isPremium,
+    canUse,
+    getRemainingUsage,
+    incrementUsage,
+    dailyLimit,
+  } = useUsageLimit();
   const {
     isLoading: isNewsAnalyzing,
     error: newsError,
@@ -103,6 +114,19 @@ export default function HomePage() {
     result: financialEval,
     evaluate: evaluateFinancials,
   } = useFinancialEvaluation();
+
+  // 残り使用回数
+  const remainingUsage = getRemainingUsage();
+
+  // アップグレードへスクロール
+  const scrollToUpgrade = useCallback(() => {
+    if (subscriptionRef.current) {
+      subscriptionRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else if (!user) {
+      // 未ログインの場合はログインモーダルを表示
+      setShowAuthModal(true);
+    }
+  }, [user]);
 
   const handleSearchAndAnalyze = useCallback(async () => {
     const queryToUse = searchQuery.trim();
@@ -174,12 +198,22 @@ export default function HomePage() {
 
   const handleAnalyze = useCallback(async () => {
     if (!searchResult) return;
+    
+    // 使用回数をインクリメント（プレミアムでない場合）
+    if (!isPremium && user) {
+      try {
+        await incrementUsage("analysis");
+      } catch (err) {
+        console.error("使用回数の更新に失敗:", err);
+      }
+    }
+    
     await analyzeStock(
       searchResult.companyInfo,
       searchResult.stockData,
       searchResult.newsData
     );
-  }, [searchResult, analyzeStock]);
+  }, [searchResult, analyzeStock, isPremium, user, incrementUsage]);
 
   const getCurrencySymbol = useMemo(() => {
     if (!searchResult) return "$";
@@ -195,20 +229,40 @@ export default function HomePage() {
 
   const handleNewsAnalysis = useCallback(async () => {
     if (!searchResult) return;
+    
+    // 使用回数をインクリメント（プレミアムでない場合）
+    if (!isPremium && user) {
+      try {
+        await incrementUsage("news");
+      } catch (err) {
+        console.error("使用回数の更新に失敗:", err);
+      }
+    }
+    
     await analyzeNews(
       searchResult.companyInfo.symbol,
       searchResult.companyInfo.name
     );
-  }, [searchResult, analyzeNews]);
+  }, [searchResult, analyzeNews, isPremium, user, incrementUsage]);
 
   const handleFinancialEvaluation = useCallback(async () => {
     if (!searchResult) return;
+    
+    // 使用回数をインクリメント（プレミアムでない場合）
+    if (!isPremium && user) {
+      try {
+        await incrementUsage("financial");
+      } catch (err) {
+        console.error("使用回数の更新に失敗:", err);
+      }
+    }
+    
     await evaluateFinancials({
       symbol: searchResult.companyInfo.symbol,
       companyName: searchResult.companyInfo.name,
       financialData: searchResult.financialData,
     });
-  }, [searchResult, evaluateFinancials]);
+  }, [searchResult, evaluateFinancials, isPremium, user, incrementUsage]);
 
   const getScoreLabel = useCallback((score: number) => {
     switch (score) {
@@ -254,6 +308,11 @@ export default function HomePage() {
     await searchCompany(query, chartPeriod);
   }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
 
+  // 使用可能かどうかのチェック（各機能用）
+  const canUseAnalysis = canUse("analysis");
+  const canUseFinancial = canUse("financial");
+  const canUseNews = canUse("news");
+
   return (
     <div className="min-h-screen bg-background">
       {/* ヘッダー */}
@@ -265,6 +324,12 @@ export default function HomePage() {
               <h1 className="text-2xl font-bold text-foreground">
                 AI Market Analyzer
               </h1>
+              {isPremium && (
+                <span className="ml-2 px-2 py-1 text-xs font-bold bg-gradient-to-r from-amber-400 to-orange-400 text-white rounded-full flex items-center gap-1">
+                  <Crown className="h-3 w-3" />
+                  Premium
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-4">
               {user ? (
@@ -297,14 +362,31 @@ export default function HomePage() {
           <PurchaseSuccessHandler />
         </Suspense>
 
-        {/* 無料プラン案内 */}
-        <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
-          無料プランはログイン不要でご利用いただけます。登録なしですぐにお試しください。
-        </div>
+        {/* 無料プラン案内（プレミアムでない場合のみ） */}
+        {!isPremium && (
+          <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
+            <div className="flex items-center justify-between">
+              <span>
+                無料プランはログイン不要でご利用いただけます。AI分析は1日{dailyLimit}回まで無料です。
+              </span>
+              {user && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={scrollToUpgrade}
+                  className="ml-4 border-amber-400 text-amber-700 hover:bg-amber-50"
+                >
+                  <Crown className="h-4 w-4 mr-1" />
+                  プレミアムに
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* 購入状態表示（ログイン時のみ） */}
         {user && (
-          <div className="mb-6">
+          <div className="mb-6" ref={subscriptionRef}>
             <SubscriptionStatus />
           </div>
         )}
@@ -436,6 +518,11 @@ export default function HomePage() {
                   isAnalyzing={isAnalyzing}
                   onAnalyze={handleAnalyze}
                   currencySymbol={getCurrencySymbol}
+                  isPremium={isPremium}
+                  canUse={canUseAnalysis}
+                  remainingUsage={remainingUsage}
+                  dailyLimit={dailyLimit}
+                  onUpgrade={scrollToUpgrade}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}
@@ -445,6 +532,11 @@ export default function HomePage() {
                   onEvaluate={handleFinancialEvaluation}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
+                  isPremium={isPremium}
+                  canUse={canUseFinancial}
+                  remainingUsage={remainingUsage}
+                  dailyLimit={dailyLimit}
+                  onUpgrade={scrollToUpgrade}
                 />
 
                 {/* ニュースセクション */}
@@ -454,6 +546,11 @@ export default function HomePage() {
                   newsData={searchResult.newsData}
                   isNewsAnalyzing={isNewsAnalyzing}
                   onAnalyze={handleNewsAnalysis}
+                  isPremium={isPremium}
+                  canUse={canUseNews}
+                  remainingUsage={remainingUsage}
+                  dailyLimit={dailyLimit}
+                  onUpgrade={scrollToUpgrade}
                 />
               </div>
             </div>
@@ -470,61 +567,78 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* フッター広告セクション */}
-        <div className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6">
-          <div className="text-center">
-            <p className="text-sm text-orange-600 font-semibold mb-3">
-              スポンサー
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 広告1 */}
-              <div>
-                <a
-                  href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                  rel="nofollow"
-                >
+        {/* フッター広告セクション - プレミアムユーザーには非表示 */}
+        {!isPremium && (
+          <div className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6">
+            <div className="text-center">
+              <p className="text-sm text-orange-600 font-semibold mb-3">
+                スポンサー
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 広告1 */}
+                <div>
+                  <a
+                    href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
+                    rel="nofollow"
+                  >
+                    <Image
+                      width={250}
+                      height={250}
+                      alt=""
+                      src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                      style={{ border: "0" }}
+                    />
+                  </a>
                   <Image
-                    width={250}
-                    height={250}
+                    width={1}
+                    height={1}
+                    src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
                     alt=""
-                    src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
                     style={{ border: "0" }}
                   />
-                </a>
-                <Image
-                  width={1}
-                  height={1}
-                  src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                  alt=""
-                  style={{ border: "0" }}
-                />
+                </div>
+                
+                {/* 広告2 */}
+                <div>
+                  <a
+                    href="https://px.a8.net/svt/ejp?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
+                    rel="nofollow"
+                  >
+                    <Image
+                      width={300}
+                      height={250}
+                      alt=""
+                      src="https://www25.a8.net/svt/bgt?aid=251029056683&wid=001&eno=01&mid=s00000016652002006000&mc=1"
+                      style={{ border: "0" }}
+                    />
+                  </a>
+                  <Image
+                    width={1}
+                    height={1}
+                    src="https://www10.a8.net/0.gif?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
+                    alt=""
+                    style={{ border: "0" }}
+                  />
+                </div>
               </div>
               
-              {/* 広告2 */}
-              <div>
-                <a
-                  href="https://px.a8.net/svt/ejp?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                  rel="nofollow"
+              {/* 広告非表示案内 */}
+              <div className="mt-4 pt-4 border-t border-orange-200">
+                <p className="text-xs text-orange-600 mb-2">
+                  広告を非表示にするには
+                </p>
+                <Button
+                  size="sm"
+                  onClick={scrollToUpgrade}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white"
                 >
-                  <Image
-                    width={300}
-                    height={250}
-                    alt=""
-                    src="https://www25.a8.net/svt/bgt?aid=251029056683&wid=001&eno=01&mid=s00000016652002006000&mc=1"
-                    style={{ border: "0" }}
-                  />
-                </a>
-                <Image
-                  width={1}
-                  height={1}
-                  src="https://www10.a8.net/0.gif?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                  alt=""
-                  style={{ border: "0" }}
-                />
+                  <Crown className="h-4 w-4 mr-1" />
+                  プレミアムにアップグレード
+                </Button>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* フッター */}

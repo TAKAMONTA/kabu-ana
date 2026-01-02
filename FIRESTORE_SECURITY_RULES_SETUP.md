@@ -33,6 +33,12 @@ service cloud.firestore {
       // 書き込みはサーバー側（Admin SDK）のみ
       allow write: if false;
     }
+    
+    // 使用回数のコレクション（プレミアム差別化用）
+    match /usage/{userId} {
+      // ユーザーは自分の使用状況を読み書き可能
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
 ```
@@ -58,6 +64,12 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       // 書き込みはサーバー側（Admin SDK）のみ
       allow write: if false;
+    }
+    
+    // 使用回数のコレクション（プレミアム差別化用）
+    match /usage/{userId} {
+      // ユーザーは自分の使用状況を読み書き可能
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
