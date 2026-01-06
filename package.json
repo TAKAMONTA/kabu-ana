@@ -15,7 +15,6 @@
     "version:android:major": "node scripts/version-update.js major"
   },
   "dependencies": {
-    "@capacitor/ios": "^6.2.1",
     "@firebase/auth": "^1.11.0",
     "@firebase/firestore": "^4.9.2",
     "@hookform/resolvers": "^5.2.2",
