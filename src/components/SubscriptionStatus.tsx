@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { usePurchase } from "@/hooks/usePurchase";
@@ -67,20 +68,31 @@ export function SubscriptionStatus() {
 
   // 共通の利用規約・プライバシーポリシーリンク
   const LegalLinks = () => (
-    <div className="space-y-2 mt-3">
-      <p className="text-[10px] text-muted-foreground text-center leading-relaxed">
-        サブスクリプションは期間終了の24時間前までにキャンセルしない限り自動更新されます。
-        お支払いはApple IDアカウントに請求されます。
-        サブスクリプションの管理・キャンセルは、購入後にApple IDのアカウント設定から行えます。
-      </p>
-      <div className="flex items-center justify-center gap-2 text-[10px]">
-        <a href={isiOS ? "https://kabu-ana.com/terms-of-use" : "/terms-of-use"} className="text-primary hover:underline" target={isiOS ? "_blank" : undefined} rel={isiOS ? "noopener noreferrer" : undefined}>
-          利用規約
-        </a>
-        <span className="text-muted-foreground">|</span>
-        <a href={isiOS ? "https://kabu-ana.com/privacy-policy" : "/privacy-policy"} className="text-primary hover:underline" target={isiOS ? "_blank" : undefined} rel={isiOS ? "noopener noreferrer" : undefined}>
-          プライバシーポリシー
-        </a>
+    <div className="space-y-3 mt-4 border-t border-border pt-4">
+      <div className="flex flex-col items-center gap-2">
+        <div className="flex items-center justify-center gap-3 text-xs">
+          <Link href="/terms-of-use" className="text-primary hover:underline font-medium">
+            利用規約
+          </Link>
+          <span className="text-muted-foreground">|</span>
+          <Link href="/privacy-policy" className="text-primary hover:underline font-medium">
+            プライバシーポリシー
+          </Link>
+        </div>
+        <p className="text-[10px] text-muted-foreground text-center leading-relaxed max-w-[280px]">
+          サブスクリプションは期間終了の24時間前までにキャンセルしない限り自動更新されます。
+          お支払いはApple IDアカウントに請求されます。管理・キャンセルは、購入後にApple IDのアカウント設定から行えます。
+        </p>
+        <div className="mt-1">
+          <a
+            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline font-medium"
+          >
+            Apple標準利用規約 (EULA)
+          </a>
+        </div>
       </div>
     </div>
   );
@@ -138,6 +150,10 @@ export function SubscriptionStatus() {
           <p className="text-sm text-muted-foreground">
             ログインしてプレミアム機能をご利用ください
           </p>
+          <div className="mt-4 flex justify-center items-center gap-4 text-xs">
+            <Link href="/terms-of-use" className="text-muted-foreground hover:text-primary underline">利用規約</Link>
+            <Link href="/privacy-policy" className="text-muted-foreground hover:text-primary underline">プライバシーポリシー</Link>
+          </div>
         </CardContent>
       </Card>
     );
@@ -219,7 +235,7 @@ export function SubscriptionStatus() {
                     onClick={() => setSelectedPlan("monthly")}
                     className="flex-1"
                   >
-                    月額 ¥700
+                    月額プランを更新
                   </Button>
                   <Button
                     variant={selectedPlan === "yearly" ? "default" : "outline"}
@@ -227,11 +243,11 @@ export function SubscriptionStatus() {
                     onClick={() => setSelectedPlan("yearly")}
                     className="flex-1"
                   >
-                    年額 ¥7,000
+                    年額プランを更新
                   </Button>
                 </div>
                 <Button
-                  variant="outline"
+                  variant="default"
                   size="sm"
                   onClick={handlePurchase}
                   disabled={currentlyPurchasing}
@@ -296,56 +312,58 @@ export function SubscriptionStatus() {
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("monthly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors ${selectedPlan === "monthly"
+                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${selectedPlan === "monthly"
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border bg-background hover:bg-muted"
                     }`}
                 >
-                  <div className="font-semibold">プレミアム月額プラン</div>
+                  <div className="font-semibold text-xs">プレミアム月額プラン</div>
                   <div className="mt-1 text-lg font-bold">¥700</div>
-                  <div className="text-xs text-muted-foreground">1ヶ月ごとに自動更新</div>
+                  <div className="text-[10px] text-muted-foreground">1ヶ月ごとに自動更新</div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("yearly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors ${selectedPlan === "yearly"
+                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${selectedPlan === "yearly"
                     ? "border-primary bg-primary/10 text-primary"
                     : "border-border bg-background hover:bg-muted"
                     }`}
                 >
-                  <div className="font-semibold">プレミアム年額プラン</div>
+                  <div className="font-semibold text-xs">プレミアム年額プラン</div>
                   <div className="mt-1 text-lg font-bold">¥7,000</div>
-                  <div className="text-xs text-muted-foreground">1年ごとに自動更新</div>
-                  <div className="mt-1 text-xs font-semibold text-green-600">
+                  <div className="text-[10px] text-muted-foreground">1年ごとに自動更新</div>
+                  <div className="mt-1 text-[10px] font-semibold text-green-600">
                     約¥583/月（17%お得）
                   </div>
                 </button>
               </div>
 
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handlePurchase}
-                disabled={currentlyPurchasing}
-                className="w-full"
-              >
-                {currentlyPurchasing ? "処理中..." : `${selectedPlan === "monthly" ? "月額" : "年額"}プランを購入`}
-              </Button>
-              {isiOS && (
+              <div className="pt-2">
                 <Button
-                  variant="ghost"
+                  variant="default"
                   size="sm"
-                  onClick={restorePurchases}
+                  onClick={handlePurchase}
                   disabled={currentlyPurchasing}
-                  className="w-full mt-1"
+                  className="w-full py-6 text-base font-bold shadow-md"
                 >
-                  購入を復元
+                  {currentlyPurchasing ? "処理中..." : `${selectedPlan === "monthly" ? "月額" : "年額"}プランで開始する`}
                 </Button>
-              )}
+                {isiOS && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={restorePurchases}
+                    disabled={currentlyPurchasing}
+                    className="w-full mt-2 text-xs text-muted-foreground"
+                  >
+                    購入を復元
+                  </Button>
+                )}
+              </div>
             </div>
 
             {currentError && (
-              <p className="text-xs text-red-600">{currentError}</p>
+              <p className="text-xs text-red-600 font-medium text-center">{currentError}</p>
             )}
 
             <LegalLinks />
