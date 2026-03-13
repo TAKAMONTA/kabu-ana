@@ -1,0 +1,28 @@
+PODS:
+  - Capacitor (6.2.1):
+    - CapacitorCordova
+  - CapacitorCordova (6.2.1)
+  - CapgoNativePurchases (6.0.42):
+    - Capacitor
+
+DEPENDENCIES:
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+  - "CapgoNativePurchases (from `../../node_modules/@capgo/native-purchases`)"
+
+EXTERNAL SOURCES:
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+  CapgoNativePurchases:
+    :path: "../../node_modules/@capgo/native-purchases"
+
+SPEC CHECKSUMS:
+  Capacitor: c95400d761e376be9da6be5a05f226c0e865cebf
+  CapacitorCordova: 8d93e14982f440181be7304aa9559ca631d77fff
+  CapgoNativePurchases: 260513c14dadae1e5b32e885adb63e8cb19f9d7a
+
+PODFILE CHECKSUM: 1c3e15b5507d12db1f6c64357014ddb2cf1eb6b1
+
+COCOAPODS: 1.16.2

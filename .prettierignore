@@ -1,0 +1,10 @@
+# Prettier無視ファイル
+node_modules/
+.next/
+out/
+build/
+dist/
+*.log
+*.lock
+.env*
+CUserstnakakabu-analapplibfirebase.ts
