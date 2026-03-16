@@ -25,7 +25,8 @@ export function useAIAnalysis() {
   const analyzeStock = async (
     companyInfo: any,
     stockData: any,
-    newsData: any[]
+    newsData: any[],
+    edinetExtras?: { ratios?: any; financialHistory?: any[]; accountingStandard?: string | null }
   ) => {
     setIsAnalyzing(true);
     setError(null);
@@ -49,6 +50,7 @@ export function useAIAnalysis() {
           companyInfo: cleanData(companyInfo),
           stockData: cleanedStockData,
           newsData: cleanedNewsData,
+          edinetExtras,
         }),
       });
 

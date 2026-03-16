@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -27,10 +26,14 @@ import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
 import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useTopTradingValue } from "@/hooks/useTopTradingValue";
 import { useFinancialEvaluation } from "@/hooks/useFinancialEvaluation";
+import { useTextBlocks } from "@/hooks/useTextBlocks";
 import { SearchSection } from "@/components/SearchSection";
 import { TopTradingValueSection } from "@/components/TopTradingValueSection";
+import { RankingSection } from "@/components/RankingSection";
 import { AnalysisSection } from "@/components/AnalysisSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
+import { FinancialTrendChart } from "@/components/FinancialTrendChart";
+import { TextBlocksSection } from "@/components/TextBlocksSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { CastleSection } from "@/components/castle/CastleSection";
@@ -42,9 +45,7 @@ function PurchaseSuccessHandler() {
   useEffect(() => {
     if (searchParams.get("purchase") === "success") {
       setPurchaseSuccess(true);
-      // URLからパラメータを削除
       window.history.replaceState({}, "", "/");
-      // 5秒後にメッセージを非表示
       const timer = setTimeout(() => setPurchaseSuccess(false), 5000);
       return () => clearTimeout(timer);
     }
@@ -69,6 +70,7 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
@@ -103,6 +105,16 @@ export default function HomePage() {
     result: financialEval,
     evaluate: evaluateFinancials,
   } = useFinancialEvaluation();
+  const {
+    textBlocks,
+    aiSummary,
+    isLoading: isTextLoading,
+    isSummarizing,
+    error: textError,
+    fetchTextBlocks,
+    summarizeWithAI,
+    clear: clearTextBlocks,
+  } = useTextBlocks();
 
   const handleSearchAndAnalyze = useCallback(async () => {
     const queryToUse = searchQuery.trim();
@@ -113,9 +125,10 @@ export default function HomePage() {
     clearSuggestions();
     clearAiAnalysis();
     clearNewsAnalysis();
+    clearTextBlocks();
 
     await searchCompany(queryToUse, chartPeriod);
-  }, [searchQuery, chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  }, [searchQuery, chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis, clearTextBlocks]);
 
   const handleInputChange = useCallback((value: string) => {
     setSearchQuery(value);
@@ -139,8 +152,9 @@ export default function HomePage() {
     clearSuggestions();
     clearAiAnalysis();
     clearNewsAnalysis();
+    clearTextBlocks();
     await searchCompany(symbol, chartPeriod);
-  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis, clearTextBlocks]);
 
   const renderHighlighted = useCallback((text: string, query: string) => {
     if (!query) return text;
@@ -177,7 +191,15 @@ export default function HomePage() {
     await analyzeStock(
       searchResult.companyInfo,
       searchResult.stockData,
-      searchResult.newsData
+      searchResult.newsData,
+      // EDINET DB データを追加
+      searchResult.ratios || searchResult.financialHistory
+        ? {
+            ratios: searchResult.ratios,
+            financialHistory: searchResult.financialHistory ?? undefined,
+            accountingStandard: searchResult.accountingStandard,
+          }
+        : undefined
     );
   }, [searchResult, analyzeStock]);
 
@@ -207,56 +229,48 @@ export default function HomePage() {
       symbol: searchResult.companyInfo.symbol,
       companyName: searchResult.companyInfo.name,
       financialData: searchResult.financialData,
+      edinetCode: searchResult.edinetCode,
+      ratios: searchResult.ratios,
+      financialHistory: searchResult.financialHistory ?? undefined,
+      accountingStandard: searchResult.accountingStandard,
     });
   }, [searchResult, evaluateFinancials]);
 
+  const handleFetchTextBlocks = useCallback(() => {
+    if (!searchResult?.edinetCode) return;
+    fetchTextBlocks(searchResult.edinetCode);
+  }, [searchResult, fetchTextBlocks]);
+
+  const handleSummarizeTextBlocks = useCallback(() => {
+    if (!searchResult?.edinetCode) return;
+    summarizeWithAI(searchResult.edinetCode, searchResult.companyInfo.name);
+  }, [searchResult, summarizeWithAI]);
+
   const getScoreLabel = useCallback((score: number) => {
     switch (score) {
-      case 5:
-        return "非常に優秀";
-      case 4:
-        return "優秀";
-      case 3:
-        return "標準";
-      case 2:
-        return "やや劣る";
-      case 1:
-        return "劣る";
-      default:
-        return "標準";
+      case 5: return "非常に優秀";
+      case 4: return "優秀";
+      case 3: return "標準";
+      case 2: return "やや劣る";
+      case 1: return "劣る";
+      default: return "標準";
     }
   }, []);
 
   const getScoreColor = useCallback((score: number) => {
     switch (score) {
-      case 5:
-        return "text-green-700 bg-green-100";
-      case 4:
-        return "text-blue-700 bg-blue-100";
-      case 3:
-        return "text-gray-700 bg-gray-100";
-      case 2:
-        return "text-orange-700 bg-orange-100";
-      case 1:
-        return "text-red-700 bg-red-100";
-      default:
-        return "text-gray-700 bg-gray-100";
+      case 5: return "text-green-700 bg-green-100";
+      case 4: return "text-blue-700 bg-blue-100";
+      case 3: return "text-gray-700 bg-gray-100";
+      case 2: return "text-orange-700 bg-orange-100";
+      case 1: return "text-red-700 bg-red-100";
+      default: return "text-gray-700 bg-gray-100";
     }
   }, []);
 
   const handlePickSelect = useCallback(async (query: string) => {
-    if (!query || !query.trim()) {
-      console.error("無効な検索クエリです:", query);
-      return;
-    }
-    
-    // クエリをトリムして検証
+    if (!query || !query.trim()) return;
     const trimmedQuery = query.trim();
-    if (trimmedQuery.length === 0) {
-      console.error("検索クエリが空です");
-      return;
-    }
-    
     try {
       setSearchQuery(trimmedQuery);
       setShowSuggestions(false);
@@ -264,20 +278,15 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      clearTextBlocks();
       await searchCompany(trimmedQuery, chartPeriod);
     } catch (error) {
       console.error("注目銘柄の分析開始時にエラーが発生しました:", error);
-      // エラーはuseCompanySearchのerror stateで表示される
-      // 追加のエラーログを出力
-      if (error instanceof Error) {
-        console.error("エラー詳細:", {
-          message: error.message,
-          stack: error.stack,
-          query: trimmedQuery,
-        });
-      }
     }
-  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis, clearTextBlocks]);
+
+  // 日本企業かどうかの判定（EDINET Code があれば日本企業）
+  const isJapaneseCompany = Boolean(searchResult?.edinetCode);
 
   return (
     <div className="min-h-screen bg-background">
@@ -358,6 +367,9 @@ export default function HomePage() {
           error={rankingError}
           onSelect={handlePickSelect}
         />
+
+        {/* 財務指標ランキング（EDINET DB） */}
+        <RankingSection onSelect={handlePickSelect} />
 
         {/* エラー表示 */}
         {(error || analysisError || newsError) && (
@@ -455,6 +467,14 @@ export default function HomePage() {
                   </Card>
                 )}
 
+                {/* 財務推移チャート（EDINET DB データがある場合のみ） */}
+                {searchResult.financialHistory && searchResult.financialHistory.length > 0 && (
+                  <FinancialTrendChart
+                    financialHistory={searchResult.financialHistory as import("@/hooks/useCompanySearch").FinancialHistoryItem[]}
+                    companyName={searchResult.companyInfo.name}
+                  />
+                )}
+
                 {/* AI分析セクション */}
                 <AnalysisSection
                   analysisResult={analysisResult}
@@ -472,10 +492,26 @@ export default function HomePage() {
                   getScoreColor={getScoreColor}
                 />
 
+                {/* 有報テキスト分析（日本企業のみ） */}
+                {isJapaneseCompany && (
+                  <TextBlocksSection
+                    edinetCode={searchResult.edinetCode!}
+                    companyName={searchResult.companyInfo.name}
+                    textBlocks={textBlocks}
+                    aiSummary={aiSummary}
+                    isLoading={isTextLoading}
+                    isSummarizing={isSummarizing}
+                    error={textError}
+                    onFetchTextBlocks={handleFetchTextBlocks}
+                    onSummarize={handleSummarizeTextBlocks}
+                  />
+                )}
+
                 {/* 企業城郭図鑑 */}
                 <CastleSection
                   symbol={searchResult.companyInfo.symbol}
                   companyName={searchResult.companyInfo.name}
+                  edinetCode={searchResult.edinetCode}
                 />
 
                 {/* ニュースセクション */}
@@ -496,6 +532,8 @@ export default function HomePage() {
                 stockData={searchResult.stockData}
                 financialData={searchResult.financialData}
                 currency={getCurrencySymbol}
+                accountingStandard={searchResult.accountingStandard}
+                ratios={searchResult.ratios}
               />
             </div>
           </div>
@@ -530,7 +568,7 @@ export default function HomePage() {
                   style={{ border: "0" }}
                 />
               </div>
-              
+
               {/* 広告2 */}
               <div>
                 <a

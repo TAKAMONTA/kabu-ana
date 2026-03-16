@@ -98,9 +98,10 @@ function formatMetricValue(key: string, value: number | null): string {
 interface CastleSectionProps {
   symbol: string;
   companyName: string;
+  edinetCode?: string | null;
 }
 
-export function CastleSection({ symbol, companyName }: CastleSectionProps) {
+export function CastleSection({ symbol, companyName, edinetCode }: CastleSectionProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [result, setResult] = useState<FinancialMetricsResponse | null>(null);
@@ -119,8 +120,11 @@ export function CastleSection({ symbol, companyName }: CastleSectionProps) {
 
     try {
       const { getApiUrl } = await import("@/lib/utils/apiClient");
+      // EDINET コードがある場合は追加パラメータとして渡す
+      const params = new URLSearchParams({ symbol });
+      if (edinetCode) params.set("edinet_code", edinetCode);
       const response = await fetch(
-        `${getApiUrl("/api/castle/financial-metrics")}?symbol=${encodeURIComponent(symbol)}`
+        `${getApiUrl("/api/castle/financial-metrics")}?${params.toString()}`
       );
 
       if (!response.ok) {

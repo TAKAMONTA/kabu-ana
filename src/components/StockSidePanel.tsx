@@ -41,11 +41,24 @@ interface FinancialData {
   period?: string;
 }
 
+interface Ratios {
+  roe?: number;
+  roa?: number;
+  operatingMargin?: number;
+  netMargin?: number;
+  equityRatio?: number;
+  currentRatio?: number;
+  revenueGrowth?: number;
+  dividendYield?: number;
+}
+
 interface StockSidePanelProps {
   companyInfo: CompanyInfo;
   stockData: StockData | null;
   financialData?: FinancialData | null;
   currency?: string;
+  accountingStandard?: string | null;
+  ratios?: Ratios | null;
 }
 
 // ヘルパー関数：数値をフォーマット（後方互換性のため残す）
@@ -58,6 +71,8 @@ export function StockSidePanel({
   stockData,
   financialData,
   currency = "$",
+  accountingStandard,
+  ratios,
 }: StockSidePanelProps) {
   const getCurrencySymbol = () => {
     return companyInfo.market === "TYO" ? "¥" : currency;
@@ -109,6 +124,11 @@ export function StockSidePanel({
             <div>
               <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
                 {companyInfo.symbol}
+                {accountingStandard && (
+                  <span className="ml-2 text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-normal normal-case">
+                    {accountingStandard}
+                  </span>
+                )}
               </h2>
               <h1 className="text-2xl font-bold text-foreground line-clamp-2">
                 {companyInfo.name}
@@ -206,15 +226,15 @@ export function StockSidePanel({
           </CardHeader>
           <CardContent className="space-y-2">
             {financialData.revenue && (
-              <StatsCard 
-                label="売上高" 
-                value={formatNumber(financialData.revenue, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="売上高"
+                value={formatNumber(financialData.revenue, { currency: currencySymbol, compact: true })}
               />
             )}
             {financialData.netIncome && (
-              <StatsCard 
-                label="純利益" 
-                value={formatNumber(financialData.netIncome, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="純利益"
+                value={formatNumber(financialData.netIncome, { currency: currencySymbol, compact: true })}
               />
             )}
             {financialData.cash && (
@@ -227,6 +247,56 @@ export function StockSidePanel({
               <StatsCard
                 label="EPS"
                 value={formatNumber(financialData.eps, { currency: currencySymbol, decimals: 2 })}
+              />
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* EDINET DB 財務指標 */}
+      {ratios && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">財務指標</CardTitle>
+            <CardDescription className="text-xs">出典: EDINET DB</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {ratios.roe != null && (
+              <StatsCard
+                label="ROE"
+                value={`${(ratios.roe * 100).toFixed(1)}%`}
+                trend={ratios.roe >= 0.1 ? "up" : ratios.roe >= 0.05 ? "neutral" : undefined}
+              />
+            )}
+            {ratios.roa != null && (
+              <StatsCard
+                label="ROA"
+                value={`${(ratios.roa * 100).toFixed(1)}%`}
+              />
+            )}
+            {ratios.operatingMargin != null && (
+              <StatsCard
+                label="営業利益率"
+                value={`${(ratios.operatingMargin * 100).toFixed(1)}%`}
+              />
+            )}
+            {ratios.equityRatio != null && (
+              <StatsCard
+                label="自己資本比率"
+                value={`${(ratios.equityRatio * 100).toFixed(1)}%`}
+              />
+            )}
+            {ratios.currentRatio != null && (
+              <StatsCard
+                label="流動比率"
+                value={`${(ratios.currentRatio * 100).toFixed(1)}%`}
+              />
+            )}
+            {ratios.revenueGrowth != null && (
+              <StatsCard
+                label="売上成長率(YoY)"
+                value={`${(ratios.revenueGrowth * 100).toFixed(1)}%`}
+                trend={ratios.revenueGrowth > 0 ? "up" : ratios.revenueGrowth < 0 ? "down" : "neutral"}
               />
             )}
           </CardContent>

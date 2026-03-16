@@ -7,6 +7,7 @@ import {
   FMPIncomeStatement,
 } from "@/components/castle/types";
 import { evaluateFinancialDefense } from "@/lib/castle/calculateDefenseScore";
+import { EdinetDBClient } from "@/lib/api/edinetdb";
 
 const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 const FMP_API_KEY = process.env.FMP_API_KEY;
@@ -229,6 +230,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const symbol = searchParams.get("symbol");
+    const edinetCode = searchParams.get("edinet_code");
 
     if (!symbol) {
       return NextResponse.json(
@@ -237,6 +239,42 @@ export async function GET(request: Request) {
       );
     }
 
+    // ===== EDINET DB 経由（日本企業・edinetCode がある場合）=====
+    const edinetDbKey = process.env.EDINETDB_API_KEY;
+    if (edinetCode && edinetDbKey) {
+      try {
+        const edinetApi = new EdinetDBClient(edinetDbKey);
+        const [ratiosData, companyDetail] = await Promise.all([
+          edinetApi.getRatios(edinetCode),
+          edinetApi.getCompany(edinetCode),
+        ]);
+
+        if (ratiosData) {
+          const metrics: FinancialMetricsRaw = {
+            equityRatio: ratiosData.equity_ratio != null ? ratiosData.equity_ratio * 100 : null,
+            currentRatio: ratiosData.current_ratio != null ? ratiosData.current_ratio * 100 : null,
+            fixedRatio: null,
+            cashRatio: null,
+            interestCoverageRatio: null,
+          };
+          const evaluation = evaluateFinancialDefense(metrics);
+          const response: FinancialMetricsResponse = {
+            symbol: symbol.toUpperCase(),
+            companyName: companyDetail?.name || symbol.toUpperCase(),
+            metrics,
+            scores: evaluation.scores,
+            totalScore: evaluation.totalScore,
+            rank: evaluation.rank,
+            rankInfo: evaluation.rankInfo,
+          };
+          return NextResponse.json(response);
+        }
+      } catch (e) {
+        console.error("EDINET DB castle指標取得エラー:", e);
+      }
+    }
+
+    // ===== FMP 経由（フォールバック）=====
     if (!FMP_API_KEY) {
       return NextResponse.json(
         { error: "FMP APIキーが設定されていません" },

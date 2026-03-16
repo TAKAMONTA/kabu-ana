@@ -76,10 +76,15 @@ export class OpenRouterClient {
   async analyzeStock(
     companyInfo: any,
     stockData: any,
-    newsData: any[]
+    newsData: any[],
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[];
+      accountingStandard?: string | null;
+    }
   ): Promise<AnalysisResult> {
     try {
-      const prompt = this.buildAnalysisPrompt(companyInfo, stockData, newsData);
+      const prompt = this.buildAnalysisPrompt(companyInfo, stockData, newsData, edinetExtras);
 
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
@@ -135,8 +140,33 @@ export class OpenRouterClient {
   private buildAnalysisPrompt(
     companyInfo: any,
     stockData: any,
-    newsData: any[]
+    newsData: any[],
+    edinetExtras?: { ratios?: any; financialHistory?: any[]; accountingStandard?: string | null }
   ): string {
+    const ratios = edinetExtras?.ratios;
+    const history = edinetExtras?.financialHistory;
+    const acctStd = edinetExtras?.accountingStandard;
+
+    const ratiosSection = ratios ? `
+【財務指標（EDINET DB）】
+- 会計基準: ${acctStd || "N/A"}
+- ROE: ${ratios.roe != null ? (ratios.roe * 100).toFixed(1) + "%" : "N/A"}
+- ROA: ${ratios.roa != null ? (ratios.roa * 100).toFixed(1) + "%" : "N/A"}
+- 営業利益率: ${ratios.operatingMargin != null ? (ratios.operatingMargin * 100).toFixed(1) + "%" : "N/A"}
+- 純利益率: ${ratios.netMargin != null ? (ratios.netMargin * 100).toFixed(1) + "%" : "N/A"}
+- 自己資本比率: ${ratios.equityRatio != null ? (ratios.equityRatio * 100).toFixed(1) + "%" : "N/A"}
+- 流動比率: ${ratios.currentRatio != null ? (ratios.currentRatio * 100).toFixed(1) + "%" : "N/A"}
+- FCF: ${ratios.fcf != null ? ratios.fcf.toLocaleString() : "N/A"}
+- EBITDA: ${ratios.ebitda != null ? ratios.ebitda.toLocaleString() : "N/A"}
+- 売上成長率(YoY): ${ratios.revenueGrowth != null ? (ratios.revenueGrowth * 100).toFixed(1) + "%" : "N/A"}
+- 純利益成長率(YoY): ${ratios.niGrowth != null ? (ratios.niGrowth * 100).toFixed(1) + "%" : "N/A"}
+- 売上CAGR(3年): ${ratios.revenueCagr3y != null ? (ratios.revenueCagr3y * 100).toFixed(1) + "%" : "N/A"}
+- 配当利回り: ${ratios.dividendYield != null ? (ratios.dividendYield * 100).toFixed(1) + "%" : "N/A"}` : "";
+
+    const historySection = history && history.length > 0 ? `
+【財務推移（EDINET DB・直近${history.length}年）】
+${history.map(h => `- FY${h.fiscalYear}: 売上高=${h.revenue ? (h.revenue / 1e8).toFixed(1) + "億" : "N/A"}, 営業利益=${h.operatingIncome ? (h.operatingIncome / 1e8).toFixed(1) + "億" : "N/A"}, 純利益=${h.netIncome ? (h.netIncome / 1e8).toFixed(1) + "億" : "N/A"}`).join("\n")}` : "";
+
     return `
 以下の企業情報を基に、投資分析を行ってください。
 
@@ -150,6 +180,8 @@ export class OpenRouterClient {
 - PER: ${stockData?.pe || "N/A"}
 - EPS: ${stockData?.eps || "N/A"}
 - 配当: ${stockData?.dividend || "N/A"}
+${ratiosSection}
+${historySection}
 
 【最新ニュース】
 ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
@@ -414,13 +446,20 @@ ${newsText}
   async analyzeFinancials(
     companyName: string,
     symbol: string,
-    financialData: any
+    financialData: any,
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[];
+      accountingStandard?: string | null;
+      edinetAnalysis?: any;
+    }
   ) {
     try {
       const prompt = this.buildFinancialsPrompt(
         companyName,
         symbol,
-        financialData
+        financialData,
+        edinetExtras
       );
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
@@ -480,10 +519,47 @@ ${newsText}
   private buildFinancialsPrompt(
     companyName: string,
     symbol: string,
-    financialData: any
+    financialData: any,
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[];
+      accountingStandard?: string | null;
+      edinetAnalysis?: any;
+    }
   ) {
     const fd = financialData || {};
     const fmt = (v: any) => (v != null && v !== "" ? v : "データなし");
+
+    const ratios = edinetExtras?.ratios;
+    const history = edinetExtras?.financialHistory;
+    const acctStd = edinetExtras?.accountingStandard;
+    const ediAnalysis = edinetExtras?.edinetAnalysis;
+
+    const ratiosSection = ratios ? `
+【財務指標（EDINET DB・計算済み）】
+- 会計基準: ${acctStd || "不明"}
+- ROE: ${ratios.roe != null ? (ratios.roe * 100).toFixed(1) + "%" : "データなし"}
+- ROA: ${ratios.roa != null ? (ratios.roa * 100).toFixed(1) + "%" : "データなし"}
+- 営業利益率: ${ratios.operatingMargin != null ? (ratios.operatingMargin * 100).toFixed(1) + "%" : "データなし"}
+- 純利益率: ${ratios.netMargin != null ? (ratios.netMargin * 100).toFixed(1) + "%" : "データなし"}
+- 自己資本比率: ${ratios.equityRatio != null ? (ratios.equityRatio * 100).toFixed(1) + "%" : "データなし"}
+- 流動比率: ${ratios.currentRatio != null ? (ratios.currentRatio * 100).toFixed(1) + "%" : "データなし"}
+- D/Eレシオ: ${ratios.deRatio != null ? ratios.deRatio.toFixed(2) : "データなし"}
+- FCF: ${ratios.fcf != null ? ratios.fcf.toLocaleString() : "データなし"}
+- EBITDA: ${ratios.ebitda != null ? ratios.ebitda.toLocaleString() : "データなし"}
+- 売上成長率(YoY): ${ratios.revenueGrowth != null ? (ratios.revenueGrowth * 100).toFixed(1) + "%" : "データなし"}
+- 売上CAGR(3年): ${ratios.revenueCagr3y != null ? (ratios.revenueCagr3y * 100).toFixed(1) + "%" : "データなし"}` : "";
+
+    const historySection = history && history.length > 0 ? `
+【財務推移（EDINET DB・直近${history.length}年）】
+${history.map(h => `- FY${h.fiscalYear}: 売上=${h.revenue ? (h.revenue / 1e8).toFixed(1) + "億" : "N/A"}, 営業利益=${h.operatingIncome ? (h.operatingIncome / 1e8).toFixed(1) + "億" : "N/A"}, 純利益=${h.netIncome ? (h.netIncome / 1e8).toFixed(1) + "億" : "N/A"}, 営業CF=${h.cfOperating ? (h.cfOperating / 1e8).toFixed(1) + "億" : "N/A"}`).join("\n")}` : "";
+
+    const ediAnalysisSection = ediAnalysis?.credit_score != null ? `
+【EDINET DB AIスコア】
+- 財務健全性スコア: ${ediAnalysis.credit_score}
+- 格付け: ${ediAnalysis.credit_rating || "N/A"}
+- AI所見: ${ediAnalysis.summary || "N/A"}` : "";
+
     return `企業名: ${companyName}
 シンボル: ${symbol}
 
@@ -515,6 +591,9 @@ ${newsText}
 - フリーCF: ${fmt(fd.freeCashFlow)}
 
 決算期間: ${fmt(fd.period)}
+${ratiosSection}
+${historySection}
+${ediAnalysisSection}
 
 【出力フォーマット（必ずこのJSONのみを返す）】
 {

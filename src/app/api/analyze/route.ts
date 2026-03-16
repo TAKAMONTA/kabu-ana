@@ -23,6 +23,7 @@ async function analyzeHandler(request: NextRequest) {
     }
 
     const { companyInfo, stockData, newsData } = validationResult.data;
+    const edinetExtras = body.edinetExtras ?? undefined;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || apiKey === "your_openrouter_key_here") {
@@ -41,7 +42,8 @@ async function analyzeHandler(request: NextRequest) {
     const analysisResult = await openRouter.analyzeStock(
       companyInfo,
       stockData,
-      newsData || []
+      newsData || [],
+      edinetExtras
     );
 
     return NextResponse.json({

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import { EdinetDBClient } from "@/lib/api/edinetdb";
 
 export async function POST(request: NextRequest) {
   try {
-    const { symbol, companyName, financialData } = await request.json();
+    const { symbol, companyName, financialData, edinetCode, ratios, financialHistory, accountingStandard } = await request.json();
     if (!symbol || !companyName) {
       return NextResponse.json(
         { error: "シンボルと企業名が必要です" },
@@ -19,11 +20,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // EDINET DB の AI 所見を追加取得（edinetCode がある場合）
+    let edinetAnalysis: any = null;
+    if (edinetCode) {
+      const edinetDbKey = process.env.EDINETDB_API_KEY;
+      if (edinetDbKey) {
+        try {
+          const edinetApi = new EdinetDBClient(edinetDbKey);
+          edinetAnalysis = await edinetApi.getAnalysis(edinetCode);
+        } catch (e) {
+          console.error("EDINET DB analysis 取得エラー:", e);
+        }
+      }
+    }
+
     const client = new OpenRouterClient(apiKey);
     const result = await client.analyzeFinancials(
       companyName,
       symbol,
-      financialData || {}
+      financialData || {},
+      { ratios, financialHistory, accountingStandard, edinetAnalysis }
     );
 
     return NextResponse.json({ analysis: result });

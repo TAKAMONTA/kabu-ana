@@ -22,6 +22,10 @@ export function useFinancialEvaluation() {
       symbol: string;
       companyName: string;
       financialData?: any;
+      edinetCode?: string | null;
+      ratios?: any;
+      financialHistory?: any[];
+      accountingStandard?: string | null;
     }) => {
       setIsLoading(true);
       setError(null);
@@ -39,6 +43,10 @@ export function useFinancialEvaluation() {
             symbol: args.symbol,
             companyName: args.companyName,
             financialData: cleanedFinancialData,
+            edinetCode: args.edinetCode,
+            ratios: args.ratios,
+            financialHistory: args.financialHistory,
+            accountingStandard: args.accountingStandard,
           }),
         });
 

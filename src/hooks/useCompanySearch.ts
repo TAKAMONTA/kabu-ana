@@ -7,12 +7,45 @@ import {
 } from "@/lib/api/serpapi";
 import { getApiUrl } from "@/lib/utils/apiClient";
 
-interface SearchResult {
+export interface SearchResultRatios {
+  roe?: number;
+  roa?: number;
+  operatingMargin?: number;
+  netMargin?: number;
+  grossMargin?: number;
+  equityRatio?: number;
+  currentRatio?: number;
+  deRatio?: number;
+  fcf?: number;
+  ebitda?: number;
+  revenueGrowth?: number;
+  niGrowth?: number;
+  revenueCagr3y?: number;
+  niCagr3y?: number;
+  dividendYield?: number;
+}
+
+export interface FinancialHistoryItem {
+  fiscalYear: number;
+  revenue?: number;
+  operatingIncome?: number;
+  netIncome?: number;
+  eps?: number;
+  totalAssets?: number;
+  cfOperating?: number;
+}
+
+export interface SearchResult {
   companyInfo: CompanyInfo;
   stockData: StockData;
   newsData: any[];
   chartData: ChartDataPoint[];
   financialData: FinancialData | null;
+  // EDINET DB 拡張フィールド（日本企業の場合のみ存在）
+  edinetCode?: string | null;
+  accountingStandard?: string | null;
+  ratios?: SearchResultRatios | null;
+  financialHistory?: FinancialHistoryItem[] | null;
 }
 
 export function useCompanySearch() {
@@ -37,18 +70,16 @@ export function useCompanySearch() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        // エラーメッセージを優先的に取得（日本語メッセージを優先）
-        const errorMessage = 
-          errorData.message || 
-          errorData.error || 
-          (errorData.details && errorData.details.length > 0 
+        const errorMessage =
+          errorData.message ||
+          errorData.error ||
+          (errorData.details && errorData.details.length > 0
             ? errorData.details.map((d: any) => d.message).join("; ")
             : null) ||
           "検索に失敗しました";
         throw new Error(errorMessage);
       }
 
-      // レスポンスがJSON形式かどうかをチェック
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
@@ -60,15 +91,14 @@ export function useCompanySearch() {
       setSearchResult(data);
     } catch (err) {
       let errorMessage = "検索中にエラーが発生しました";
-      
+
       if (err instanceof Error) {
         errorMessage = err.message;
-        // JSONパースエラーの場合、より分かりやすいメッセージを表示
         if (err.message.includes("JSON") || err.message.includes("非JSON")) {
           errorMessage = "APIが利用できません。本番環境のURLが設定されていない可能性があります。";
         }
       }
-      
+
       setError(errorMessage);
     } finally {
       setIsLoading(false);
