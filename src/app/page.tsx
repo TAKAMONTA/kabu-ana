@@ -33,6 +33,7 @@ import { AnalysisSection } from "@/components/AnalysisSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
+import { CastleSection } from "@/components/castle/CastleSection";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -244,13 +245,38 @@ export default function HomePage() {
   }, []);
 
   const handlePickSelect = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    setShowSuggestions(false);
-    setActiveSuggestion(-1);
-    clearSuggestions();
-    clearAiAnalysis();
-    clearNewsAnalysis();
-    await searchCompany(query, chartPeriod);
+    if (!query || !query.trim()) {
+      console.error("無効な検索クエリです:", query);
+      return;
+    }
+    
+    // クエリをトリムして検証
+    const trimmedQuery = query.trim();
+    if (trimmedQuery.length === 0) {
+      console.error("検索クエリが空です");
+      return;
+    }
+    
+    try {
+      setSearchQuery(trimmedQuery);
+      setShowSuggestions(false);
+      setActiveSuggestion(-1);
+      clearSuggestions();
+      clearAiAnalysis();
+      clearNewsAnalysis();
+      await searchCompany(trimmedQuery, chartPeriod);
+    } catch (error) {
+      console.error("注目銘柄の分析開始時にエラーが発生しました:", error);
+      // エラーはuseCompanySearchのerror stateで表示される
+      // 追加のエラーログを出力
+      if (error instanceof Error) {
+        console.error("エラー詳細:", {
+          message: error.message,
+          stack: error.stack,
+          query: trimmedQuery,
+        });
+      }
+    }
   }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
 
   return (
@@ -444,6 +470,12 @@ export default function HomePage() {
                   onEvaluate={handleFinancialEvaluation}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
+                />
+
+                {/* 企業城郭図鑑 */}
+                <CastleSection
+                  symbol={searchResult.companyInfo.symbol}
+                  companyName={searchResult.companyInfo.name}
                 />
 
                 {/* ニュースセクション */}

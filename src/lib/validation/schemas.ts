@@ -3,12 +3,15 @@ import { z } from "zod";
 // 検索クエリの検証スキーマ
 export const searchSchema = z.object({
   query: z
-    .string()
+    .string({
+      required_error: "検索クエリが必要です",
+      invalid_type_error: "検索クエリは文字列である必要があります",
+    })
     .min(1, "検索クエリが必要です")
     .max(100, "検索クエリは100文字以内で入力してください")
     .regex(
       /^[a-zA-Z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\s:.-]+$/,
-      "無効な文字が含まれています"
+      "検索クエリに無効な文字が含まれています。英数字、日本語、記号(:.-)のみ使用できます。"
     )
     .transform(val => val.trim()),
   chartPeriod: z
@@ -19,42 +22,60 @@ export const searchSchema = z.object({
     .default("1M"),
 });
 
+const coerceNumber = z.preprocess(
+  (val) => (val === null || val === undefined ? undefined : Number(val)),
+  z.number().optional()
+);
+
+const coerceNumberRequired = z.preprocess(
+  (val) => (val === null || val === undefined ? 0 : Number(val)),
+  z.number()
+);
+
+const coerceString = z.preprocess(
+  (val) => (val === null || val === undefined ? undefined : String(val)),
+  z.string().optional()
+);
+
 // 分析リクエストの検証スキーマ
 export const analysisSchema = z.object({
   companyInfo: z.object({
     name: z.string().min(1, "企業名が必要です"),
     symbol: z.string().min(1, "シンボルが必要です"),
-    market: z.string().optional(),
-    price: z.number().optional(),
-    change: z.number().optional(),
-    changePercent: z.number().optional(),
-    description: z.string().optional(),
-    website: z.string().optional(),
-    employees: z.string().optional(),
-    founded: z.string().optional(),
-    headquarters: z.string().optional(),
+    market: coerceString,
+    price: coerceNumber,
+    change: coerceNumber,
+    changePercent: coerceNumber,
+    description: coerceString,
+    website: coerceString,
+    employees: coerceString,
+    founded: coerceString,
+    headquarters: coerceString,
   }),
   stockData: z.object({
     symbol: z.string().min(1, "シンボルが必要です"),
-    price: z.number(),
-    change: z.number(),
-    changePercent: z.number(),
-    volume: z.number(),
-    marketCap: z.string(),
-    pe: z.number().optional(),
-    eps: z.number().optional(),
-    dividend: z.number().optional(),
-    high52: z.number().optional(),
-    low52: z.number().optional(),
+    price: coerceNumberRequired,
+    change: coerceNumberRequired,
+    changePercent: coerceNumberRequired,
+    volume: coerceNumberRequired,
+    marketCap: z.preprocess(
+      (val) => (val === null || val === undefined ? "0" : String(val)),
+      z.string()
+    ),
+    pe: coerceNumber,
+    eps: coerceNumber,
+    dividend: coerceNumber,
+    high52: coerceNumber,
+    low52: coerceNumber,
   }),
   newsData: z
     .array(
       z.object({
-        title: z.string(),
-        snippet: z.string(),
-        link: z.string(),
-        source: z.string(),
-        date: z.string(),
+        title: z.preprocess((v) => v ?? "", z.string()),
+        snippet: z.preprocess((v) => v ?? "", z.string()),
+        link: z.preprocess((v) => v ?? "", z.string()),
+        source: z.preprocess((v) => v ?? "", z.string()),
+        date: z.preprocess((v) => v ?? "", z.string()),
       })
     )
     .optional()

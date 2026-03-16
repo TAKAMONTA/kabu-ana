@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { getApiUrl } from "@/lib/utils/apiClient";
 
 export interface FinancialEvaluationResult {
   bs: { score: 1 | 2 | 3 | 4 | 5; summary: string };
@@ -25,16 +26,36 @@ export function useFinancialEvaluation() {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await fetch("/api/financial-evaluation", {
+        const cleanedFinancialData = args.financialData
+          ? Object.fromEntries(
+              Object.entries(args.financialData).filter(([, v]) => v != null && v !== "")
+            )
+          : {};
+
+        const res = await fetch(getApiUrl("/api/financial-evaluation"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(args),
+          body: JSON.stringify({
+            symbol: args.symbol,
+            companyName: args.companyName,
+            financialData: cleanedFinancialData,
+          }),
         });
+
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("サーバーとの通信に問題が発生しました。しばらくしてから再試行してください。");
+        }
+
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "財務評価に失敗しました");
         setResult(data.analysis);
       } catch (e: any) {
-        setError(e.message || "財務評価に失敗しました");
+        if (e instanceof TypeError && (e.message.includes("Failed to fetch") || e.message.includes("NetworkError"))) {
+          setError("ネットワークエラーが発生しました。接続を確認してください。");
+        } else {
+          setError(e.message || "財務評価に失敗しました");
+        }
       } finally {
         setIsLoading(false);
       }

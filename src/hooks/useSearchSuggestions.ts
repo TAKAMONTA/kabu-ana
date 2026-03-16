@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { getApiUrl } from "@/lib/utils/apiClient";
 
 interface SearchSuggestion {
   symbol: string;
@@ -32,7 +33,7 @@ export function useSearchSuggestions() {
       }
       abortRef.current = new AbortController();
 
-      const response = await fetch("/api/search-suggestions", {
+      const response = await fetch(getApiUrl("/api/search-suggestions"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

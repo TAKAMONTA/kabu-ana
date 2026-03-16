@@ -268,6 +268,56 @@ export class FMPClient {
   }
 
   /**
+   * 貸借対照表（BS）を取得
+   */
+  async getBalanceSheet(
+    symbol: string,
+    limit: number = 1
+  ): Promise<any[]> {
+    try {
+      const response = await axios.get(
+        `${FMP_BASE_URL}/balance-sheet-statement/${symbol}`,
+        {
+          params: {
+            apikey: this.apiKey,
+            limit,
+          },
+        }
+      );
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error("FMP貸借対照表取得エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
+   * キャッシュフロー計算書（CF）を取得
+   */
+  async getCashFlowStatement(
+    symbol: string,
+    limit: number = 1
+  ): Promise<any[]> {
+    try {
+      const response = await axios.get(
+        `${FMP_BASE_URL}/cash-flow-statement/${symbol}`,
+        {
+          params: {
+            apikey: this.apiKey,
+            limit,
+          },
+        }
+      );
+
+      return response.data || [];
+    } catch (error: any) {
+      console.error("FMPキャッシュフロー取得エラー:", error.message);
+      return [];
+    }
+  }
+
+  /**
    * 企業検索（名前検索）
    */
   async searchCompany(query: string): Promise<FMPCompanyProfile[]> {

@@ -52,7 +52,8 @@ function verifyWebhookSignature(
 }
 
 // このルートは動的レンダリングが必要
-export const dynamic = 'force-dynamic';
+// 一時的にコメントアウト（静的エクスポート用）
+// export const dynamic = 'force-dynamic';
 
 /**
  * Lemon Squeezy Webhook処理

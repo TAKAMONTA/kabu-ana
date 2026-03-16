@@ -9,15 +9,34 @@ async function searchHandler(request: NextRequest) {
   try {
     // 入力データの検証
     const body = await request.json();
+    
+    // デバッグ用ログ（開発環境のみ）
+    if (process.env.NODE_ENV === "development") {
+      console.log("検索リクエスト受信:", { query: body.query, chartPeriod: body.chartPeriod });
+    }
+    
     const validationResult = searchSchema.safeParse(body);
 
     if (!validationResult.success) {
+      // より詳細なエラーメッセージを返す（日本語を優先）
+      const errorMessages = validationResult.error.errors.map(err => {
+        const field = err.path.join(".");
+        // フィールド名を日本語に変換
+        const fieldName = field === "query" ? "検索クエリ" : field;
+        return `${fieldName}: ${err.message}`;
+      });
+      
+      // メインメッセージ（最初のエラーを優先）
+      const mainMessage = validationResult.error.errors[0]?.message || "入力データが無効です";
+      
       return NextResponse.json(
         {
-          error: "入力データが無効です",
+          error: mainMessage,
+          message: errorMessages.join("; "),
           details: validationResult.error.errors.map(err => ({
             field: err.path.join("."),
             message: err.message,
+            code: err.code,
           })),
         },
         { status: 400 }
@@ -101,9 +120,21 @@ async function searchHandler(request: NextRequest) {
       netIncome?: string;
       operatingIncome?: string;
       totalAssets?: string;
+      totalLiabilities?: string;
+      totalEquity?: string;
       cash?: string;
       eps?: string;
       period?: string;
+      equityRatio?: string;
+      debtRatio?: string;
+      operatingCashFlow?: string;
+      investingCashFlow?: string;
+      financingCashFlow?: string;
+      freeCashFlow?: string;
+      grossProfit?: string;
+      grossProfitRatio?: string;
+      operatingIncomeRatio?: string;
+      netIncomeRatio?: string;
     } | null = null;
 
     // FMP APIを使用してデータを取得（優先）
@@ -150,22 +181,59 @@ async function searchHandler(request: NextRequest) {
             };
           }
 
-          // 財務諸表を取得
-          const financialStatements = await fmpApi.getFinancialStatements(
-            company.symbol,
-            1
-          );
-          if (financialStatements && financialStatements.length > 0) {
-            const latest = financialStatements[0];
-            financialData = {
-              revenue: latest.revenue?.toString(),
-              netIncome: latest.netIncome?.toString(),
-              operatingIncome: latest.operatingIncome?.toString(),
-              totalAssets: undefined,
-              cash: undefined,
-              eps: latest.eps?.toString(),
-              period: `${latest.calendarYear} (${latest.period})`,
-            };
+          // 財務三表を並行取得（PL / BS / CF）
+          const [financialStatements, balanceSheets, cashFlows] = await Promise.all([
+            fmpApi.getFinancialStatements(company.symbol, 1),
+            fmpApi.getBalanceSheet(company.symbol, 1),
+            fmpApi.getCashFlowStatement(company.symbol, 1),
+          ]);
+
+          {
+            const pl = financialStatements?.[0];
+            const bs = balanceSheets?.[0];
+            const cf = cashFlows?.[0];
+
+            if (pl || bs || cf) {
+              const totalAssets = bs?.totalAssets;
+              const totalEquity = bs?.totalStockholdersEquity ?? bs?.totalEquity;
+              const totalLiabilities = bs?.totalLiabilities;
+
+              financialData = {
+                revenue: pl?.revenue?.toString(),
+                netIncome: pl?.netIncome?.toString(),
+                operatingIncome: pl?.operatingIncome?.toString(),
+                grossProfit: pl?.grossProfit?.toString(),
+                grossProfitRatio: pl?.grossProfitRatio != null
+                  ? (pl.grossProfitRatio * 100).toFixed(1) + "%"
+                  : undefined,
+                operatingIncomeRatio: pl?.operatingIncome != null && pl?.revenue
+                  ? ((pl.operatingIncome / pl.revenue) * 100).toFixed(1) + "%"
+                  : undefined,
+                netIncomeRatio: pl?.netIncomeRatio != null
+                  ? (pl.netIncomeRatio * 100).toFixed(1) + "%"
+                  : undefined,
+                eps: pl?.eps?.toString(),
+                totalAssets: totalAssets?.toString(),
+                totalLiabilities: totalLiabilities?.toString(),
+                totalEquity: totalEquity?.toString(),
+                cash: (bs?.cashAndCashEquivalents ?? bs?.cashAndShortTermInvestments)?.toString(),
+                equityRatio: totalAssets && totalEquity
+                  ? ((totalEquity / totalAssets) * 100).toFixed(1) + "%"
+                  : undefined,
+                debtRatio: totalAssets && totalLiabilities
+                  ? ((totalLiabilities / totalAssets) * 100).toFixed(1) + "%"
+                  : undefined,
+                operatingCashFlow: cf?.operatingCashFlow?.toString(),
+                investingCashFlow: cf?.netCashUsedForInvestingActivites?.toString(),
+                financingCashFlow: cf?.netCashUsedProvidedByFinancingActivities?.toString(),
+                freeCashFlow: cf?.freeCashFlow?.toString(),
+                period: pl
+                  ? `${pl.calendarYear} (${pl.period})`
+                  : bs
+                    ? `${bs.calendarYear} (${bs.period})`
+                    : undefined,
+              };
+            }
           }
 
           // 主要指標を取得

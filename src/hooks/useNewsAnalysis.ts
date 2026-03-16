@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
+import { getApiUrl } from "@/lib/utils/apiClient";
 
 interface NewsAnalysisState {
   isLoading: boolean;
@@ -20,7 +21,7 @@ export function useNewsAnalysis() {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
-      const response = await fetch("/api/news-analysis", {
+      const response = await fetch(getApiUrl("/api/news-analysis"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

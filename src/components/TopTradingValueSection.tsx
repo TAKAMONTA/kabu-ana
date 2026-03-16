@@ -18,10 +18,59 @@ export function TopTradingValueSection({
   onSelect,
 }: TopTradingValueSectionProps) {
   const handleSelect = (item: TradingValueItem) => {
-    if (!item) return;
-    const symbol =
-      item.code && /^\d{4}$/.test(item.code) ? `${item.code}:TYO` : item.code;
-    onSelect(symbol || item.name);
+    if (!item) {
+      console.error("アイテムが選択されていません");
+      return;
+    }
+    
+    try {
+      let symbol: string | null = null;
+      
+      // コードが存在し、4桁の数字の場合は日本株として扱う
+      if (item.code) {
+        const codeStr = String(item.code).trim();
+        // 4桁の数字の場合は日本株として扱う
+        if (/^\d{4}$/.test(codeStr)) {
+          symbol = `${codeStr}:TYO`;
+        } else if (codeStr.length > 0) {
+          // コードが存在するが4桁でない場合はそのまま使用（米国株など）
+          symbol = codeStr;
+        }
+      }
+      
+      // コードが取得できなかった場合は、名前から検索を試みる
+      // ただし、名前のみでの検索はAPI側で失敗する可能性が高いため、エラーをログに記録
+      if (!symbol) {
+        console.error("有効な銘柄コードが見つかりません", item);
+        // 名前をそのまま渡して検索を試みる（API側でエラーハンドリングされる）
+        if (item.name && item.name.trim().length > 0) {
+          symbol = item.name.trim();
+        } else {
+          console.error("企業名も取得できませんでした", item);
+          return;
+        }
+      }
+      
+      // シンボルが有効な形式か最終チェック
+      if (!symbol || symbol.trim().length === 0) {
+        console.error("無効なシンボル形式:", symbol);
+        return;
+      }
+      
+      onSelect(symbol);
+    } catch (error) {
+      console.error("分析ボタンのクリック時にエラーが発生しました:", error);
+      // エラーは親コンポーネントのエラー表示システムで処理される
+      // 可能な限り処理を続行
+      if (item.code) {
+        const codeStr = String(item.code).trim();
+        if (codeStr.length > 0) {
+          onSelect(/^\d{4}$/.test(codeStr) ? `${codeStr}:TYO` : codeStr);
+        }
+      } else if (item.name && item.name.trim().length > 0) {
+        onSelect(item.name.trim());
+      }
+    }
   };
 
   return (

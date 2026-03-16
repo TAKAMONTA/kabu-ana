@@ -19,6 +19,9 @@ const nextConfig = {
   },
   // 本番環境での最適化
   // output: "standalone", // Vercelデプロイエラーのため一時的に無効化
+  // 静的エクスポート（Capacitor用、スクリーンショット撮影のため）
+  // 環境変数 EXPORT_STATIC=true が設定されている場合のみ静的エクスポート
+  ...(process.env.EXPORT_STATIC === "true" ? { output: "export" } : {}),
   // 環境変数の検証
   env: {
     CUSTOM_KEY: process.env.CUSTOM_KEY,

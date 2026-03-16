@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.vercel.kabu_9t7mdgybz_takamontas_projects.twa',
+  // iOSのBundle Identifierと揃える（iOSリリース準備）
+  appId: 'com.takaapps.kabunavi',
   appName: 'Kabuana',
   webDir: 'out'
 };

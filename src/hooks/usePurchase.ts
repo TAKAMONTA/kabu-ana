@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
+import { getApiUrl } from "@/lib/utils/apiClient";
 
 /**
  * 購入処理を管理するカスタムフック
@@ -26,7 +27,7 @@ export function usePurchase() {
       }
 
       // チェックアウトセッションを作成
-      const response = await fetch("/api/lemon-squeezy/checkout", {
+      const response = await fetch(getApiUrl("/api/lemon-squeezy/checkout"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -48,9 +48,20 @@ export interface FinancialData {
   operatingIncome?: string;
   totalAssets?: string;
   totalLiabilities?: string;
+  totalEquity?: string;
   cash?: string;
   eps?: string;
   period?: string;
+  equityRatio?: string;
+  debtRatio?: string;
+  operatingCashFlow?: string;
+  investingCashFlow?: string;
+  financingCashFlow?: string;
+  freeCashFlow?: string;
+  grossProfit?: string;
+  grossProfitRatio?: string;
+  operatingIncomeRatio?: string;
+  netIncomeRatio?: string;
 }
 
 export class SerpApiClient {

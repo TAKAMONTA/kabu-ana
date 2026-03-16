@@ -483,16 +483,47 @@ ${newsText}
     financialData: any
   ) {
     const fd = financialData || {};
-    return `企業名: ${companyName}\nシンボル: ${symbol}\n\n以下の財務データ（存在する場合のみ）を参考に、BS/PL/CFを5段階で評価してください。指標が無い場合は一般的な水準を仮定せず、保守的に評価してください。\n\n【財務データの例】\n- 総資産: ${
-      fd.totalAssets ?? "N/A"
-    }\n- 自己資本比率: ${fd.equityRatio ?? "N/A"}\n- 負債比率: ${
-      fd.debtRatio ?? "N/A"
-    }\n- 売上高: ${fd.revenue ?? "N/A"}\n- 営業利益: ${
-      fd.operatingIncome ?? "N/A"
-    }\n- 当期純利益: ${fd.netIncome ?? "N/A"}\n- 営業CF: ${
-      fd.operatingCashFlow ?? "N/A"
-    }\n- 投資CF: ${fd.investingCashFlow ?? "N/A"}\n- 財務CF: ${
-      fd.financingCashFlow ?? "N/A"
-    }\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["投資家への提言1", "提言2"]\n}`;
+    const fmt = (v: any) => (v != null && v !== "" ? v : "データなし");
+    return `企業名: ${companyName}
+シンボル: ${symbol}
+
+以下の実際の財務データを基に、BS（貸借対照表）/PL（損益計算書）/CF（キャッシュフロー計算書）を5段階で評価してください。
+データが「データなし」のものは、企業名・シンボルから公開情報を参照して評価してください。
+
+【損益計算書（PL）】
+- 売上高: ${fmt(fd.revenue)}
+- 売上総利益: ${fmt(fd.grossProfit)}
+- 売上総利益率: ${fmt(fd.grossProfitRatio)}
+- 営業利益: ${fmt(fd.operatingIncome)}
+- 営業利益率: ${fmt(fd.operatingIncomeRatio)}
+- 当期純利益: ${fmt(fd.netIncome)}
+- 純利益率: ${fmt(fd.netIncomeRatio)}
+- EPS: ${fmt(fd.eps)}
+
+【貸借対照表（BS）】
+- 総資産: ${fmt(fd.totalAssets)}
+- 総負債: ${fmt(fd.totalLiabilities)}
+- 株主資本: ${fmt(fd.totalEquity)}
+- 自己資本比率: ${fmt(fd.equityRatio)}
+- 負債比率: ${fmt(fd.debtRatio)}
+- 現金及び現金同等物: ${fmt(fd.cash)}
+
+【キャッシュフロー計算書（CF）】
+- 営業CF: ${fmt(fd.operatingCashFlow)}
+- 投資CF: ${fmt(fd.investingCashFlow)}
+- 財務CF: ${fmt(fd.financingCashFlow)}
+- フリーCF: ${fmt(fd.freeCashFlow)}
+
+決算期間: ${fmt(fd.period)}
+
+【出力フォーマット（必ずこのJSONのみを返す）】
+{
+  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },
+  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },
+  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },
+  "overall": { "score": 1-5, "label": "総合ラベル" },
+  "analysis": "総合所見(2〜4文)",
+  "recommendations": ["投資家への提言1", "提言2"]
+}`;
   }
 }
