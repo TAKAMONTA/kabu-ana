@@ -1,182 +1,45 @@
 # Firestoreセキュリティルール設定ガイド
 
-購入状態共有システム用のFirestoreセキュリティルールを設定します。
+現在のアプリ構成（サブスク + 使用量制限 + ウォッチリスト + 通知）に対応した
+Firestoreルールの設定手順です。
 
-## 設定手順
+## 対象コレクション
 
-### 1. Firebase Consoleにアクセス
+- `subscriptions/{userId}`: 購入状態（読み取りのみ）
+- `usage/{userId}`: 使用回数管理（本人のみ読み書き）
+- `users/{userId}/watchlist/{itemId}`: ウォッチリスト（本人のみ読み書き）
+- `users/{userId}/alerts/{alertId}`: 通知履歴（本人のみ読み書き）
+- `users/{userId}/preferences/{prefId}`: 通知設定など（本人のみ読み書き）
 
-1. [Firebase Console](https://console.firebase.google.com/) にアクセス
-2. プロジェクトを選択
+## 反映するルールファイル
 
-### 2. Firestore Databaseを開く
+このリポジトリでは `firestore.rules` を利用します。
 
-1. 左メニューから「**Firestore Database**」をクリック
-2. 上部タブから「**ルール**」タブをクリック
-
-### 3. セキュリティルールを設定
-
-既存のルールがある場合とない場合で対応が異なります。
-
-#### 既存のルールがない場合
-
-以下のルールをそのままコピー＆ペーストしてください：
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // 購入状態のコレクション
-    match /subscriptions/{userId} {
-      // ユーザーは自分の購入状態のみ読み取り可能
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // 書き込みはサーバー側（Admin SDK）のみ
-      allow write: if false;
-    }
-  }
-}
+```bash
+firebase deploy --only firestore:rules
 ```
 
-#### 既存のルールがある場合
+## ルールの要点
 
-既存のルールに `subscriptions` コレクションのルールを追加してください。
+- 認証済みかつ `request.auth.uid == userId` の場合のみ、ユーザー配下データへアクセス可
+- `subscriptions` は読み取りのみ可、書き込み禁止（サーバー/Admin SDK想定）
+- 明示したコレクション以外はすべて拒否
 
-**例：既存のルールがある場合**
+## 動作確認（最低限）
 
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // 既存のルール（例：ユーザープロファイル）
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // 購入状態のコレクション（新規追加）
-    match /subscriptions/{userId} {
-      // ユーザーは自分の購入状態のみ読み取り可能
-      allow read: if request.auth != null && request.auth.uid == userId;
-      // 書き込みはサーバー側（Admin SDK）のみ
-      allow write: if false;
-    }
-  }
-}
-```
-
-### 4. ルールを公開
-
-1. ルールを入力したら、「**公開**」ボタンをクリック
-2. 確認ダイアログで「**公開**」をクリック
-3. 数秒で反映されます
-
-## ルールの説明
-
-### `subscriptions/{userId}` コレクション
-
-- **`allow read`**: 
-  - ログイン済みユーザー（`request.auth != null`）
-  - かつ自分のUIDと一致する場合のみ読み取り可能
-  - これにより、ユーザーは自分の購入状態のみ確認できます
-
-- **`allow write: if false`**: 
-  - すべての書き込みを禁止
-  - 書き込みはFirebase Admin SDK（サーバー側）のみ可能
-  - これにより、クライアント側からの不正な書き込みを防止
-
-## 動作確認
-
-### 1. ルールのテスト
-
-Firebase Consoleの「ルール」タブで「**ルールをテスト**」ボタンからテストできます。
-
-**テストケース例：**
-
-```javascript
-// テスト1: 自分の購入状態を読み取る（成功するはず）
-function test1() {
-  return {
-    auth: { uid: "user123" },
-    path: "/databases/(default)/documents/subscriptions/user123",
-    method: "get"
-  };
-}
-
-// テスト2: 他人の購入状態を読み取る（失敗するはず）
-function test2() {
-  return {
-    auth: { uid: "user123" },
-    path: "/databases/(default)/documents/subscriptions/user456",
-    method: "get"
-  };
-}
-
-// テスト3: ログインなしで読み取る（失敗するはず）
-function test3() {
-  return {
-    auth: null,
-    path: "/databases/(default)/documents/subscriptions/user123",
-    method: "get"
-  };
-}
-
-// テスト4: 書き込もうとする（失敗するはず）
-function test4() {
-  return {
-    auth: { uid: "user123" },
-    path: "/databases/(default)/documents/subscriptions/user123",
-    method: "create",
-    resource: { data: { status: "active" } }
-  };
-}
-```
-
-### 2. 実際の動作確認
-
-Webアプリでログインして、`useSubscription`フックが正常に動作するか確認：
-
-```typescript
-import { useSubscription } from "@/hooks/useSubscription";
-
-function TestComponent() {
-  const { subscription, loading, error } = useSubscription();
-  
-  if (loading) return <div>読み込み中...</div>;
-  if (error) return <div>エラー: {error}</div>;
-  
-  return <div>購入状態: {subscription ? "あり" : "なし"}</div>;
-}
-```
+1. ログイン済みユーザーで自分のウォッチリストを追加/削除できる
+2. 同ユーザーで通知設定を更新できる
+3. 別ユーザーの `users/{uid}` 配下は読み書き不可
+4. `subscriptions/{uid}` へのクライアント書き込みは拒否される
 
 ## トラブルシューティング
 
-### エラー: "Missing or insufficient permissions"
+- **`Missing or insufficient permissions`**
+  - ログイン状態を確認
+  - ドキュメントの `userId` と `request.auth.uid` の一致を確認
+  - ルールがデプロイ済みか確認
 
-- ユーザーがログインしているか確認
-- ルールが正しく公開されているか確認
-- ユーザーのUIDとドキュメントのパスが一致しているか確認
-
-### エラー: "Permission denied"
-
-- `allow write: if false` により、クライアント側からの書き込みは常に拒否されます
-- これは正常な動作です（書き込みはAdmin SDK経由のみ）
-
-### ルールが反映されない
-
-- ルールを公開してから数秒待つ
-- ブラウザのキャッシュをクリア
-- 開発サーバーを再起動
-
-## セキュリティのベストプラクティス
-
-1. **最小権限の原則**: 必要最小限の権限のみ付与
-2. **サーバー側での検証**: 重要なデータの書き込みは常にサーバー側で検証
-3. **定期的な監査**: ルールを定期的に見直し、不要な権限がないか確認
-
-## 次のステップ
-
-セキュリティルールの設定が完了したら：
-
-1. ✅ 動作確認（Webアプリでログインして購入状態を確認）
-2. ✅ Android版での実装（購入成功時にAPIを呼び出す）
-3. ✅ Lemon Squeezyの実装（Web版の課金機能）
+- **ルール更新が反映されない**
+  - 反映に数秒かかる場合あり
+  - アプリ再読み込みで再確認
 

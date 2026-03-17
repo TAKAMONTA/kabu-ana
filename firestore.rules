@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // サブスク状態: 読み取りのみ許可（更新はサーバー/Admin SDK経由）
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    // 使用回数管理
+    match /usage/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // ユーザー配下データ（ウォッチリスト / 通知履歴 / 通知設定）
+    match /users/{userId} {
+      allow read, write: if false;
+
+      match /watchlist/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /alerts/{alertId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      match /preferences/{prefId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // それ以外はすべて拒否
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
