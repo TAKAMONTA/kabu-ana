@@ -7,9 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Star } from "lucide-react";
 import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
@@ -59,6 +60,13 @@ interface StockSidePanelProps {
   currency?: string;
   accountingStandard?: string | null;
   ratios?: Ratios | null;
+  watchlist?: {
+    enabled: boolean;
+    isInWatchlist: boolean;
+    isToggling: boolean;
+    onToggle: () => void | Promise<void>;
+    hint?: string | null;
+  };
 }
 
 // ヘルパー関数：数値をフォーマット（後方互換性のため残す）
@@ -73,6 +81,7 @@ export function StockSidePanel({
   currency = "$",
   accountingStandard,
   ratios,
+  watchlist,
 }: StockSidePanelProps) {
   const getCurrencySymbol = () => {
     return companyInfo.market === "TYO" ? "¥" : currency;
@@ -134,6 +143,28 @@ export function StockSidePanel({
                 {companyInfo.name}
               </h1>
             </div>
+            {watchlist?.enabled && (
+              <div className="space-y-1.5">
+                <Button
+                  variant={watchlist.isInWatchlist ? "secondary" : "outline"}
+                  className="w-full"
+                  onClick={watchlist.onToggle}
+                  disabled={watchlist.isToggling}
+                >
+                  <Star
+                    className={`mr-2 h-4 w-4 ${
+                      watchlist.isInWatchlist ? "fill-current text-amber-500" : ""
+                    }`}
+                  />
+                  {watchlist.isInWatchlist
+                    ? "ウォッチリストから外す"
+                    : "ウォッチリストに追加"}
+                </Button>
+                {watchlist.hint && (
+                  <p className="text-xs text-muted-foreground">{watchlist.hint}</p>
+                )}
+              </div>
+            )}
 
             <Separator className="my-3" />
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import { useState, useCallback, useMemo, useEffect, Suspense, useRef } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,17 @@ import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useTopTradingValue } from "@/hooks/useTopTradingValue";
 import { useFinancialEvaluation } from "@/hooks/useFinancialEvaluation";
 import { useTextBlocks } from "@/hooks/useTextBlocks";
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { useAlerts } from "@/hooks/useAlerts";
+import {
+  ensureLocalNotificationPermission,
+  sendLocalNotification,
+} from "@/lib/notifications/localNotifications";
 import { SearchSection } from "@/components/SearchSection";
 import { TopTradingValueSection } from "@/components/TopTradingValueSection";
 import { RankingSection } from "@/components/RankingSection";
+import { WatchlistSection } from "@/components/WatchlistSection";
+import { AlertCenterSection } from "@/components/AlertCenterSection";
 import { AnalysisSection } from "@/components/AnalysisSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { FinancialTrendChart } from "@/components/FinancialTrendChart";
@@ -37,6 +45,18 @@ import { TextBlocksSection } from "@/components/TextBlocksSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { CastleSection } from "@/components/castle/CastleSection";
+
+function getNewsSeverity(absImpact: number): "high" | "medium" | "low" {
+  if (absImpact >= 70) return "high";
+  if (absImpact >= 40) return "medium";
+  return "low";
+}
+
+function getFinancialSeverity(diff: number): "high" | "medium" | "low" {
+  if (diff >= 3) return "high";
+  if (diff >= 2) return "medium";
+  return "low";
+}
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -70,6 +90,11 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isWatchlistToggling, setIsWatchlistToggling] = useState(false);
+  const [watchlistActionError, setWatchlistActionError] = useState<string | null>(null);
+  const [alertActionError, setAlertActionError] = useState<string | null>(null);
+  const lastProcessedNewsKeyRef = useRef<string>("");
+  const lastProcessedFinancialKeyRef = useRef<string>("");
 
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
@@ -80,6 +105,29 @@ export default function HomePage() {
     clearAnalysis: clearAiAnalysis,
   } = useAIAnalysis();
   const { user, logout } = useAuth();
+  const {
+    items: watchlistItems,
+    loading: watchlistLoading,
+    error: watchlistError,
+    isPremium,
+    isInWatchlist,
+    canAddMore,
+    addToWatchlist,
+    removeFromWatchlist,
+    updateWatchlistMetrics,
+    freeLimit,
+  } = useWatchlist();
+  const {
+    settings: alertSettings,
+    alerts,
+    unreadCount,
+    loading: alertsLoading,
+    error: alertsError,
+    updateSettings: updateAlertSettings,
+    createAlert,
+    markAsRead,
+    markAllAsRead,
+  } = useAlerts();
   const {
     isLoading: isNewsAnalyzing,
     error: newsError,
@@ -285,6 +333,286 @@ export default function HomePage() {
     }
   }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis, clearTextBlocks]);
 
+  const handleToggleWatchlist = useCallback(async () => {
+    if (!searchResult) return;
+
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    const targetSymbol = searchResult.companyInfo.symbol;
+    setWatchlistActionError(null);
+    setIsWatchlistToggling(true);
+
+    try {
+      if (isInWatchlist(targetSymbol)) {
+        await removeFromWatchlist(targetSymbol);
+      } else {
+        await addToWatchlist({
+          symbol: targetSymbol,
+          companyName: searchResult.companyInfo.name,
+          market: searchResult.companyInfo.market,
+          edinetCode: searchResult.edinetCode,
+        });
+      }
+    } catch (watchlistActionErr) {
+      const message =
+        watchlistActionErr instanceof Error
+          ? watchlistActionErr.message
+          : "ウォッチリストの更新に失敗しました";
+      setWatchlistActionError(message);
+    } finally {
+      setIsWatchlistToggling(false);
+    }
+  }, [
+    searchResult,
+    user,
+    isInWatchlist,
+    removeFromWatchlist,
+    addToWatchlist,
+  ]);
+
+  const handleRemoveFromWatchlist = useCallback(async (symbol: string) => {
+    try {
+      setWatchlistActionError(null);
+      await removeFromWatchlist(symbol);
+    } catch (removeErr) {
+      const message =
+        removeErr instanceof Error
+          ? removeErr.message
+          : "ウォッチリストからの削除に失敗しました";
+      setWatchlistActionError(message);
+    }
+  }, [removeFromWatchlist]);
+
+  const handleToggleAlertEnabled = useCallback(async () => {
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({ enabled: !alertSettings.enabled });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings, alertSettings.enabled]);
+
+  const handleToggleNewsImpactAlert = useCallback(async () => {
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({
+        newsImpactEnabled: !alertSettings.newsImpactEnabled,
+      });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings, alertSettings.newsImpactEnabled]);
+
+  const handleToggleFinancialAlert = useCallback(async () => {
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({
+        financialScoreEnabled: !alertSettings.financialScoreEnabled,
+      });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings, alertSettings.financialScoreEnabled]);
+
+  const handleChangeNewsThreshold = useCallback(async (value: number) => {
+    if (!Number.isFinite(value)) return;
+    const threshold = Math.max(0, Math.min(100, Math.round(value)));
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({ newsImpactThreshold: threshold });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings]);
+
+  const handleChangeFinancialThreshold = useCallback(async (value: number) => {
+    if (!Number.isFinite(value)) return;
+    const threshold = Math.max(1, Math.min(4, Math.round(value)));
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({ financialScoreChangeThreshold: threshold });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings]);
+
+  const handleChangeCooldownMinutes = useCallback(async (value: number) => {
+    if (!Number.isFinite(value)) return;
+    const cooldownMinutes = Math.max(1, Math.min(240, Math.round(value)));
+    try {
+      setAlertActionError(null);
+      await updateAlertSettings({ cooldownMinutes });
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知設定の更新に失敗しました"
+      );
+    }
+  }, [updateAlertSettings]);
+
+  const handleMarkAlertRead = useCallback(async (alertId: string) => {
+    try {
+      setAlertActionError(null);
+      await markAsRead(alertId);
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知の既読更新に失敗しました"
+      );
+    }
+  }, [markAsRead]);
+
+  const handleMarkAllAlertsRead = useCallback(async () => {
+    try {
+      setAlertActionError(null);
+      await markAllAsRead();
+    } catch (err) {
+      setAlertActionError(
+        err instanceof Error ? err.message : "通知の既読更新に失敗しました"
+      );
+    }
+  }, [markAllAsRead]);
+
+  useEffect(() => {
+    if (!user || !alertSettings.enabled) return;
+    ensureLocalNotificationPermission().catch((err) => {
+      console.error("通知権限リクエスト失敗:", err);
+    });
+  }, [user, alertSettings.enabled]);
+
+  useEffect(() => {
+    const symbol = searchResult?.companyInfo.symbol;
+    if (!user || !symbol || !newsAnalysis) return;
+    if (!isInWatchlist(symbol)) return;
+
+    const processKey = `${symbol}:${newsAnalysis.impact}:${newsAnalysis.impactScore}:${newsAnalysis.analysis}`;
+    if (lastProcessedNewsKeyRef.current === processKey) return;
+    lastProcessedNewsKeyRef.current = processKey;
+
+    const run = async () => {
+      const absImpact = Math.abs(newsAnalysis.impactScore || 0);
+      if (
+        alertSettings.enabled &&
+        alertSettings.newsImpactEnabled &&
+        absImpact >= alertSettings.newsImpactThreshold
+      ) {
+        const message = `ニュース影響がしきい値超過: impactScore ${newsAnalysis.impactScore > 0 ? "+" : ""}${newsAnalysis.impactScore}`;
+        const severity = getNewsSeverity(absImpact);
+        const created = await createAlert({
+          type: "news-impact",
+          severity,
+          symbol,
+          companyName: searchResult.companyInfo.name,
+          value: newsAnalysis.impactScore,
+          message,
+        }, { cooldownMinutes: alertSettings.cooldownMinutes });
+        if (created) {
+          await sendLocalNotification({
+            title: `[${severity.toUpperCase()}] 通知: ${searchResult.companyInfo.name}`,
+            body: message,
+          });
+        }
+      }
+
+      await updateWatchlistMetrics(symbol, {
+        latestNewsImpactScore: newsAnalysis.impactScore,
+      });
+    };
+
+    run().catch((err) => {
+      console.error("ニュース通知処理エラー:", err);
+    });
+  }, [
+    user,
+    searchResult,
+    newsAnalysis,
+    isInWatchlist,
+    alertSettings.enabled,
+    alertSettings.newsImpactEnabled,
+    alertSettings.newsImpactThreshold,
+    alertSettings.cooldownMinutes,
+    createAlert,
+    updateWatchlistMetrics,
+  ]);
+
+  useEffect(() => {
+    const symbol = searchResult?.companyInfo.symbol;
+    if (!user || !symbol || !financialEval) return;
+    if (!isInWatchlist(symbol)) return;
+
+    const processKey = `${symbol}:${financialEval.overall.score}:${financialEval.analysis}`;
+    if (lastProcessedFinancialKeyRef.current === processKey) return;
+    lastProcessedFinancialKeyRef.current = processKey;
+
+    const currentItem = watchlistItems.find(
+      (item) => item.symbol.trim().toUpperCase() === symbol.trim().toUpperCase()
+    );
+    if (!currentItem) return;
+
+    const run = async () => {
+      const previous = currentItem.latestFinancialOverallScore;
+      const next = financialEval.overall.score;
+      const diff =
+        typeof previous === "number" ? Math.abs(next - previous) : 0;
+
+      if (
+        typeof previous === "number" &&
+        alertSettings.enabled &&
+        alertSettings.financialScoreEnabled &&
+        diff >= alertSettings.financialScoreChangeThreshold
+      ) {
+        const delta = next - previous;
+        const message = `財務スコア急変: ${previous} → ${next} (差分 ${delta > 0 ? "+" : ""}${delta})`;
+        const severity = getFinancialSeverity(diff);
+        const created = await createAlert({
+          type: "financial-score-change",
+          severity,
+          symbol,
+          companyName: searchResult.companyInfo.name,
+          value: delta,
+          message,
+        }, { cooldownMinutes: alertSettings.cooldownMinutes });
+        if (created) {
+          await sendLocalNotification({
+            title: `[${severity.toUpperCase()}] 通知: ${searchResult.companyInfo.name}`,
+            body: message,
+          });
+        }
+      }
+
+      await updateWatchlistMetrics(symbol, {
+        latestFinancialOverallScore: next,
+      });
+    };
+
+    run().catch((err) => {
+      console.error("財務通知処理エラー:", err);
+    });
+  }, [
+    user,
+    searchResult,
+    financialEval,
+    isInWatchlist,
+    watchlistItems,
+    alertSettings.enabled,
+    alertSettings.financialScoreEnabled,
+    alertSettings.financialScoreChangeThreshold,
+    alertSettings.cooldownMinutes,
+    createAlert,
+    updateWatchlistMetrics,
+  ]);
+
   // 日本企業かどうかの判定（EDINET Code があれば日本企業）
   const isJapaneseCompany = Boolean(searchResult?.edinetCode);
 
@@ -331,6 +659,18 @@ export default function HomePage() {
           <PurchaseSuccessHandler />
         </Suspense>
 
+        {/* 使い方ガイド */}
+        <Card className="mb-6 border-blue-200 bg-blue-50/40">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-sm text-blue-900 font-semibold mb-2">
+              はじめての方へ：このアプリの使い方
+            </p>
+            <p className="text-sm text-blue-900/90 leading-relaxed">
+              1) 上の検索欄で企業名や証券コードを入力して銘柄を表示します。2) 「財務をAI評価」「関連ニュースをAI分析」で投資判断の材料を確認します。3) 気になる銘柄はウォッチリストに追加し、通知センターでしきい値を設定すると急変を見逃しにくくなります。
+            </p>
+          </CardContent>
+        </Card>
+
         {/* 無料プラン案内 */}
         <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
           無料プランはログイン不要でご利用いただけます。登録なしですぐにお試しください。
@@ -342,6 +682,35 @@ export default function HomePage() {
             <SubscriptionStatus />
           </div>
         )}
+
+        {/* マイウォッチリスト */}
+        <WatchlistSection
+          userLoggedIn={Boolean(user)}
+          items={watchlistItems}
+          loading={watchlistLoading}
+          error={watchlistError}
+          isPremium={isPremium}
+          freeLimit={freeLimit}
+          onSelect={handleSelectSuggestion}
+          onRemove={handleRemoveFromWatchlist}
+        />
+
+        <AlertCenterSection
+          userLoggedIn={Boolean(user)}
+          settings={alertSettings}
+          alerts={alerts}
+          unreadCount={unreadCount}
+          loading={alertsLoading}
+          error={alertsError}
+          onToggleEnabled={handleToggleAlertEnabled}
+          onToggleNewsImpact={handleToggleNewsImpactAlert}
+          onToggleFinancial={handleToggleFinancialAlert}
+          onChangeNewsThreshold={handleChangeNewsThreshold}
+          onChangeFinancialThreshold={handleChangeFinancialThreshold}
+          onChangeCooldownMinutes={handleChangeCooldownMinutes}
+          onMarkAsRead={handleMarkAlertRead}
+          onMarkAllAsRead={handleMarkAllAlertsRead}
+        />
 
         {/* 検索セクション */}
         <SearchSection
@@ -384,6 +753,22 @@ export default function HomePage() {
                   </p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {watchlistActionError && (
+          <Card className="mb-6 border-destructive bg-destructive/5">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-destructive">{watchlistActionError}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {alertActionError && (
+          <Card className="mb-6 border-destructive bg-destructive/5">
+            <CardContent className="pt-4 pb-4">
+              <p className="text-sm text-destructive">{alertActionError}</p>
             </CardContent>
           </Card>
         )}
@@ -534,6 +919,18 @@ export default function HomePage() {
                 currency={getCurrencySymbol}
                 accountingStandard={searchResult.accountingStandard}
                 ratios={searchResult.ratios}
+                watchlist={{
+                  enabled: true,
+                  isInWatchlist: isInWatchlist(searchResult.companyInfo.symbol),
+                  isToggling: isWatchlistToggling,
+                  onToggle: handleToggleWatchlist,
+                  hint:
+                    !isPremium &&
+                    !isInWatchlist(searchResult.companyInfo.symbol) &&
+                    !canAddMore()
+                      ? `無料プランの上限(${freeLimit}銘柄)です。プレミアムで拡張できます。`
+                      : null,
+                }}
               />
             </div>
           </div>
