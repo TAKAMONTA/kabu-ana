@@ -203,7 +203,7 @@ export function useAlerts() {
         readAt: serverTimestamp(),
       });
     },
-    [user, db]
+    [user]
   );
 
   const markAllAsRead = useCallback(async () => {
@@ -220,7 +220,7 @@ export function useAlerts() {
         });
       })
     );
-  }, [user, db, alerts]);
+  }, [user, alerts]);
 
   const unreadCount = alerts.filter((alert) => !alert.read).length;
 
