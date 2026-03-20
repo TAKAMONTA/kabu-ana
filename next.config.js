@@ -1,5 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Capacitor 等（別オリジン）からの fetch 用。Vercel でも確実に付与されるよう next.config で指定
+  async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          {
+            key: "Access-Control-Allow-Methods",
+            value: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+          },
+          {
+            key: "Access-Control-Allow-Headers",
+            value:
+              "Content-Type, Authorization, X-Requested-With, X-API-Key",
+          },
+        ],
+      },
+    ];
+  },
   // 注意: output: "export" を削除しました
   // 静的エクスポートではAPI Routesが動作しないため、動的モードを使用します
   // セキュリティヘッダーはサーバー側（Vercel/ホスティング）で設定してください
