@@ -183,8 +183,8 @@ export default function TermsOfServicePage() {
                 <h3 className="text-lg font-medium mb-2">連絡先情報</h3>
                 <p className="text-sm text-muted-foreground">
                   サービス名: AI Market Analyzer<br />
-                  運営: かぶあな<br />
-                  連絡先: support@kabuana.com<br />
+                  運営: Takaapps<br />
+                  連絡先: admin@takaapps.com<br />
                   対応時間: 平日 9:00-18:00（JST）
                 </p>
               </div>

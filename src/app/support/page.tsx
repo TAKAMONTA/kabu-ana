@@ -25,7 +25,7 @@ export default function SupportPage() {
                   <h3 className="text-lg font-medium text-blue-800">メールサポート</h3>
                 </div>
                 <p className="text-sm text-blue-700 mb-2">
-                  support@kabuana.com
+                  admin@takaapps.com
                 </p>
                 <p className="text-xs text-blue-600">
                   通常2営業日以内にご返信いたします
@@ -99,7 +99,7 @@ export default function SupportPage() {
                   Q: アカウントの削除方法は？
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  A: アカウント削除をご希望の場合は、support@kabuana.com までご連絡ください。
+                  A: アカウント削除をご希望の場合は、admin@takaapps.com までご連絡ください。
                   登録メールアドレスをお知らせいただければ、速やかに対応いたします。
                 </p>
               </div>
@@ -109,7 +109,7 @@ export default function SupportPage() {
                   Q: 有料プランの解約方法は？
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  A: 有料プランの解約は、設定画面またはsupport@kabuana.comへのご連絡で可能です。
+                  A: 有料プランの解約は、設定画面またはadmin@takaapps.comへのご連絡で可能です。
                   解約後も契約期間終了までサービスをご利用いただけます。
                 </p>
               </div>
@@ -195,11 +195,11 @@ export default function SupportPage() {
                 </div>
                 <div className="flex">
                   <dt className="font-medium w-32 text-foreground">運営:</dt>
-                  <dd className="text-muted-foreground">かぶあな</dd>
+                  <dd className="text-muted-foreground">Takaapps</dd>
                 </div>
                 <div className="flex">
                   <dt className="font-medium w-32 text-foreground">連絡先:</dt>
-                  <dd className="text-muted-foreground">support@kabuana.com</dd>
+                  <dd className="text-muted-foreground">admin@takaapps.com</dd>
                 </div>
               </dl>
             </div>
