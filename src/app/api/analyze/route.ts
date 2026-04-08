@@ -3,7 +3,6 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
-import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 async function analyzeHandler(request: NextRequest) {
@@ -11,10 +10,6 @@ async function analyzeHandler(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
   try {
-    // 認証チェック
-    const authResult = await verifyAuth(request);
-    if (isAuthError(authResult)) return authResult;
-
     // 入力データの検証
     const body = await request.json();
     const validationResult = analysisSchema.safeParse(body);
