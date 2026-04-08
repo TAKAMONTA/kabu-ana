@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { CastleRank } from "@/components/castle/types";
 import { generateCastlePrompt } from "@/lib/castle/generateCastlePrompt";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 // OpenAIクライアントを遅延初期化（ビルド時のエラーを防ぐため）
 function getOpenAIClient(): OpenAI | null {
@@ -12,8 +13,12 @@ function getOpenAIClient(): OpenAI | null {
   return new OpenAI({ apiKey });
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     const { rank, companyName } = await request.json();
 
     if (!rank || !companyName) {

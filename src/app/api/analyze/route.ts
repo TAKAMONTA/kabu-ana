@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 async function analyzeHandler(request: NextRequest) {
   try {
+    // 認証チェック
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     // 入力データの検証
     const body = await request.json();
     const validationResult = analysisSchema.safeParse(body);
@@ -51,12 +56,11 @@ async function analyzeHandler(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // セキュアなエラーハンドリング
-    const { createErrorResponse, logError } = await import(
-      "@/lib/utils/errorHandler"
-    );
+    const { logError } = await import("@/lib/utils/errorHandler");
     logError(error, "Analysis API");
-    return createErrorResponse(error, "分析中にエラーが発生しました");
+    // OpenRouterクライアントがユーザー向けメッセージに変換済みなので、そのまま返す
+    const message = error instanceof Error ? error.message : "分析中にエラーが発生しました";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 

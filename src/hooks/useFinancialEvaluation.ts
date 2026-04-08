@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 
 export interface FinancialEvaluationResult {
   bs: { score: 1 | 2 | 3 | 4 | 5; summary: string };
@@ -36,9 +36,10 @@ export function useFinancialEvaluation() {
             )
           : {};
 
+        const headers = await getAuthHeaders();
         const res = await fetch(getApiUrl("/api/financial-evaluation"), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers,
           body: JSON.stringify({
             symbol: args.symbol,
             companyName: args.companyName,

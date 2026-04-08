@@ -68,23 +68,28 @@ export function useCompanySearch() {
         body: JSON.stringify({ query, chartPeriod }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage =
-          errorData.message ||
-          errorData.error ||
-          (errorData.details && errorData.details.length > 0
-            ? errorData.details.map((d: any) => d.message).join("; ")
-            : null) ||
-          "検索に失敗しました";
-        throw new Error(errorMessage);
-      }
-
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const text = await response.text();
         console.error("非JSONレスポンス:", text.substring(0, 200));
         throw new Error("APIが利用できません。本番環境のURLが設定されていない可能性があります。");
+      }
+
+      if (!response.ok) {
+        let errorMessage = "検索に失敗しました";
+        try {
+          const errorData = await response.json();
+          errorMessage =
+            errorData.message ||
+            errorData.error ||
+            (errorData.details && errorData.details.length > 0
+              ? errorData.details.map((d: any) => d.message).join("; ")
+              : null) ||
+            "検索に失敗しました";
+        } catch {
+          // JSONパース失敗時はデフォルトメッセージを使用
+        }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

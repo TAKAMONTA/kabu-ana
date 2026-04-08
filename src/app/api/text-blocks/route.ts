@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { EdinetDBClient } from "@/lib/api/edinetdb";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +38,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 認証チェック（AI要約はコストがかかるため）
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     const { edinetCode, companyName, sections } = await request.json();
 
     if (!edinetCode || !companyName) {

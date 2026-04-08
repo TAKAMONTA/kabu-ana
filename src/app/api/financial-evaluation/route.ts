@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { EdinetDBClient } from "@/lib/api/edinetdb";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 export async function POST(request: NextRequest) {
   try {
+    // 認証チェック
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     const { symbol, companyName, financialData, edinetCode, ratios, financialHistory, accountingStandard } = await request.json();
     if (!symbol || !companyName) {
       return NextResponse.json(

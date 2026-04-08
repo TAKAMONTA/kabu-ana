@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 
 export function useAIAnalysis() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -41,11 +41,10 @@ export function useAIAnalysis() {
         date: item.date || "",
       }));
 
+      const headers = await getAuthHeaders();
       const response = await fetch(getApiUrl("/api/analyze"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           companyInfo: cleanData(companyInfo),
           stockData: cleanedStockData,
@@ -63,12 +62,16 @@ export function useAIAnalysis() {
       }
 
       if (!response.ok) {
+        let errorMessage = `分析に失敗しました（ステータス: ${response.status}）`;
         try {
           const errorData = await response.json();
-          throw new Error(errorData.error || "分析に失敗しました");
-        } catch (parseErr) {
-          throw new Error(`分析に失敗しました（ステータス: ${response.status}）`);
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // JSONパース失敗時はデフォルトメッセージを使用
         }
+        throw new Error(errorMessage);
       }
 
       const data = await response.json();

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { EdinetTextBlock } from "@/lib/api/edinetdb";
 
 export interface AISummary {
@@ -36,9 +36,10 @@ export function useTextBlocks() {
     setIsSummarizing(true);
     setError(null);
     try {
+      const headers = await getAuthHeaders();
       const res = await fetch(getApiUrl("/api/text-blocks"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({
           edinetCode,
           companyName,

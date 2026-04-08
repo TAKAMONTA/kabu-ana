@@ -144,12 +144,11 @@ export function CastleVisualizer({ symbol: initialSymbol, onClose }: CastleVisua
     setIsGeneratingImage(true);
 
     try {
-      const { getApiUrl } = await import("@/lib/utils/apiClient");
+      const { getApiUrl, getAuthHeaders } = await import("@/lib/utils/apiClient");
+      const headers = await getAuthHeaders();
       const response = await fetch(getApiUrl("/api/castle/generate-image"), {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           rank: result.rank,
           companyName: result.companyName,

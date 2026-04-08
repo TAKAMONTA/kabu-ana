@@ -115,6 +115,15 @@ export function useAuth() {
     }
   };
 
+  const getIdToken = async (): Promise<string | null> => {
+    if (!auth?.currentUser) return null;
+    try {
+      return await auth.currentUser.getIdToken();
+    } catch {
+      return null;
+    }
+  };
+
   return {
     user,
     loading,
@@ -122,5 +131,6 @@ export function useAuth() {
     register,
     logout,
     resetPassword,
+    getIdToken,
   };
 }

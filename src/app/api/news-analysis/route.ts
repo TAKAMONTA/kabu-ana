@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { SerpApiClient } from "@/lib/api/serpapi";
 import { FreeNewsClient } from "@/lib/api/freeNews";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 export interface NewsAnalysisResult {
   impact: "positive" | "negative" | "neutral";
@@ -13,6 +14,10 @@ export interface NewsAnalysisResult {
 
 async function newsAnalysisHandler(request: NextRequest) {
   try {
+    // 認証チェック
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     const body = await request.json();
     const { symbol, companyName } = body;
 
