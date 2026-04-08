@@ -128,7 +128,7 @@ export class OpenRouterClient {
 
       return analysisResult;
     } catch (error: any) {
-      console.error("OpenRouter分析エラー:", error);
+      console.error("OpenRouter分析エラー:", error.message || error);
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const apiMessage = error.response?.data?.error?.message;
@@ -236,7 +236,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
 
       return content || "感想を生成できませんでした。";
     } catch (error) {
-      console.error("AI感想生成エラー:", error);
+      console.error("AI感想生成エラー:", error instanceof Error ? error.message : error);
       return "感想の生成中にエラーが発生しました。";
     }
   }
@@ -379,7 +379,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         recommendations: analysisResult.recommendations,
       };
     } catch (error: any) {
-      console.error("ニュース分析エラー:", error);
+      console.error("ニュース分析エラー:", error instanceof Error ? error.message : error);
       return {
         impact: "neutral",
         impactScore: 0,
@@ -478,7 +478,7 @@ ${newsText}
         recommendations: json.recommendations || [],
       };
     } catch (error) {
-      console.error("財務評価エラー:", error);
+      console.error("財務評価エラー:", error instanceof Error ? error.message : error);
       return {
         bs: { score: 3, summary: "BSの評価を取得できませんでした。" },
         pl: { score: 3, summary: "PLの評価を取得できませんでした。" },

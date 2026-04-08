@@ -261,7 +261,7 @@ const callOpenRouter = async (news: any[]) => {
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "anthropic/claude-3.5-sonnet",
+        model: "anthropic/claude-sonnet-4",
         temperature: 0.4,
         max_tokens: 1200,
         messages: [
@@ -280,7 +280,7 @@ const callOpenRouter = async (news: any[]) => {
         headers: {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://ai-market-analyzer.com",
+          "HTTP-Referer": "https://kabu-ana.com",
           "X-Title": "AI Market Analyzer",
         },
         timeout: 30000, // 30秒のタイムアウト
@@ -300,7 +300,6 @@ const callOpenRouter = async (news: any[]) => {
     
     if (!content) {
       console.error("❌ レスポンスにcontentが含まれていません");
-      console.error("レスポンス全体:", JSON.stringify(response.data, null, 2));
       throw new Error("openrouter_empty_response");
     }
 
@@ -339,11 +338,7 @@ const callOpenRouter = async (news: any[]) => {
     return parsed.recommendations as OpenRouterRecommendation[];
   } catch (axiosError: any) {
     if (axios.isAxiosError(axiosError)) {
-      console.error("❌ OpenRouter API呼び出しエラー:");
-      console.error("ステータス:", axiosError.response?.status);
-      console.error("ステータステキスト:", axiosError.response?.statusText);
-      console.error("レスポンスデータ:", axiosError.response?.data);
-      console.error("エラーメッセージ:", axiosError.message);
+      console.error("❌ OpenRouter API呼び出しエラー:", axiosError.response?.status, axiosError.message);
       
       if (axiosError.code === 'ECONNABORTED') {
         throw new Error("openrouter_timeout");
