@@ -59,12 +59,10 @@ async function analyzeHandler(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    // セキュアなエラーハンドリング
-    const { createErrorResponse, logError } = await import(
-      "@/lib/utils/errorHandler"
-    );
+    const { logError } = await import("@/lib/utils/errorHandler");
     logError(error, "Analysis API");
-    return createErrorResponse(error, "分析中にエラーが発生しました");
+    const message = error instanceof Error ? error.message : "分析中にエラーが発生しました";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
