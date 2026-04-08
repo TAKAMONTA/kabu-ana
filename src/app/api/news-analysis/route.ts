@@ -96,7 +96,7 @@ async function newsAnalysisHandler(request: NextRequest) {
       analysis: analysisResult,
     });
   } catch (error: any) {
-    console.error("ニュース分析エラー:", error);
+    console.error("ニュース分析エラー:", error.message || "Unknown error");
     return NextResponse.json(
       { error: error.message || "ニュース分析中にエラーが発生しました" },
       { status: 500 }

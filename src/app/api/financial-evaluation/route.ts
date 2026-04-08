@@ -33,7 +33,7 @@ async function financialEvaluationHandler(request: NextRequest) {
 
     return NextResponse.json({ analysis: result });
   } catch (error: any) {
-    console.error("財務評価APIエラー:", error);
+    console.error("財務評価APIエラー:", error.message || "Unknown error");
     return NextResponse.json(
       { error: error.message || "財務評価に失敗しました" },
       { status: 500 }

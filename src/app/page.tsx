@@ -77,6 +77,7 @@ export default function HomePage() {
     analysisResult,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
+    retry: retryAnalysis,
   } = useAIAnalysis();
   const { user, logout } = useAuth();
   const {
@@ -86,6 +87,7 @@ export default function HomePage() {
     analysis: newsAnalysis,
     analyzeNews,
     clearAnalysis: clearNewsAnalysis,
+    retry: retryNewsAnalysis,
   } = useNewsAnalysis();
   const {
     suggestions,
@@ -103,6 +105,7 @@ export default function HomePage() {
     error: financialError,
     result: financialEval,
     evaluate: evaluateFinancials,
+    retry: retryFinancialEval,
   } = useFinancialEvaluation();
   const {
     canUseFeature,
@@ -370,6 +373,18 @@ export default function HomePage() {
                   <p className="text-sm mt-1">
                     {error || analysisError || newsError}
                   </p>
+                  <div className="flex gap-2 mt-3">
+                    {analysisError && (
+                      <button onClick={retryAnalysis} className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors">
+                        AI分析を再試行
+                      </button>
+                    )}
+                    {newsError && (
+                      <button onClick={retryNewsAnalysis} className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors">
+                        ニュース分析を再試行
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </CardContent>

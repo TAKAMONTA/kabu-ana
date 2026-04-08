@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -17,6 +17,7 @@ export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FinancialEvaluationResult | null>(null);
+  const lastArgsRef = useRef<{ symbol: string; companyName: string; financialData?: any } | null>(null);
 
   const evaluate = useCallback(
     async (args: {
@@ -24,6 +25,7 @@ export function useFinancialEvaluation() {
       companyName: string;
       financialData?: any;
     }) => {
+      lastArgsRef.current = args;
       setIsLoading(true);
       setError(null);
       try {
@@ -46,7 +48,13 @@ export function useFinancialEvaluation() {
     []
   );
 
+  const retry = useCallback(() => {
+    if (lastArgsRef.current) {
+      evaluate(lastArgsRef.current);
+    }
+  }, [evaluate]);
+
   const clear = useCallback(() => setResult(null), []);
 
-  return { isLoading, error, result, evaluate, clear } as const;
+  return { isLoading, error, result, evaluate, clear, retry } as const;
 }

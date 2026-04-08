@@ -28,7 +28,7 @@ async function searchSuggestionsHandler(request: NextRequest) {
         const fmpResults = await fmpApi.comprehensiveSearch(query);
         suggestions = fmpResults.slice(0, 5);
       } catch (error) {
-        console.error("FMP検索候補エラー:", error);
+        console.error("FMP検索候補エラー:", error instanceof Error ? error.message : error);
       }
     }
 
@@ -45,7 +45,7 @@ async function searchSuggestionsHandler(request: NextRequest) {
           suggestions = [serpResult];
         }
       } catch (error) {
-        console.error("SERPAPI検索候補エラー:", error);
+        console.error("SERPAPI検索候補エラー:", error instanceof Error ? error.message : error);
       }
     }
 
@@ -60,7 +60,7 @@ async function searchSuggestionsHandler(request: NextRequest) {
 
     return NextResponse.json({ suggestions: formattedSuggestions });
   } catch (error: any) {
-    console.error("検索候補エラー:", error);
+    console.error("検索候補エラー:", error.message || "Unknown error");
     return NextResponse.json(
       { error: error.message || "検索候補の取得中にエラーが発生しました" },
       { status: 500 }
