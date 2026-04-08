@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
 interface NewsAnalysisState {
@@ -22,11 +22,10 @@ export function useNewsAnalysis() {
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
+      const headers = await getAuthHeaders();
       const options = {
         url: getApiUrl("/api/news-analysis"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         data: { symbol, companyName },
       };
 

@@ -102,9 +102,10 @@ export class OpenRouterClient {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://ai-market-analyzer.com",
+            "HTTP-Referer": "https://kabu-ana.com",
             "X-Title": "AI Market Analyzer",
           },
+          timeout: 30000,
         }
       );
 
@@ -126,8 +127,17 @@ export class OpenRouterClient {
       analysisResult.aiReflection = reflection;
 
       return analysisResult;
-    } catch (error) {
+    } catch (error: any) {
       console.error("OpenRouter分析エラー:", error);
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const apiMessage = error.response?.data?.error?.message;
+        if (status === 401) throw new Error("AI分析サービスの認証に失敗しました。APIキーを確認してください。");
+        if (status === 402) throw new Error("AI分析サービスの残高が不足しています。");
+        if (status === 429) throw new Error("AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。");
+        if (error.code === "ECONNABORTED") throw new Error("AI分析がタイムアウトしました。しばらくしてから再試行してください。");
+        throw new Error(apiMessage || "AI分析中にエラーが発生しました。");
+      }
       throw error;
     }
   }
@@ -214,9 +224,10 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://ai-market-analyzer.com",
+            "HTTP-Referer": "https://kabu-ana.com",
             "X-Title": "AI Market Analyzer",
           },
+          timeout: 30000,
         }
       );
 
@@ -353,6 +364,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
             "HTTP-Referer": "https://kabu-ana.com",
             "X-Title": "AI Market Analyzer",
           },
+          timeout: 30000,
         }
       );
 
@@ -444,6 +456,7 @@ ${newsText}
             "HTTP-Referer": "https://kabu-ana.com",
             "X-Title": "AI Market Analyzer",
           },
+          timeout: 30000,
         }
       );
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
 export interface FinancialEvaluationResult {
@@ -27,9 +27,10 @@ export function useFinancialEvaluation() {
       setIsLoading(true);
       setError(null);
       try {
+        const headers = await getAuthHeaders();
         const options = {
           url: getApiUrl("/api/financial-evaluation"),
-          headers: { "Content-Type": "application/json" },
+          headers,
           data: args,
         };
         const response = await CapacitorHttp.post(options);
