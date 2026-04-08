@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
@@ -17,8 +17,10 @@ export function useNewsAnalysis() {
     newsData: null,
     analysis: null,
   });
+  const lastArgsRef = useRef<{ symbol: string; companyName: string } | null>(null);
 
-  const analyzeNews = async (symbol: string, companyName: string) => {
+  const analyzeNews = useCallback(async (symbol: string, companyName: string) => {
+    lastArgsRef.current = { symbol, companyName };
     setState(prev => ({ ...prev, isLoading: true, error: null }));
 
     try {
@@ -51,20 +53,28 @@ export function useNewsAnalysis() {
             : "ニュース分析中にエラーが発生しました",
       }));
     }
-  };
+  }, []);
 
-  const clearAnalysis = () => {
+  const retry = useCallback(() => {
+    if (lastArgsRef.current) {
+      const { symbol, companyName } = lastArgsRef.current;
+      analyzeNews(symbol, companyName);
+    }
+  }, [analyzeNews]);
+
+  const clearAnalysis = useCallback(() => {
     setState({
       isLoading: false,
       error: null,
       newsData: null,
       analysis: null,
     });
-  };
+  }, []);
 
   return {
     ...state,
     analyzeNews,
     clearAnalysis,
+    retry,
   };
 }

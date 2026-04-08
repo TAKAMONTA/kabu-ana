@@ -197,7 +197,6 @@ const fetchMarketNews = async () => {
     new Map(allNews.map(item => [item.title, item])).values()
   );
   
-  console.log(`📰 収集したニュース数: ${uniqueNews.length}件`);
   return uniqueNews.slice(0, 20); // 最大20件に制限
 };
 
@@ -246,18 +245,13 @@ ${newsText}
 };
 
 const callOpenRouter = async (news: any[]) => {
-  console.log("🔑 OpenRouter APIキーチェック...");
   if (!OPENROUTER_API_KEY || OPENROUTER_API_KEY.trim() === "") {
-    console.error("❌ OPENROUTER_API_KEYが設定されていません");
     throw new Error("openrouter_api_key_missing");
   }
-  console.log("✅ OpenRouter APIキーが設定されています（長さ:", OPENROUTER_API_KEY.length, "）");
 
   const prompt = buildNewsPrompt(news);
-  console.log("📝 プロンプトを構築しました（ニュース数:", news.length, "）");
 
   try {
-    console.log("🚀 OpenRouter APIを呼び出します...");
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
@@ -287,19 +281,12 @@ const callOpenRouter = async (news: any[]) => {
       }
     );
 
-    console.log("📥 OpenRouter APIレスポンスを受信しました");
-    console.log("レスポンスステータス:", response.status);
-    
     if (response.data?.error) {
-      console.error("❌ OpenRouter APIエラー:", response.data.error);
       throw new Error(`openrouter_api_error: ${JSON.stringify(response.data.error)}`);
     }
 
     const content: string | undefined = response.data?.choices?.[0]?.message?.content;
-    console.log("🔍 OpenRouter生レスポンス:", content?.substring(0, 200) + "...");
-    
     if (!content) {
-      console.error("❌ レスポンスにcontentが含まれていません");
       throw new Error("openrouter_empty_response");
     }
 
@@ -313,28 +300,14 @@ const callOpenRouter = async (news: any[]) => {
     try {
       const cleaned = sanitizeOpenRouterJson(match[0]);
       parsed = JSON.parse(cleaned);
-      console.log("✅ パース成功:", JSON.stringify(parsed, null, 2));
     } catch (parseError: any) {
-      console.error("❌ JSONパースエラー:", parseError);
-      console.error("エラーメッセージ:", parseError?.message);
-      console.error("パースしようとした文字列（最初の500文字）:", match[0].substring(0, 500));
-      console.error("パースしようとした文字列（最後の500文字）:", match[0].substring(Math.max(0, match[0].length - 500)));
-      // パースエラーの詳細をログに記録
-      if (parseError instanceof SyntaxError) {
-        console.error("SyntaxErrorの詳細:", {
-          message: parseError.message,
-          stack: parseError.stack,
-        });
-      }
+      console.error("JSONパースエラー:", parseError?.message);
       throw new Error("openrouter_parse_error");
     }
-    
+
     if (!Array.isArray(parsed.recommendations)) {
-      console.error("❌ recommendations配列が見つかりません:", parsed);
       throw new Error("openrouter_missing_recommendations");
     }
-
-    console.log("✅ 推奨銘柄数:", parsed.recommendations.length);
     return parsed.recommendations as OpenRouterRecommendation[];
   } catch (axiosError: any) {
     if (axios.isAxiosError(axiosError)) {
@@ -414,9 +387,7 @@ export async function GET() {
       });
     } catch (openRouterError: any) {
       const errorMessage = openRouterError?.message || String(openRouterError);
-      console.error("❌ OpenRouter呼び出しエラー:");
-      console.error("エラーメッセージ:", errorMessage);
-      console.error("エラーオブジェクト:", openRouterError);
+      console.error("OpenRouter呼び出しエラー:", errorMessage);
       
       // エラーコードを抽出
       let errorCode = "openrouter_failed";
@@ -443,12 +414,7 @@ export async function GET() {
       });
     }
   } catch (error: any) {
-    console.error("top-trading-value エラー:", error?.message || error);
-    console.error("エラーの詳細:", {
-      message: error?.message,
-      stack: error?.stack,
-      name: error?.name,
-    });
+    console.error("top-trading-value エラー:", error?.message || "Unknown error");
     // エラーレスポンスを確実にJSON形式で返す
     return NextResponse.json(
       {

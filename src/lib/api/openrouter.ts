@@ -128,7 +128,7 @@ export class OpenRouterClient {
 
       return analysisResult;
     } catch (error: any) {
-      console.error("OpenRouter分析エラー:", error.message || error);
+      console.error("OpenRouter分析エラー:", error instanceof Error ? error.message : "Unknown error");
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const apiMessage = error.response?.data?.error?.message;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
@@ -9,12 +9,14 @@ export function useAIAnalysis() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
     null
   );
+  const lastArgsRef = useRef<{ companyInfo: any; stockData: any; newsData: any[] } | null>(null);
 
-  const analyzeStock = async (
+  const analyzeStock = useCallback(async (
     companyInfo: any,
     stockData: any,
     newsData: any[]
   ) => {
+    lastArgsRef.current = { companyInfo, stockData, newsData };
     setIsAnalyzing(true);
     setError(null);
 
@@ -23,11 +25,7 @@ export function useAIAnalysis() {
       const options = {
         url: getApiUrl("/api/analyze"),
         headers,
-        data: {
-          companyInfo,
-          stockData,
-          newsData,
-        },
+        data: { companyInfo, stockData, newsData },
       };
 
       const response = await CapacitorHttp.post(options);
@@ -44,12 +42,19 @@ export function useAIAnalysis() {
     } finally {
       setIsAnalyzing(false);
     }
-  };
+  }, []);
 
-  const clearAnalysis = () => {
+  const retry = useCallback(() => {
+    if (lastArgsRef.current) {
+      const { companyInfo, stockData, newsData } = lastArgsRef.current;
+      analyzeStock(companyInfo, stockData, newsData);
+    }
+  }, [analyzeStock]);
+
+  const clearAnalysis = useCallback(() => {
     setAnalysisResult(null);
     setError(null);
-  };
+  }, []);
 
   return {
     isAnalyzing,
@@ -57,5 +62,6 @@ export function useAIAnalysis() {
     analysisResult,
     analyzeStock,
     clearAnalysis,
+    retry,
   };
 }
