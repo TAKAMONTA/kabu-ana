@@ -3,7 +3,6 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { SerpApiClient } from "@/lib/api/serpapi";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
-import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 
 export interface NewsAnalysisResult {
   impact: "positive" | "negative" | "neutral";
@@ -19,10 +18,6 @@ async function newsAnalysisHandler(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
   try {
-    // 認証チェック
-    const authResult = await verifyAuth(request);
-    if (isAuthError(authResult)) return authResult;
-
     const body = await request.json();
     const { symbol, companyName } = body;
 
