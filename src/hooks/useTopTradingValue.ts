@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -26,6 +26,7 @@ export function useTopTradingValue() {
   const [items, setItems] = useState<TradingValueItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   const translateErrorCode = (code: string): string | null => {
     switch (code) {
@@ -81,6 +82,7 @@ export function useTopTradingValue() {
         throw new Error(friendlyMessage || `ランキングの取得に失敗しました（ステータス: ${response.status}）`);
       }
 
+      if (!mountedRef.current) return;
       const data = response.data;
       const itemsFromApi = Array.isArray(data.items) ? data.items : [];
       setItems(itemsFromApi);
@@ -94,6 +96,7 @@ export function useTopTradingValue() {
         setError(null);
       }
     } catch (err: any) {
+      if (!mountedRef.current) return;
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -101,12 +104,13 @@ export function useTopTradingValue() {
       }
       setItems([]);
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchRanking();
+    return () => { mountedRef.current = false; };
   }, []);
 
   return { items, isLoading, error, refresh: fetchRanking };

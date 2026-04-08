@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -18,6 +18,11 @@ export function useFinancialEvaluation() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FinancialEvaluationResult | null>(null);
   const lastArgsRef = useRef<{ symbol: string; companyName: string; financialData?: any } | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const evaluate = useCallback(
     async (args: {
@@ -38,11 +43,13 @@ export function useFinancialEvaluation() {
         const response = await CapacitorHttp.post(options);
         const data = response.data;
         if (response.status !== 200) throw new Error(data.error || "財務評価に失敗しました");
+        if (!mountedRef.current) return;
         setResult(data.analysis);
       } catch (e: any) {
+        if (!mountedRef.current) return;
         setError(e.message || "財務評価に失敗しました");
       } finally {
-        setIsLoading(false);
+        if (mountedRef.current) setIsLoading(false);
       }
     },
     []

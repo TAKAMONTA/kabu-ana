@@ -1,9 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: process.env.EXPORT_STATIC === "true" ? "export" : undefined,
-  // 注意: EXPORT_STATIC=true の場合のみ output: "export" を使用します
-  // 静的エクスポートではAPI Routesが動作しないため、Web版では動的モードを使用します
-  // セキュリティヘッダーはサーバー側（Vercel/ホスティング）で設定してください
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   // 実験的機能の設定
   experimental: {
     serverComponentsExternalPackages: ["@firebase/auth", "@firebase/firestore"],
