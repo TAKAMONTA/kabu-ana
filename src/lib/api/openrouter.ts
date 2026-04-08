@@ -84,7 +84,7 @@ export class OpenRouterClient {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-3.5-sonnet", // コスト効率の良いモデル
+          model: "anthropic/claude-sonnet-4", // コスト効率の良いモデル
           messages: [
             {
               role: "system",
@@ -206,7 +206,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-3.5-sonnet",
+          model: "anthropic/claude-sonnet-4",
           messages: [
             {
               role: "system",
@@ -343,7 +343,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-3.5-sonnet",
+          model: "anthropic/claude-sonnet-4",
           messages: [
             {
               role: "system",
@@ -437,7 +437,7 @@ ${newsText}
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-3.5-sonnet",
+          model: "anthropic/claude-sonnet-4",
           messages: [
             {
               role: "system",
