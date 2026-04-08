@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
-import { getApiUrl } from "@/lib/utils/apiClient";
+import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
 export function useAIAnalysis() {
@@ -19,11 +19,10 @@ export function useAIAnalysis() {
     setError(null);
 
     try {
+      const headers = await getAuthHeaders();
       const options = {
         url: getApiUrl("/api/analyze"),
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         data: {
           companyInfo,
           stockData,

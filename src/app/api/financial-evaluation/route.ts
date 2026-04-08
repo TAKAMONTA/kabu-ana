@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import { verifyAuth, isAuthError } from "@/lib/auth/verifyAuth";
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 async function financialEvaluationHandler(request: NextRequest) {
@@ -8,6 +9,10 @@ async function financialEvaluationHandler(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
   try {
+    // 認証チェック
+    const authResult = await verifyAuth(request);
+    if (isAuthError(authResult)) return authResult;
+
     const { symbol, companyName, financialData } = await request.json();
     if (!symbol || !companyName) {
       return NextResponse.json(

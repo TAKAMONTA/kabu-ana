@@ -12,7 +12,7 @@ export const searchSchema = z.object({
     )
     .transform(val => val.trim()),
   chartPeriod: z
-    .enum(["1D", "1W", "1M", "3M", "1Y"], {
+    .enum(["1D", "5D", "1W", "1M", "3M", "6M", "1Y", "5Y", "MAX"], {
       errorMap: () => ({ message: "無効な期間が指定されています" }),
     })
     .optional()

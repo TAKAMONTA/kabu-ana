@@ -22,6 +22,28 @@ export function getApiBaseUrl(): string {
 }
 
 /**
+ * 認証付きリクエスト用のヘッダーを生成する。
+ * Firebase Auth のログインユーザーがいれば Authorization ヘッダーを付与。
+ */
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  try {
+    const { auth } = await import("@/lib/firebase");
+    if (auth?.currentUser) {
+      const token = await auth.currentUser.getIdToken();
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+    }
+  } catch {
+    // Firebase未初期化の場合は認証なしで続行
+  }
+  return headers;
+}
+
+/**
  * APIエンドポイントの完全なURLを取得
  */
 export function getApiUrl(endpoint: string): string {
