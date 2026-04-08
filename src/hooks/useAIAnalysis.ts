@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
@@ -10,6 +10,11 @@ export function useAIAnalysis() {
     null
   );
   const lastArgsRef = useRef<{ companyInfo: any; stockData: any; newsData: any[] } | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const analyzeStock = useCallback(async (
     companyInfo: any,
@@ -34,13 +39,15 @@ export function useAIAnalysis() {
         throw new Error(response.data?.error || "分析に失敗しました");
       }
 
+      if (!mountedRef.current) return;
       setAnalysisResult(response.data.analysis);
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(
         err instanceof Error ? err.message : "分析中にエラーが発生しました"
       );
     } finally {
-      setIsAnalyzing(false);
+      if (mountedRef.current) setIsAnalyzing(false);
     }
   }, []);
 

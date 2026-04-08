@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
@@ -18,6 +18,11 @@ export function useNewsAnalysis() {
     analysis: null,
   });
   const lastArgsRef = useRef<{ symbol: string; companyName: string } | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const analyzeNews = useCallback(async (symbol: string, companyName: string) => {
     lastArgsRef.current = { symbol, companyName };
@@ -37,6 +42,7 @@ export function useNewsAnalysis() {
         throw new Error(response.data?.error || "ニュース分析に失敗しました");
       }
 
+      if (!mountedRef.current) return;
       setState({
         isLoading: false,
         error: null,
@@ -44,6 +50,7 @@ export function useNewsAnalysis() {
         analysis: response.data.analysis,
       });
     } catch (err) {
+      if (!mountedRef.current) return;
       setState(prev => ({
         ...prev,
         isLoading: false,
