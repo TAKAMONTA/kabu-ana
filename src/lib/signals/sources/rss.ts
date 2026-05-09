@@ -5,6 +5,8 @@ export interface RssSource {
   name: string;
   url: string;
   weight: number;
+  /** Skip Next.js fetch cache (for feeds whose payload exceeds the 2MB cache limit). */
+  noCache?: boolean;
 }
 
 export interface EnergyNewsItem {
@@ -31,7 +33,7 @@ export const RSS_SOURCES: RssSource[] = [
   { id: "jogmec", name: "JOGMEC", url: "https://www.jogmec.go.jp/news/release/news.xml", weight: 0.7 },
   { id: "reuters-world", name: "Reuters World", url: "https://www.reutersagency.com/feed/?best-topics=world", weight: 0.8 },
   { id: "bbc-world", name: "BBC World", url: "https://feeds.bbci.co.uk/news/world/rss.xml", weight: 0.7 },
-  { id: "ap", name: "AP News", url: "https://apnews.com/hub/ap-top-news?output=rss", weight: 0.7 },
+  { id: "ap", name: "AP News", url: "https://apnews.com/hub/ap-top-news?output=rss", weight: 0.7, noCache: true },
 ];
 
 function decodeEntities(value: string): string {
@@ -81,7 +83,10 @@ export function parseRssFeed(xml: string, source: RssSource): EnergyNewsItem[] {
 export async function fetchEnergyNews(): Promise<EnergyNewsItem[]> {
   const settled = await Promise.allSettled(
     RSS_SOURCES.map(async (source) => {
-      const response = await fetch(source.url, { next: { revalidate: 900 } });
+      const init: RequestInit = source.noCache
+        ? { cache: "no-store" }
+        : { next: { revalidate: 900 } };
+      const response = await fetch(source.url, init);
       if (!response.ok) throw new Error(`${source.name} RSS failed: ${response.status}`);
       return parseRssFeed(await response.text(), source);
     })
