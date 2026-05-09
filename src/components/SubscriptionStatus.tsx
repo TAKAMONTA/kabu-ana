@@ -70,6 +70,13 @@ export function SubscriptionStatus() {
   const LegalLinks = () => (
     <div className="space-y-3 mt-4 border-t border-border pt-4">
       <div className="flex flex-col items-center gap-2">
+        <p className="text-[10px] text-muted-foreground text-center leading-relaxed max-w-[300px]">
+          プレミアム月額プラン: ¥700/月（1ヶ月ごとに自動更新）
+          プレミアム年額プラン: ¥7,000/年（1年ごとに自動更新）
+          サブスクリプションは期間終了の少なくとも24時間前に自動更新をオフにしない限り自動的に更新されます。
+          お支払いはApple IDアカウントに請求されます。
+          購入後の管理・キャンセルは「設定」＞「Apple ID」＞「サブスクリプション」から行えます。
+        </p>
         <div className="flex items-center justify-center gap-3 text-xs">
           <Link href="/terms-of-use" className="text-primary hover:underline font-medium">
             利用規約
@@ -78,19 +85,14 @@ export function SubscriptionStatus() {
           <Link href="/privacy-policy" className="text-primary hover:underline font-medium">
             プライバシーポリシー
           </Link>
-        </div>
-        <p className="text-[10px] text-muted-foreground text-center leading-relaxed max-w-[280px]">
-          サブスクリプションは期間終了の24時間前までにキャンセルしない限り自動更新されます。
-          お支払いはApple IDアカウントに請求されます。管理・キャンセルは、購入後にApple IDのアカウント設定から行えます。
-        </p>
-        <div className="mt-1">
+          <span className="text-muted-foreground">|</span>
           <a
             href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline font-medium"
+            className="text-primary hover:underline font-medium"
           >
-            Apple標準利用規約 (EULA)
+            EULA
           </a>
         </div>
       </div>
@@ -176,13 +178,13 @@ export function SubscriptionStatus() {
     return (
       <>
         <DeleteConfirmDialog />
-        <Card className="border-green-200 bg-green-50">
+        <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
           <CardHeader>
-            <CardTitle className="text-green-800">プレミアム会員</CardTitle>
+            <CardTitle className="text-green-800 dark:text-green-200">プレミアム会員</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <p className="text-sm text-green-700">
+              <p className="text-sm text-green-700 dark:text-green-300">
                 ✅ プレミアム機能をご利用いただけます
               </p>
               {subscription?.platform && (
@@ -196,7 +198,7 @@ export function SubscriptionStatus() {
                 </p>
               )}
               {subscription?.isTrial && (
-                <p className="text-xs text-orange-600">
+                <p className="text-xs text-orange-600 dark:text-orange-300">
                   ⚠️ トライアル期間中です
                 </p>
               )}
@@ -213,13 +215,13 @@ export function SubscriptionStatus() {
     return (
       <>
         <DeleteConfirmDialog />
-        <Card className="border-orange-200 bg-orange-50">
+        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
           <CardHeader>
-            <CardTitle className="text-orange-800">有効期限切れ</CardTitle>
+            <CardTitle className="text-orange-800 dark:text-orange-200">有効期限切れ</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <p className="text-sm text-orange-700">
+              <p className="text-sm text-orange-700 dark:text-orange-300">
                 プレミアム機能の有効期限が切れています
               </p>
               {subscription?.expiryDate && (
@@ -268,7 +270,7 @@ export function SubscriptionStatus() {
                 )}
               </div>
               {currentError && (
-                <p className="text-xs text-red-600">{currentError}</p>
+                <p className="text-xs text-red-600 dark:text-red-300">{currentError}</p>
               )}
               <LegalLinks />
               <DeleteAccountButton />
@@ -300,8 +302,8 @@ export function SubscriptionStatus() {
               <li>✨ 広告なしの快適な利用体験</li>
             </ul>
 
-            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200">
-              <p className="text-xs text-blue-700">
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-200">
                 💡 無料プランではAI機能を1日5回までご利用いただけます。プレミアムプランで無制限に！
               </p>
             </div>
@@ -332,7 +334,7 @@ export function SubscriptionStatus() {
                   <div className="font-semibold text-xs">プレミアム年額プラン</div>
                   <div className="mt-1 text-lg font-bold">¥7,000</div>
                   <div className="text-[10px] text-muted-foreground">1年ごとに自動更新</div>
-                  <div className="mt-1 text-[10px] font-semibold text-green-600">
+                  <div className="mt-1 text-[10px] font-semibold text-green-600 dark:text-green-400">
                     約¥583/月（17%お得）
                   </div>
                 </button>
@@ -363,7 +365,7 @@ export function SubscriptionStatus() {
             </div>
 
             {currentError && (
-              <p className="text-xs text-red-600 font-medium text-center">{currentError}</p>
+              <p className="text-xs text-red-600 dark:text-red-300 font-medium text-center">{currentError}</p>
             )}
 
             <LegalLinks />

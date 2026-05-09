@@ -86,8 +86,8 @@ export function NewsSection({
             {!isPremium && (
               <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
                 canUseFeature
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-red-100 text-red-700"
+                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                  : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
               }`}>
                 残り{remainingUses}/{dailyLimit}
               </span>
@@ -100,23 +100,23 @@ export function NewsSection({
         {newsAnalysis ? (
           <div className="space-y-6">
             {/* ニュース影響分析結果 */}
-            <div className="p-5 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-lg border-2 border-purple-300 shadow-sm">
+            <div className="p-5 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-lg border-2 border-purple-300 shadow-sm dark:from-purple-950 dark:to-purple-900/50 dark:border-purple-800">
               <div className="flex items-start gap-3 mb-4">
-                <div className="p-2 bg-purple-200 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-purple-800" />
+                <div className="p-2 bg-purple-200 rounded-lg dark:bg-purple-900">
+                  <TrendingUp className="h-5 w-5 text-purple-800 dark:text-purple-200" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-bold text-purple-950 text-lg">
+                    <h4 className="font-bold text-purple-950 text-lg dark:text-purple-100">
                       📈 ニュース影響分析
                     </h4>
                     <span
                       className={`px-3 py-1 rounded-full text-sm font-bold ${
                         newsAnalysis.impact === "positive"
-                          ? "bg-green-200 text-green-900"
+                          ? "bg-green-200 text-green-900 dark:bg-green-900 dark:text-green-200"
                           : newsAnalysis.impact === "negative"
-                          ? "bg-red-200 text-red-900"
-                          : "bg-gray-200 text-gray-900"
+                          ? "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
+                          : "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-gray-200"
                       }`}
                     >
                       {newsAnalysis.impact === "positive"
@@ -128,27 +128,27 @@ export function NewsSection({
                       {newsAnalysis.impactScore})
                     </span>
                   </div>
-                  <p className="text-sm text-purple-700 mb-3">
+                  <p className="text-sm text-purple-700 mb-3 dark:text-purple-300">
                     AIによる最新ニュースの株価影響評価
                   </p>
                 </div>
               </div>
-              <div className="bg-white p-4 rounded-lg border border-purple-200 shadow-sm">
-                <p className="text-sm text-purple-900 leading-relaxed mb-4">
+              <div className="bg-white p-4 rounded-lg border border-purple-200 shadow-sm dark:bg-card dark:border-purple-800">
+                <p className="text-sm text-purple-900 leading-relaxed mb-4 dark:text-purple-200">
                   {newsAnalysis.analysis}
                 </p>
 
                 {/* 重要なポイント */}
                 {newsAnalysis.keyPoints.length > 0 && (
                   <div className="mb-4">
-                    <h5 className="font-semibold text-purple-800 mb-2 text-sm">
+                    <h5 className="font-semibold text-purple-800 mb-2 text-sm dark:text-purple-200">
                       🔍 重要なポイント
                     </h5>
                     <ul className="space-y-1">
                       {newsAnalysis.keyPoints.map((point, idx) => (
                         <li
                           key={idx}
-                          className="text-xs text-purple-800 pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-purple-600"
+                          className="text-xs text-purple-800 pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-purple-600 dark:text-purple-200 dark:before:text-purple-400"
                         >
                           {point}
                         </li>
@@ -160,14 +160,14 @@ export function NewsSection({
                 {/* 推奨事項 */}
                 {newsAnalysis.recommendations.length > 0 && (
                   <div>
-                    <h5 className="font-semibold text-purple-800 mb-2 text-sm">
+                    <h5 className="font-semibold text-purple-800 mb-2 text-sm dark:text-purple-200">
                       💡 投資家への推奨事項
                     </h5>
                     <ul className="space-y-1">
                       {newsAnalysis.recommendations.map((rec, idx) => (
                         <li
                           key={idx}
-                          className="text-xs text-purple-800 pl-4 relative before:content-['→'] before:absolute before:left-0 before:text-purple-600"
+                          className="text-xs text-purple-800 pl-4 relative before:content-['→'] before:absolute before:left-0 before:text-purple-600 dark:text-purple-200 dark:before:text-purple-400"
                         >
                           {rec}
                         </li>
