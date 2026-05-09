@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /signals_prices/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_news/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_seismic/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_baseline/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_risk/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_brief/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /signals_run_log/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /signals_claude_log/{document=**} {
+      allow read, write: if false;
+    }
+
+    match /signals_claude_usage/{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
