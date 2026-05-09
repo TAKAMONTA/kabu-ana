@@ -12,12 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  TrendingUp,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { TrendingUp, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
@@ -36,6 +31,7 @@ import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSect
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SignalsNav } from "@/components/signals/SignalsNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -127,32 +123,48 @@ export default function HomePage() {
     clearNewsAnalysis();
 
     await searchCompany(queryToUse, chartPeriod);
-  }, [searchQuery, chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  }, [
+    searchQuery,
+    chartPeriod,
+    searchCompany,
+    clearSuggestions,
+    clearAiAnalysis,
+    clearNewsAnalysis,
+  ]);
 
-  const handleInputChange = useCallback((value: string) => {
-    setSearchQuery(value);
-    if (value.trim().length < 1) {
-      clearSuggestions();
-      setShowSuggestions(false);
+  const handleInputChange = useCallback(
+    (value: string) => {
+      setSearchQuery(value);
+      if (value.trim().length < 1) {
+        clearSuggestions();
+        setShowSuggestions(false);
+        setActiveSuggestion(-1);
+        return;
+      }
+      setShowSuggestions(true);
       setActiveSuggestion(-1);
-      return;
-    }
-    setShowSuggestions(true);
-    setActiveSuggestion(-1);
-    searchSuggestions(value);
-  }, [searchSuggestions, clearSuggestions]);
+      searchSuggestions(value);
+    },
+    [searchSuggestions, clearSuggestions]
+  );
 
-  const handleSelectSuggestion = useCallback(async (
-    symbol: string,
-    displayText?: string
-  ) => {
-    setSearchQuery(displayText || symbol);
-    setShowSuggestions(false);
-    clearSuggestions();
-    clearAiAnalysis();
-    clearNewsAnalysis();
-    await searchCompany(symbol, chartPeriod);
-  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  const handleSelectSuggestion = useCallback(
+    async (symbol: string, displayText?: string) => {
+      setSearchQuery(displayText || symbol);
+      setShowSuggestions(false);
+      clearSuggestions();
+      clearAiAnalysis();
+      clearNewsAnalysis();
+      await searchCompany(symbol, chartPeriod);
+    },
+    [
+      chartPeriod,
+      searchCompany,
+      clearSuggestions,
+      clearAiAnalysis,
+      clearNewsAnalysis,
+    ]
+  );
 
   const renderHighlighted = useCallback((text: string, query: string) => {
     if (!query) return text;
@@ -200,12 +212,15 @@ export default function HomePage() {
     return searchResult.companyInfo.market === "TYO" ? "¥" : "$";
   }, [searchResult]);
 
-  const handleChartPeriodChange = useCallback(async (period: string) => {
-    setChartPeriod(period);
-    if (searchResult) {
-      await searchCompany(searchResult.companyInfo.symbol, period);
-    }
-  }, [searchResult, searchCompany]);
+  const handleChartPeriodChange = useCallback(
+    async (period: string) => {
+      setChartPeriod(period);
+      if (searchResult) {
+        await searchCompany(searchResult.companyInfo.symbol, period);
+      }
+    },
+    [searchResult, searchCompany]
+  );
 
   const handleNewsAnalysis = useCallback(async () => {
     if (!searchResult) return;
@@ -262,15 +277,24 @@ export default function HomePage() {
     }
   }, []);
 
-  const handlePickSelect = useCallback(async (query: string) => {
-    setSearchQuery(query);
-    setShowSuggestions(false);
-    setActiveSuggestion(-1);
-    clearSuggestions();
-    clearAiAnalysis();
-    clearNewsAnalysis();
-    await searchCompany(query, chartPeriod);
-  }, [chartPeriod, searchCompany, clearSuggestions, clearAiAnalysis, clearNewsAnalysis]);
+  const handlePickSelect = useCallback(
+    async (query: string) => {
+      setSearchQuery(query);
+      setShowSuggestions(false);
+      setActiveSuggestion(-1);
+      clearSuggestions();
+      clearAiAnalysis();
+      clearNewsAnalysis();
+      await searchCompany(query, chartPeriod);
+    },
+    [
+      chartPeriod,
+      searchCompany,
+      clearSuggestions,
+      clearAiAnalysis,
+      clearNewsAnalysis,
+    ]
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -285,7 +309,8 @@ export default function HomePage() {
               </h1>
             </div>
             <SignalsNav active="home" />
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <ThemeToggle />
               {user ? (
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-muted-foreground hidden sm:inline">
@@ -319,13 +344,18 @@ export default function HomePage() {
         {/* 無料プラン案内 */}
         <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
           <div className="flex items-center justify-between">
-            <span>無料プランではAI機能を1日{dailyLimit}回までご利用いただけます。ログイン不要ですぐにお試しください。</span>
+            <span>
+              無料プランではAI機能を1日{dailyLimit}
+              回までご利用いただけます。ログイン不要ですぐにお試しください。
+            </span>
             {!isPremium && (
-              <span className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
-                canUseFeature
-                  ? "bg-green-200 text-green-800"
-                  : "bg-red-200 text-red-800"
-              }`}>
+              <span
+                className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
+                  canUseFeature
+                    ? "bg-green-200 text-green-800"
+                    : "bg-red-200 text-red-800"
+                }`}
+              >
                 残り{remainingUses}/{dailyLimit}回
               </span>
             )}
@@ -377,12 +407,18 @@ export default function HomePage() {
                   </p>
                   <div className="flex gap-2 mt-3">
                     {analysisError && (
-                      <button onClick={retryAnalysis} className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors">
+                      <button
+                        onClick={retryAnalysis}
+                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                      >
                         AI分析を再試行
                       </button>
                     )}
                     {newsError && (
-                      <button onClick={retryNewsAnalysis} className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors">
+                      <button
+                        onClick={retryNewsAnalysis}
+                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                      >
                         ニュース分析を再試行
                       </button>
                     )}
@@ -599,11 +635,17 @@ export default function HomePage() {
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col items-center space-y-3">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <Link href="/terms-of-use" className="hover:text-foreground hover:underline">
+              <Link
+                href="/terms-of-use"
+                className="hover:text-foreground hover:underline"
+              >
                 利用規約
               </Link>
               <span>·</span>
-              <Link href="/privacy-policy" className="hover:text-foreground hover:underline">
+              <Link
+                href="/privacy-policy"
+                className="hover:text-foreground hover:underline"
+              >
                 プライバシーポリシー
               </Link>
             </div>

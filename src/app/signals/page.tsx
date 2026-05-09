@@ -7,6 +7,7 @@ import { GeopolRiskGauge } from "@/components/signals/GeopolRiskGauge";
 import { PriceStrip } from "@/components/signals/PriceStrip";
 import { SeismicTable } from "@/components/signals/SeismicTable";
 import { SignalsNav } from "@/components/signals/SignalsNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 export default function SignalsPage() {
   return (
@@ -17,7 +18,10 @@ export default function SignalsPage() {
             <h1 className="text-2xl font-semibold tracking-normal">マーケット・シグナル</h1>
             <p className="mt-1 text-sm text-muted-foreground">外部環境とAIブリーフを30秒で確認</p>
           </div>
-          <SignalsNav active="signals" />
+          <div className="flex items-center gap-2">
+            <SignalsNav active="signals" />
+            <ThemeToggle />
+          </div>
         </div>
         <AnomalyTicker />
         <PriceStrip />
