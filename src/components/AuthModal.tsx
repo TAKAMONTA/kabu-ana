@@ -92,15 +92,20 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
-        <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-6 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
-        >
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-6 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out">
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <Dialog.Title className="text-lg font-semibold">認証</Dialog.Title>
+              <Dialog.Title className="text-lg font-semibold">
+                認証
+              </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-foreground">
                 アカウントにログインまたは新規登録してください
               </Dialog.Description>
@@ -198,8 +203,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             <div
               className={`mt-4 p-3 rounded-md flex items-center space-x-2 ${
                 message.type === "success"
-                  ? "bg-green-50 text-green-800 border border-green-200"
-                  : "bg-red-50 text-red-800 border border-red-200"
+                  ? "bg-green-50 text-green-800 border border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800"
+                  : "bg-red-50 text-red-800 border border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800"
               }`}
             >
               {message.type === "success" ? (
@@ -210,7 +215,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
               <span className="text-sm">{message.text}</span>
             </div>
           )}
-
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>

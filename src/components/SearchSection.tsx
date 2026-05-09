@@ -107,6 +107,18 @@ export function SearchSection({
                 onBlur={() => {
                   setTimeout(() => setShowSuggestions(false), 100);
                 }}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-controls="search-suggestions"
+                aria-expanded={
+                  showSuggestions &&
+                  (suggestions.length > 0 || isSuggestLoading)
+                }
+                aria-activedescendant={
+                  activeSuggestion >= 0
+                    ? `search-suggestion-${activeSuggestion}`
+                    : undefined
+                }
               />
               {/* サジェストドロップダウン */}
               {showSuggestions &&
@@ -114,6 +126,7 @@ export function SearchSection({
                   <div className="absolute left-0 right-0 top-full z-50 mt-2 rounded-md border bg-card shadow">
                     {searchQuery.trim() && (
                       <button
+                        type="button"
                         className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
                         onMouseDown={e => {
                           e.preventDefault();
@@ -126,32 +139,51 @@ export function SearchSection({
                     )}
 
                     {isSuggestLoading && (
-                      <div className="px-3 py-2 text-sm text-muted-foreground">
+                      <div
+                        className="px-3 py-2 text-sm text-muted-foreground"
+                        role="status"
+                        aria-live="polite"
+                      >
                         候補を取得中...
                       </div>
                     )}
-                    {!isSuggestLoading &&
-                      suggestions.map((sug, idx) => (
-                        <button
-                          key={`${sug.symbol}-${idx}`}
-                          className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
-                            idx === activeSuggestion ? "bg-accent" : ""
-                          }`}
-                          onMouseEnter={() => setActiveSuggestion(idx)}
-                          onMouseDown={e => {
-                            e.preventDefault();
-                            onSelectSuggestion(sug.symbol, `${sug.companyName}`);
-                          }}
-                        >
-                          <span className="font-medium">
-                            {renderHighlighted(sug.companyName, searchQuery)}
-                          </span>
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {renderHighlighted(sug.symbol, searchQuery)}
-                            {sug.exchange ? ` · ${sug.exchange}` : ""}
-                          </span>
-                        </button>
-                      ))}
+                    <ul
+                      id="search-suggestions"
+                      role="listbox"
+                      aria-label="検索候補"
+                      className="m-0 list-none p-0"
+                    >
+                      {!isSuggestLoading &&
+                        suggestions.map((sug, idx) => (
+                          <li key={`${sug.symbol}-${idx}`} role="presentation">
+                            <button
+                              type="button"
+                              id={`search-suggestion-${idx}`}
+                              role="option"
+                              aria-selected={idx === activeSuggestion}
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
+                                idx === activeSuggestion ? "bg-accent" : ""
+                              }`}
+                              onMouseEnter={() => setActiveSuggestion(idx)}
+                              onMouseDown={e => {
+                                e.preventDefault();
+                                onSelectSuggestion(
+                                  sug.symbol,
+                                  `${sug.companyName}`
+                                );
+                              }}
+                            >
+                              <span className="font-medium">
+                                {renderHighlighted(sug.companyName, searchQuery)}
+                              </span>
+                              <span className="ml-2 text-xs text-muted-foreground">
+                                {renderHighlighted(sug.symbol, searchQuery)}
+                                {sug.exchange ? ` · ${sug.exchange}` : ""}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                    </ul>
                   </div>
                 )}
             </div>

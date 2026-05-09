@@ -342,7 +342,7 @@ export default function HomePage() {
         </Suspense>
 
         {/* 無料プラン案内 */}
-        <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800">
+        <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
           <div className="flex items-center justify-between">
             <span>
               無料プランではAI機能を1日{dailyLimit}
@@ -352,8 +352,8 @@ export default function HomePage() {
               <span
                 className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
                   canUseFeature
-                    ? "bg-green-200 text-green-800"
-                    : "bg-red-200 text-red-800"
+                    ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                    : "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
                 }`}
               >
                 残り{remainingUses}/{dailyLimit}回
@@ -564,10 +564,10 @@ export default function HomePage() {
         {!isPremium && (
           <aside
             aria-label="スポンサー広告"
-            className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6"
+            className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6 dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"
           >
             <div className="text-center">
-              <p className="text-sm text-orange-600 font-semibold mb-3">
+              <p className="text-sm text-orange-600 font-semibold mb-3 dark:text-orange-300">
                 スポンサー
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
