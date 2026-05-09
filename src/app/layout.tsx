@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { VercelAnalytics } from "@/components/VercelAnalytics";
@@ -22,6 +22,13 @@ export const metadata: Metadata = {
     icon: "/icon-192x192.png",
     apple: "/icon-192x192.png",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#3b82f6",
+  viewportFit: "cover",
+  initialScale: 1,
+  width: "device-width",
 };
 
 export default function RootLayout({

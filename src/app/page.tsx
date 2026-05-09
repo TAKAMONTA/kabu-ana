@@ -35,6 +35,7 @@ import { AnalysisSection } from "@/components/AnalysisSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
+import { SignalsNav } from "@/components/signals/SignalsNav";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -276,13 +277,14 @@ export default function HomePage() {
       {/* ヘッダー */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-8 w-8 text-primary" />
               <h1 className="text-2xl font-bold text-foreground">
                 AI Market Analyzer
               </h1>
             </div>
+            <SignalsNav active="home" />
             <div className="flex items-center space-x-4">
               {user ? (
                 <div className="flex items-center space-x-2">
@@ -522,61 +524,74 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* フッター広告セクション */}
-        <div className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6">
-          <div className="text-center">
-            <p className="text-sm text-orange-600 font-semibold mb-3">
-              スポンサー
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* 広告1 */}
-              <div>
-                <a
-                  href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                  rel="nofollow"
-                >
+        {/* フッター広告セクション（フリーユーザーのみ表示） */}
+        {!isPremium && (
+          <aside
+            aria-label="スポンサー広告"
+            className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6"
+          >
+            <div className="text-center">
+              <p className="text-sm text-orange-600 font-semibold mb-3">
+                スポンサー
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 広告1 */}
+                <div>
+                  <a
+                    href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
+                    rel="nofollow sponsored noopener"
+                    target="_blank"
+                  >
+                    <Image
+                      width={250}
+                      height={250}
+                      alt="スポンサー広告 1"
+                      src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                      style={{ border: "0" }}
+                      unoptimized
+                    />
+                  </a>
                   <Image
-                    width={250}
-                    height={250}
+                    width={1}
+                    height={1}
+                    src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
                     alt=""
-                    src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
+                    aria-hidden="true"
                     style={{ border: "0" }}
+                    unoptimized
                   />
-                </a>
-                <Image
-                  width={1}
-                  height={1}
-                  src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                  alt=""
-                  style={{ border: "0" }}
-                />
-              </div>
-              
-              {/* 広告2 */}
-              <div>
-                <a
-                  href="https://px.a8.net/svt/ejp?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                  rel="nofollow"
-                >
+                </div>
+
+                {/* 広告2 */}
+                <div>
+                  <a
+                    href="https://px.a8.net/svt/ejp?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
+                    rel="nofollow sponsored noopener"
+                    target="_blank"
+                  >
+                    <Image
+                      width={300}
+                      height={250}
+                      alt="スポンサー広告 2"
+                      src="https://www25.a8.net/svt/bgt?aid=251029056683&wid=001&eno=01&mid=s00000016652002006000&mc=1"
+                      style={{ border: "0" }}
+                      unoptimized
+                    />
+                  </a>
                   <Image
-                    width={300}
-                    height={250}
+                    width={1}
+                    height={1}
+                    src="https://www10.a8.net/0.gif?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
                     alt=""
-                    src="https://www25.a8.net/svt/bgt?aid=251029056683&wid=001&eno=01&mid=s00000016652002006000&mc=1"
+                    aria-hidden="true"
                     style={{ border: "0" }}
+                    unoptimized
                   />
-                </a>
-                <Image
-                  width={1}
-                  height={1}
-                  src="https://www10.a8.net/0.gif?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                  alt=""
-                  style={{ border: "0" }}
-                />
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </aside>
+        )}
       </main>
 
       {/* フッター */}

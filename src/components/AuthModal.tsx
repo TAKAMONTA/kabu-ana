@@ -1,19 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertCircle, CheckCircle } from "lucide-react";
+import { AlertCircle, CheckCircle, X } from "lucide-react";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -97,18 +91,27 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setIsLoading(false);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>認証</CardTitle>
-          <CardDescription>
-            アカウントにログインまたは新規登録してください
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <Dialog.Root open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Content
+          className="fixed left-1/2 top-1/2 z-50 w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border bg-card p-6 shadow-lg focus:outline-none data-[state=open]:animate-in data-[state=closed]:animate-out"
+        >
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div>
+              <Dialog.Title className="text-lg font-semibold">認証</Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+                アカウントにログインまたは新規登録してください
+              </Dialog.Description>
+            </div>
+            <Dialog.Close
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-label="閉じる"
+            >
+              <X className="size-4" />
+            </Dialog.Close>
+          </div>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">ログイン</TabsTrigger>
@@ -208,13 +211,8 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
             </div>
           )}
 
-          <div className="mt-4 flex justify-end">
-            <Button variant="outline" onClick={onClose}>
-              閉じる
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
