@@ -70,3 +70,80 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+@layer utilities {
+  /* Hero radial aurora — soft blue/purple glow behind the top of the page */
+  .hero-aurora {
+    background:
+      radial-gradient(
+        ellipse 70% 60% at 18% 8%,
+        hsl(var(--primary) / 0.16),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 55% 55% at 82% 20%,
+        hsl(265 85% 62% / 0.12),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 60% 50% at 50% 0%,
+        hsl(var(--primary) / 0.06),
+        transparent 70%
+      );
+  }
+  .dark .hero-aurora {
+    background:
+      radial-gradient(
+        ellipse 70% 60% at 18% 8%,
+        hsl(var(--primary) / 0.28),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 55% 55% at 82% 20%,
+        hsl(265 85% 62% / 0.22),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 60% 50% at 50% 0%,
+        hsl(var(--primary) / 0.12),
+        transparent 70%
+      );
+  }
+
+  /* Brand gradient text — used on the AI Market Analyzer wordmark */
+  .brand-gradient {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--primary)) 0%,
+      hsl(265 85% 62%) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Subtle pulse for critical alerts */
+  @keyframes pulse-soft {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.04); }
+  }
+  .animate-pulse-soft {
+    animation: pulse-soft 2.4s ease-in-out infinite;
+  }
+
+  /* Brand-tinted shimmer for skeleton loading */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--primary) / 0.18) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
+}

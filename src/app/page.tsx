@@ -32,6 +32,7 @@ import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LivePulseStrip } from "@/components/LivePulseStrip";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -297,16 +298,24 @@ export default function HomePage() {
   );
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative overflow-x-hidden">
+      {/* ヒーローオーラ（ヘッダー〜検索エリアの背景に柔らかい青紫のグロー） */}
+      <div
+        aria-hidden="true"
+        className="hero-aurora pointer-events-none absolute inset-x-0 top-0 h-[680px] -z-0"
+      />
+
       {/* ヘッダー */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/95 backdrop-blur">
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-8 w-8 text-primary" />
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
+              </div>
               <div className="leading-tight">
-                <h1 className="text-2xl font-bold text-foreground">
-                  AI Market Analyzer
+                <h1 className="text-2xl font-bold tracking-tight">
+                  <span className="brand-gradient">AI Market Analyzer</span>
                 </h1>
                 <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">
                   AIで株式分析と市場シグナルを 30 秒で
@@ -340,7 +349,7 @@ export default function HomePage() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className="container mx-auto px-4 py-6">
+      <main className="container mx-auto px-4 py-6 relative z-10">
         {/* 購入成功メッセージ */}
         <Suspense fallback={null}>
           <PurchaseSuccessHandler />
@@ -366,6 +375,9 @@ export default function HomePage() {
             )}
           </div>
         </div>
+
+        {/* Live Pulse: 「今、世界はこう動いている」3 stat カード → /signals */}
+        <LivePulseStrip />
 
         {/* 購入状態表示（ログイン時のみ） */}
         {user && (
@@ -404,18 +416,44 @@ export default function HomePage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {[
-                    { symbol: "7203", name: "トヨタ自動車", display: "7203 トヨタ" },
-                    { symbol: "AAPL", name: "Apple", display: "AAPL Apple" },
-                    { symbol: "9984", name: "ソフトバンクグループ", display: "9984 SBG" },
-                    { symbol: "5020", name: "ENEOSホールディングス", display: "5020 ENEOS" },
+                    {
+                      symbol: "7203",
+                      name: "トヨタ自動車",
+                      display: "7203 トヨタ",
+                      dotColor: "bg-emerald-500",
+                    },
+                    {
+                      symbol: "AAPL",
+                      name: "Apple",
+                      display: "AAPL Apple",
+                      dotColor: "bg-sky-500",
+                    },
+                    {
+                      symbol: "9984",
+                      name: "ソフトバンクグループ",
+                      display: "9984 SBG",
+                      dotColor: "bg-purple-500",
+                    },
+                    {
+                      symbol: "5020",
+                      name: "ENEOSホールディングス",
+                      display: "5020 ENEOS",
+                      dotColor: "bg-amber-500",
+                    },
                   ].map(stock => (
                     <Button
                       key={stock.symbol}
                       variant="outline"
                       size="sm"
-                      onClick={() => handleSelectSuggestion(stock.symbol, stock.name)}
-                      className="font-medium"
+                      onClick={() =>
+                        handleSelectSuggestion(stock.symbol, stock.name)
+                      }
+                      className="font-medium gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/50"
                     >
+                      <span
+                        className={`size-2 rounded-full ${stock.dotColor}`}
+                        aria-hidden="true"
+                      />
                       {stock.display}
                     </Button>
                   ))}

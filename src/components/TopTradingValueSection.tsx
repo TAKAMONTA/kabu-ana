@@ -50,9 +50,9 @@ export function TopTradingValueSection({
                     key={`skeleton-${index}`}
                     className="flex items-center justify-between rounded-md border p-2"
                   >
-                    <div className="h-4 w-32 animate-pulse rounded bg-muted" />
-                    <div className="h-4 w-20 animate-pulse rounded bg-muted" />
-                    <div className="h-8 w-16 animate-pulse rounded bg-muted" />
+                    <div className="h-4 w-32 shimmer rounded" />
+                    <div className="h-4 w-20 shimmer rounded" />
+                    <div className="h-8 w-16 shimmer rounded" />
                   </li>
                 ))
               : items.map(item => (

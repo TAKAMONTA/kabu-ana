@@ -134,7 +134,9 @@ export function SearchSection({
                         }}
                       >
                         <span className="text-muted-foreground">検索:</span>
-                        <span className="font-medium">{searchQuery.trim()}</span>
+                        <span className="font-medium">
+                          {searchQuery.trim()}
+                        </span>
                       </button>
                     )}
 
@@ -174,7 +176,10 @@ export function SearchSection({
                               }}
                             >
                               <span className="font-medium">
-                                {renderHighlighted(sug.companyName, searchQuery)}
+                                {renderHighlighted(
+                                  sug.companyName,
+                                  searchQuery
+                                )}
                               </span>
                               <span className="ml-2 text-xs text-muted-foreground">
                                 {renderHighlighted(sug.symbol, searchQuery)}
@@ -191,7 +196,7 @@ export function SearchSection({
               onClick={onSearch}
               disabled={!searchQuery.trim() || isLoading}
               size="lg"
-              className="px-8"
+              className="px-8 bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 disabled:shadow-primary/15"
             >
               <Search className="h-4 w-4 mr-2" />
               {isLoading ? "検索中..." : "企業を検索"}
@@ -202,4 +207,3 @@ export function SearchSection({
     </div>
   );
 }
-
