@@ -304,9 +304,14 @@ export default function HomePage() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold text-foreground">
-                AI Market Analyzer
-              </h1>
+              <div className="leading-tight">
+                <h1 className="text-2xl font-bold text-foreground">
+                  AI Market Analyzer
+                </h1>
+                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">
+                  AIで株式分析と市場シグナルを 30 秒で
+                </p>
+              </div>
             </div>
             <SignalsNav active="home" />
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -385,6 +390,40 @@ export default function HomePage() {
           onSelectSuggestion={handleSelectSuggestion}
           renderHighlighted={renderHighlighted}
         />
+
+        {/* サンプル銘柄（初回訪問者向け、検索結果なし時のみ） */}
+        {!searchResult && !isLoading && (
+          <Card className="mb-6 border-dashed">
+            <CardContent className="py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex items-center gap-2 shrink-0">
+                  <span aria-hidden="true">✨</span>
+                  <span className="text-sm font-medium">
+                    サンプル銘柄でお試し
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { symbol: "7203", name: "トヨタ自動車", display: "7203 トヨタ" },
+                    { symbol: "AAPL", name: "Apple", display: "AAPL Apple" },
+                    { symbol: "9984", name: "ソフトバンクグループ", display: "9984 SBG" },
+                    { symbol: "5020", name: "ENEOSホールディングス", display: "5020 ENEOS" },
+                  ].map(stock => (
+                    <Button
+                      key={stock.symbol}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSelectSuggestion(stock.symbol, stock.name)}
+                      className="font-medium"
+                    >
+                      {stock.display}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 本日の売買代金ランキング */}
         <TopTradingValueSection
