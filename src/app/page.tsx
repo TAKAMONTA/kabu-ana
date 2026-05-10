@@ -12,7 +12,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { TrendingUp, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  TrendingUp,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Radar,
+  Brain,
+} from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
@@ -366,13 +374,75 @@ export default function HomePage() {
           <section className="mb-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-snug">
-                AIで <span className="brand-gradient">株式分析と市場シグナル</span> を 30 秒で
+                AIで{" "}
+                <span className="brand-gradient">株式分析と市場シグナル</span>{" "}
+                を 30 秒で
               </h2>
               <p className="mt-2 text-sm text-muted-foreground max-w-xl">
                 原油・地震・地政学リスクをリアルタイムに連動分析し、銘柄判断をサポート。
               </p>
             </div>
             <HeroIllustration className="w-full max-w-[320px] h-[120px] sm:w-[280px] sm:h-[120px] lg:w-[340px] lg:h-[140px] flex-shrink-0" />
+          </section>
+        )}
+
+        {/* このアプリでできること（初回訪問者向け、検索前のみ） */}
+        {!searchResult && (
+          <section className="mb-6" aria-label="このアプリでできること">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  Icon: Sparkles,
+                  title: "銘柄を AI 分析",
+                  desc: "投資アドバイス・SWOT・5 段階財務スコアを30秒で",
+                  iconBg: "bg-blue-500/12 ring-blue-500/30",
+                  iconColor: "text-blue-600 dark:text-blue-400",
+                  cardBg:
+                    "from-blue-500/8 to-blue-500/2 dark:from-blue-500/12 dark:to-blue-500/2",
+                },
+                {
+                  Icon: Radar,
+                  title: "世界シグナル連動",
+                  desc: "原油・地震・地政学・サイバーを 5 次元でリアルタイム監視",
+                  iconBg: "bg-purple-500/12 ring-purple-500/30",
+                  iconColor: "text-purple-600 dark:text-purple-400",
+                  cardBg:
+                    "from-purple-500/8 to-purple-500/2 dark:from-purple-500/12 dark:to-purple-500/2",
+                },
+                {
+                  Icon: Brain,
+                  title: "Claude が文脈解説",
+                  desc: "「なぜ動いた」「次に何が起きるか」を日本語で要約",
+                  iconBg: "bg-fuchsia-500/12 ring-fuchsia-500/30",
+                  iconColor: "text-fuchsia-600 dark:text-fuchsia-400",
+                  cardBg:
+                    "from-fuchsia-500/8 to-pink-500/2 dark:from-fuchsia-500/12 dark:to-pink-500/2",
+                },
+              ].map(f => (
+                <Card
+                  key={f.title}
+                  className={`border bg-gradient-to-br ${f.cardBg} backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div
+                        className={`rounded-lg p-2 ring-1 ${f.iconBg}`}
+                      >
+                        <f.Icon className={`size-4 ${f.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm font-semibold leading-tight">
+                          {f.title}
+                        </h3>
+                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
+                          {f.desc}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </section>
         )}
 
