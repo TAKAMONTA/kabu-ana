@@ -33,6 +33,7 @@ import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LivePulseStrip } from "@/components/LivePulseStrip";
+import { HeroIllustration } from "@/components/HeroIllustration";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -304,6 +305,11 @@ export default function HomePage() {
         aria-hidden="true"
         className="hero-aurora pointer-events-none absolute inset-x-0 top-0 h-[680px] -z-0"
       />
+      {/* ドットパターン（オーラの上に重ねる、テック HUD 感） */}
+      <div
+        aria-hidden="true"
+        className="hero-pattern pointer-events-none absolute inset-x-0 top-0 h-[680px] opacity-50 -z-0"
+      />
 
       {/* ヘッダー */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
@@ -354,6 +360,21 @@ export default function HomePage() {
         <Suspense fallback={null}>
           <PurchaseSuccessHandler />
         </Suspense>
+
+        {/* ヒーローゾーン（初回訪問者向け、検索前のみ） */}
+        {!searchResult && (
+          <section className="mb-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex-1">
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-snug">
+                AIで <span className="brand-gradient">株式分析と市場シグナル</span> を 30 秒で
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground max-w-xl">
+                原油・地震・地政学リスクをリアルタイムに連動分析し、銘柄判断をサポート。
+              </p>
+            </div>
+            <HeroIllustration className="w-full max-w-[320px] h-[120px] sm:w-[280px] sm:h-[120px] lg:w-[340px] lg:h-[140px] flex-shrink-0" />
+          </section>
+        )}
 
         {/* 無料プラン案内 */}
         <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">

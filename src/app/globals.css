@@ -131,6 +131,23 @@
     animation: pulse-soft 2.4s ease-in-out infinite;
   }
 
+  /* Subtle dot grid pattern — layered above aurora for hero background */
+  .hero-pattern {
+    background-image: radial-gradient(
+      circle at center,
+      hsl(var(--foreground) / 0.07) 1px,
+      transparent 1.5px
+    );
+    background-size: 22px 22px;
+  }
+  .dark .hero-pattern {
+    background-image: radial-gradient(
+      circle at center,
+      hsl(var(--foreground) / 0.10) 1px,
+      transparent 1.5px
+    );
+  }
+
   /* Brand-tinted shimmer for skeleton loading */
   @keyframes shimmer {
     0% { background-position: -200% 0; }
