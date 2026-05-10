@@ -18,9 +18,7 @@ function isCapacitorNative(): boolean {
   return cap?.isNativePlatform?.() === true;
 }
 
-async function fetchSignal<T>(
-  endpoint: string
-): Promise<SignalApiResponse<T>> {
+async function fetchSignal<T>(endpoint: string): Promise<SignalApiResponse<T>> {
   const url = getApiUrl(endpoint);
   const headers = await getAuthHeaders();
 

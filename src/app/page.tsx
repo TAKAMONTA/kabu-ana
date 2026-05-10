@@ -425,9 +425,7 @@ export default function HomePage() {
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      <div
-                        className={`rounded-lg p-2 ring-1 ${f.iconBg}`}
-                      >
+                      <div className={`rounded-lg p-2 ring-1 ${f.iconBg}`}>
                         <f.Icon className={`size-4 ${f.iconColor}`} />
                       </div>
                       <div className="flex-1 min-w-0">

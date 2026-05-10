@@ -15,8 +15,12 @@ export default function SignalsPage() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 sm:px-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-semibold tracking-normal">マーケット・シグナル</h1>
-            <p className="mt-1 text-sm text-muted-foreground">外部環境とAIブリーフを30秒で確認</p>
+            <h1 className="text-2xl font-semibold tracking-normal">
+              マーケット・シグナル
+            </h1>
+            <p className="mt-1 text-sm text-muted-foreground">
+              外部環境とAIブリーフを30秒で確認
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <SignalsNav active="signals" />

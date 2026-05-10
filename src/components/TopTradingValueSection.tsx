@@ -29,9 +29,7 @@ export function TopTradingValueSection({
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">
-              今日の注目銘柄（TOP5）
-            </CardTitle>
+            <CardTitle className="text-base">今日の注目銘柄（TOP5）</CardTitle>
             <span className="text-xs text-muted-foreground">
               {isLoading ? "更新中..." : "取得済み"}
             </span>
@@ -97,4 +95,3 @@ export function TopTradingValueSection({
     </div>
   );
 }
-

@@ -27,7 +27,11 @@ export function HeroIllustration({ className = "" }: { className?: string }) {
     >
       <defs>
         <linearGradient id={wave} x1="0" y1="1" x2="1" y2="0">
-          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.95" />
+          <stop
+            offset="0%"
+            stopColor="hsl(var(--primary))"
+            stopOpacity="0.95"
+          />
           <stop offset="100%" stopColor="hsl(265 85% 65%)" />
         </linearGradient>
         <linearGradient id={node} x1="0" y1="0" x2="1" y2="1">

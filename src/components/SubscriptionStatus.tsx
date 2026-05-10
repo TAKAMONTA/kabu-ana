@@ -13,7 +13,11 @@ import { Button } from "@/components/ui/button";
 export function SubscriptionStatus() {
   const { user } = useAuth();
   const { subscription, loading, isPremium, hasExpired } = useSubscription();
-  const { isLoading: isPurchasing, error: purchaseError, startCheckout } = usePurchase();
+  const {
+    isLoading: isPurchasing,
+    error: purchaseError,
+    startCheckout,
+  } = usePurchase();
   const {
     isLoading: isIOSPurchasing,
     error: iosError,
@@ -21,7 +25,9 @@ export function SubscriptionStatus() {
     restorePurchases,
   } = useIOSPurchase();
   const { deleteAccount } = useAuth();
-  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "yearly">("monthly");
+  const [selectedPlan, setSelectedPlan] = useState<"monthly" | "yearly">(
+    "monthly"
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -75,14 +81,21 @@ export function SubscriptionStatus() {
           プレミアム年額プラン: ¥7,000/年（1年ごとに自動更新）
           サブスクリプションは期間終了の少なくとも24時間前に自動更新をオフにしない限り自動的に更新されます。
           お支払いはApple IDアカウントに請求されます。
-          購入後の管理・キャンセルは「設定」＞「Apple ID」＞「サブスクリプション」から行えます。
+          購入後の管理・キャンセルは「設定」＞「Apple
+          ID」＞「サブスクリプション」から行えます。
         </p>
         <div className="flex items-center justify-center gap-3 text-xs">
-          <Link href="/terms-of-use" className="text-primary hover:underline font-medium">
+          <Link
+            href="/terms-of-use"
+            className="text-primary hover:underline font-medium"
+          >
             利用規約
           </Link>
           <span className="text-muted-foreground">|</span>
-          <Link href="/privacy-policy" className="text-primary hover:underline font-medium">
+          <Link
+            href="/privacy-policy"
+            className="text-primary hover:underline font-medium"
+          >
             プライバシーポリシー
           </Link>
           <span className="text-muted-foreground">|</span>
@@ -106,7 +119,9 @@ export function SubscriptionStatus() {
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
         <Card className="w-full max-w-sm">
           <CardHeader>
-            <CardTitle className="text-lg text-destructive">アカウント削除の確認</CardTitle>
+            <CardTitle className="text-lg text-destructive">
+              アカウント削除の確認
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -153,8 +168,18 @@ export function SubscriptionStatus() {
             ログインしてプレミアム機能をご利用ください
           </p>
           <div className="mt-4 flex justify-center items-center gap-4 text-xs">
-            <Link href="/terms-of-use" className="text-muted-foreground hover:text-primary underline">利用規約</Link>
-            <Link href="/privacy-policy" className="text-muted-foreground hover:text-primary underline">プライバシーポリシー</Link>
+            <Link
+              href="/terms-of-use"
+              className="text-muted-foreground hover:text-primary underline"
+            >
+              利用規約
+            </Link>
+            <Link
+              href="/privacy-policy"
+              className="text-muted-foreground hover:text-primary underline"
+            >
+              プライバシーポリシー
+            </Link>
           </div>
         </CardContent>
       </Card>
@@ -180,7 +205,9 @@ export function SubscriptionStatus() {
         <DeleteConfirmDialog />
         <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
           <CardHeader>
-            <CardTitle className="text-green-800 dark:text-green-200">プレミアム会員</CardTitle>
+            <CardTitle className="text-green-800 dark:text-green-200">
+              プレミアム会員
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -189,12 +216,20 @@ export function SubscriptionStatus() {
               </p>
               {subscription?.platform && (
                 <p className="text-xs text-muted-foreground">
-                  購入プラットフォーム: {subscription.platform === "android" ? "Android" : subscription.platform === "web" ? "Web" : "iOS"}
+                  購入プラットフォーム:{" "}
+                  {subscription.platform === "android"
+                    ? "Android"
+                    : subscription.platform === "web"
+                      ? "Web"
+                      : "iOS"}
                 </p>
               )}
               {subscription?.expiryDate && (
                 <p className="text-xs text-muted-foreground">
-                  有効期限: {new Date(subscription.expiryDate).toLocaleDateString("ja-JP")}
+                  有効期限:{" "}
+                  {new Date(subscription.expiryDate).toLocaleDateString(
+                    "ja-JP"
+                  )}
                 </p>
               )}
               {subscription?.isTrial && (
@@ -217,7 +252,9 @@ export function SubscriptionStatus() {
         <DeleteConfirmDialog />
         <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
           <CardHeader>
-            <CardTitle className="text-orange-800 dark:text-orange-200">有効期限切れ</CardTitle>
+            <CardTitle className="text-orange-800 dark:text-orange-200">
+              有効期限切れ
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
@@ -226,7 +263,10 @@ export function SubscriptionStatus() {
               </p>
               {subscription?.expiryDate && (
                 <p className="text-xs text-muted-foreground">
-                  期限切れ日: {new Date(subscription.expiryDate).toLocaleDateString("ja-JP")}
+                  期限切れ日:{" "}
+                  {new Date(subscription.expiryDate).toLocaleDateString(
+                    "ja-JP"
+                  )}
                 </p>
               )}
               <div className="space-y-2">
@@ -270,7 +310,9 @@ export function SubscriptionStatus() {
                 )}
               </div>
               {currentError && (
-                <p className="text-xs text-red-600 dark:text-red-300">{currentError}</p>
+                <p className="text-xs text-red-600 dark:text-red-300">
+                  {currentError}
+                </p>
               )}
               <LegalLinks />
               <DeleteAccountButton />
@@ -304,7 +346,8 @@ export function SubscriptionStatus() {
 
             <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
               <p className="text-xs text-blue-700 dark:text-blue-200">
-                💡 無料プランではAI機能を1日5回までご利用いただけます。プレミアムプランで無制限に！
+                💡
+                無料プランではAI機能を1日5回までご利用いただけます。プレミアムプランで無制限に！
               </p>
             </div>
 
@@ -314,26 +357,36 @@ export function SubscriptionStatus() {
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("monthly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${selectedPlan === "monthly"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background hover:bg-muted"
-                    }`}
+                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${
+                    selectedPlan === "monthly"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  }`}
                 >
-                  <div className="font-semibold text-xs">プレミアム月額プラン</div>
+                  <div className="font-semibold text-xs">
+                    プレミアム月額プラン
+                  </div>
                   <div className="mt-1 text-lg font-bold">¥700</div>
-                  <div className="text-[10px] text-muted-foreground">1ヶ月ごとに自動更新</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    1ヶ月ごとに自動更新
+                  </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("yearly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${selectedPlan === "yearly"
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border bg-background hover:bg-muted"
-                    }`}
+                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${
+                    selectedPlan === "yearly"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-background hover:bg-muted"
+                  }`}
                 >
-                  <div className="font-semibold text-xs">プレミアム年額プラン</div>
+                  <div className="font-semibold text-xs">
+                    プレミアム年額プラン
+                  </div>
                   <div className="mt-1 text-lg font-bold">¥7,000</div>
-                  <div className="text-[10px] text-muted-foreground">1年ごとに自動更新</div>
+                  <div className="text-[10px] text-muted-foreground">
+                    1年ごとに自動更新
+                  </div>
                   <div className="mt-1 text-[10px] font-semibold text-green-600 dark:text-green-400">
                     約¥583/月（17%お得）
                   </div>
@@ -348,7 +401,9 @@ export function SubscriptionStatus() {
                   disabled={currentlyPurchasing}
                   className="w-full py-6 text-base font-bold shadow-md"
                 >
-                  {currentlyPurchasing ? "処理中..." : `${selectedPlan === "monthly" ? "月額" : "年額"}プランで開始する`}
+                  {currentlyPurchasing
+                    ? "処理中..."
+                    : `${selectedPlan === "monthly" ? "月額" : "年額"}プランで開始する`}
                 </Button>
                 {isiOS && (
                   <Button
@@ -365,7 +420,9 @@ export function SubscriptionStatus() {
             </div>
 
             {currentError && (
-              <p className="text-xs text-red-600 dark:text-red-300 font-medium text-center">{currentError}</p>
+              <p className="text-xs text-red-600 dark:text-red-300 font-medium text-center">
+                {currentError}
+              </p>
             )}
 
             <LegalLinks />

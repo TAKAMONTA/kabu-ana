@@ -19,9 +19,11 @@ async function fetchPulse(): Promise<PulseData> {
   ]);
 
   const prices =
-    pricesRes.status === "fulfilled" ? pricesRes.value?.data?.prices ?? [] : [];
+    pricesRes.status === "fulfilled"
+      ? (pricesRes.value?.data?.prices ?? [])
+      : [];
   const items =
-    newsRes.status === "fulfilled" ? newsRes.value?.data?.items ?? [] : [];
+    newsRes.status === "fulfilled" ? (newsRes.value?.data?.items ?? []) : [];
 
   const wti = prices.find((p: { key?: string }) => p?.key === "wti");
   const hotCount = items.filter(
@@ -72,11 +74,7 @@ export function LivePulseStrip() {
       icon: Droplet,
       label: "WTI 原油",
       value:
-        wtiValue != null
-          ? `$${wtiValue.toFixed(2)}`
-          : loaded
-            ? "— —"
-            : "...",
+        wtiValue != null ? `$${wtiValue.toFixed(2)}` : loaded ? "— —" : "...",
       sub:
         wtiChange != null
           ? `${wtiChange >= 0 ? "+" : ""}${wtiChange.toFixed(2)} (24h)`
@@ -102,10 +100,7 @@ export function LivePulseStrip() {
       label: "Critical Alert",
       value: loaded ? `${critical} 件` : "...",
       sub: critical > 0 ? "緊急シグナル発生中" : "現在 0 件",
-      tone:
-        critical > 0
-          ? ("alert" as const)
-          : ("calm" as const),
+      tone: critical > 0 ? ("alert" as const) : ("calm" as const),
       bg:
         critical > 0
           ? "from-red-500/20 to-rose-500/10 border-red-400/50 dark:from-red-500/25 dark:to-rose-500/10 dark:border-red-500/40"

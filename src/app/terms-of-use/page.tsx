@@ -9,7 +9,7 @@ export default function TermsOfUsePage() {
             利用規約
           </CardTitle>
           <p className="text-center text-muted-foreground">
-            最終更新日: 2026年3月12日
+            最終更新日: 2026年4月10日
           </p>
         </CardHeader>
         <CardContent className="space-y-6">

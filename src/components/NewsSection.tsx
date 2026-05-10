@@ -1,12 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, TrendingUp, ExternalLink, Lock } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 
@@ -41,7 +36,6 @@ export function NewsSection({
   dailyLimit = 5,
   isPremium = false,
 }: NewsSectionProps) {
-
   const AnalyzeButton = () => {
     if (!canUseFeature) {
       return (
@@ -84,11 +78,13 @@ export function NewsSection({
           <div className="flex items-center gap-2">
             {/* 残り回数バッジ（プレミアムでない場合） */}
             {!isPremium && (
-              <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                canUseFeature
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                  : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-              }`}>
+              <span
+                className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
+                  canUseFeature
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
+                }`}
+              >
                 残り{remainingUses}/{dailyLimit}
               </span>
             )}
@@ -115,15 +111,15 @@ export function NewsSection({
                         newsAnalysis.impact === "positive"
                           ? "bg-green-200 text-green-900 dark:bg-green-900 dark:text-green-200"
                           : newsAnalysis.impact === "negative"
-                          ? "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
-                          : "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-gray-200"
+                            ? "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
+                            : "bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-gray-200"
                       }`}
                     >
                       {newsAnalysis.impact === "positive"
                         ? "📈 ポジティブ"
                         : newsAnalysis.impact === "negative"
-                        ? "📉 ネガティブ"
-                        : "➡️ ニュートラル"}
+                          ? "📉 ネガティブ"
+                          : "➡️ ニュートラル"}
                       ({newsAnalysis.impactScore > 0 ? "+" : ""}
                       {newsAnalysis.impactScore})
                     </span>

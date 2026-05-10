@@ -157,15 +157,15 @@ export function AnalysisSection({
                   analysisResult.riskLevel === "low"
                     ? "bg-green-200 text-green-900 dark:bg-green-900 dark:text-green-200"
                     : analysisResult.riskLevel === "medium"
-                    ? "bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-200"
-                    : "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
+                      ? "bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-200"
+                      : "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
                 }`}
               >
                 {analysisResult.riskLevel === "low"
                   ? "🟢 低リスク"
                   : analysisResult.riskLevel === "medium"
-                  ? "🟡 中リスク"
-                  : "🔴 高リスク"}
+                    ? "🟡 中リスク"
+                    : "🔴 高リスク"}
               </span>
             </div>
 
@@ -306,11 +306,13 @@ export function AnalysisSection({
             {/* 残り回数バッジ（プレミアムでない場合） */}
             {!isPremium && (
               <div className="mb-3">
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
-                  canUseFeature
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-                }`}>
+                <span
+                  className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+                    canUseFeature
+                      ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                      : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
+                  }`}
+                >
                   本日の残り回数: {remainingUses}/{dailyLimit}
                 </span>
               </div>

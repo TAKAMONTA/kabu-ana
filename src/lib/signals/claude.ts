@@ -1,14 +1,32 @@
 import { z } from "zod";
 
+/** LLM が欠損・空文字を返しても落とさない。ticker が空の行は除去。 */
+const morningBriefStockRaw = z.object({
+  ticker: z.unknown(),
+  reason: z.unknown(),
+  direction: z.unknown(),
+});
+
+const morningBriefStockParsed = morningBriefStockRaw.transform((row): { ticker: string; reason: string; direction: "up" | "down" | "watch" } | null => {
+  const ticker = typeof row.ticker === "string" ? row.ticker.trim() : "";
+  if (!ticker) return null;
+  const d = row.direction;
+  const direction: "up" | "down" | "watch" =
+    d === "up" || d === "down" || d === "watch" ? d : "watch";
+  const r = row.reason;
+  const reason =
+    typeof r === "string" ? r.trim() : r !== null && r !== undefined ? String(r).trim() : "";
+  return { ticker, reason: reason.length > 0 ? reason : "（補足なし）", direction };
+});
+
 export const claudeMorningBriefSchema = z.object({
   headline_jp: z.string().max(15),
   summary_jp: z.string().max(120),
   key_drivers: z.array(z.object({ factor: z.string(), impact: z.string() })).default([]),
-  stocks_to_watch: z.array(z.object({
-    ticker: z.string(),
-    reason: z.string(),
-    direction: z.enum(["up", "down", "watch"]),
-  })).default([]),
+  stocks_to_watch: z
+    .array(morningBriefStockParsed)
+    .default([])
+    .transform((items) => items.filter((item): item is NonNullable<typeof item> => item !== null)),
   risk_outlook: z.enum(["low", "elevated", "high", "critical"]),
 });
 
@@ -27,8 +45,21 @@ export function buildMorningBriefPrompt(input: unknown): string {
 制約:
 - headline_jp は最大15字
 - summary_jp は120字以内
-- stocks_to_watch は日本株を中心に最大5件
-- risk_outlook は low/elevated/high/critical
+- stocks_to_watch は日本株を中心に最大5件。各要素は必ず ticker（銘柄コード）・reason（短文）・direction の3つを含める
+- direction は必ず "up" / "down" / "watch" のいずれか（文字列）
+- risk_outlook は low / elevated / high / critical のいずれか
+
+出力スキーマ例（キー名と型を厳守）:
+{
+  "headline_jp": "15字以内の見出し",
+  "summary_jp": "120字以内の要約",
+  "key_drivers": [{"factor": "要因", "impact": "影響"}],
+  "stocks_to_watch": [
+    {"ticker": "7203", "reason": "例: 円安メリット", "direction": "up"},
+    {"ticker": "9984", "reason": "例: 金利動向注意", "direction": "watch"}
+  ],
+  "risk_outlook": "elevated"
+}
 
 入力:
 ${JSON.stringify(input, null, 2)}

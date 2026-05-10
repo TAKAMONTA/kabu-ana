@@ -2,12 +2,7 @@
 
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, Lock } from "lucide-react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
 
@@ -34,7 +29,6 @@ export function FinancialEvaluationSection({
   dailyLimit = 5,
   isPremium = false,
 }: FinancialEvaluationSectionProps) {
-
   const EvaluateButton = () => {
     if (!canUseFeature) {
       return (
@@ -77,11 +71,13 @@ export function FinancialEvaluationSection({
           <div className="flex items-center gap-2">
             {/* 残り回数バッジ（プレミアムでない場合） */}
             {!isPremium && (
-              <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                canUseFeature
-                  ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                  : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-              }`}>
+              <span
+                className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
+                  canUseFeature
+                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
+                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
+                }`}
+              >
                 残り{remainingUses}/{dailyLimit}
               </span>
             )}
@@ -110,10 +106,7 @@ export function FinancialEvaluationSection({
                   color: "purple",
                 },
               ].map(item => (
-                <div
-                  key={item.label}
-                  className="p-4 border-2 rounded-lg"
-                >
+                <div key={item.label} className="p-4 border-2 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="font-semibold">{item.label}</span>
                     <span

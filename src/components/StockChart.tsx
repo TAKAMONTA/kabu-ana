@@ -166,7 +166,9 @@ export function StockChart({
             className="flex h-80 flex-col items-center justify-center gap-2 rounded-md border border-dashed text-muted-foreground"
           >
             <BarChart3 className="h-10 w-10 opacity-40" />
-            <p className="text-sm font-medium">チャートデータを取得できませんでした</p>
+            <p className="text-sm font-medium">
+              チャートデータを取得できませんでした
+            </p>
             <p className="text-xs">時間をおいて再検索してください</p>
           </div>
         )}
