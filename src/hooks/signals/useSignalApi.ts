@@ -10,7 +10,39 @@ interface SignalApiResponse<T> {
   lastSuccessfulAt?: string;
 }
 
-export function useSignalApi<T>(endpoint: string, options?: { immediate?: boolean }) {
+function isCapacitorNative(): boolean {
+  if (typeof window === "undefined") return false;
+  const cap = (
+    window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+  ).Capacitor;
+  return cap?.isNativePlatform?.() === true;
+}
+
+async function fetchSignal<T>(
+  endpoint: string
+): Promise<SignalApiResponse<T>> {
+  const url = getApiUrl(endpoint);
+  const headers = await getAuthHeaders();
+
+  if (isCapacitorNative()) {
+    const response = await CapacitorHttp.get({ url, headers });
+    return response.data as SignalApiResponse<T>;
+  }
+
+  const response = await fetch(url, {
+    headers,
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return (await response.json()) as SignalApiResponse<T>;
+}
+
+export function useSignalApi<T>(
+  endpoint: string,
+  options?: { immediate?: boolean }
+) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastSuccessfulAt, setLastSuccessfulAt] = useState<string | null>(null);
@@ -20,11 +52,7 @@ export function useSignalApi<T>(endpoint: string, options?: { immediate?: boolea
     setIsLoading(true);
     setError(null);
     try {
-      const response = await CapacitorHttp.get({
-        url: getApiUrl(endpoint),
-        headers: await getAuthHeaders(),
-      });
-      const body = response.data as SignalApiResponse<T>;
+      const body = await fetchSignal<T>(endpoint);
       setData(body.data);
       setLastSuccessfulAt(body.lastSuccessfulAt ?? null);
       setError(body.error ?? null);
