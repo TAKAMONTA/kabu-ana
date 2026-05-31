@@ -50,6 +50,12 @@ export function localizeSignalKeywords(keywords: string[]): string[] {
   return Array.from(new Set(keywords.map(localizeSignalKeyword)));
 }
 
+function isMostlyUntranslatedEnglish(value: string): boolean {
+  const englishWords = value.match(/[A-Za-z][A-Za-z'’.-]*/g) ?? [];
+  const japaneseChars = value.match(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/gu) ?? [];
+  return englishWords.length >= 4 && japaneseChars.length < englishWords.length * 2;
+}
+
 export function buildJapaneseSignalTitle(title: string): string {
   const lowerTitle = title.toLowerCase();
 
@@ -61,8 +67,43 @@ export function buildJapaneseSignalTitle(title: string): string {
     return "LNGタンカーがホルムズ海峡を通過、供給リスクに注目";
   }
 
+  if (
+    lowerTitle.includes("lng") &&
+    lowerTitle.includes("boom") &&
+    lowerTitle.includes("china")
+  ) {
+    return "米国LNG増産と中国の調達戦略に注目";
+  }
+
   if (lowerTitle.includes("hormuz") && lowerTitle.includes("tanker")) {
     return "ホルムズ海峡周辺のタンカー動向に注意";
+  }
+
+  if (lowerTitle.includes("hormuz") && lowerTitle.includes("attack")) {
+    return "ホルムズ海峡での船舶攻撃リスクに注意";
+  }
+
+  if (lowerTitle.includes("hormuz") && lowerTitle.includes("blockade")) {
+    return "ホルムズ海峡封鎖リスクによる原油輸送への影響に注意";
+  }
+
+  if (lowerTitle.includes("hormuz") && lowerTitle.includes("mine")) {
+    return "ホルムズ海峡の機雷除去と通航費を巡る交渉に注目";
+  }
+
+  if (lowerTitle.includes("hormuz") && lowerTitle.includes("uncertainty")) {
+    return "ホルムズ海峡を巡る不透明感に注意";
+  }
+
+  if (lowerTitle.includes("hormuz") && lowerTitle.includes("transit")) {
+    return "ホルムズ海峡の船舶通航動向に注意";
+  }
+
+  if (
+    lowerTitle.includes("hormuz") &&
+    (lowerTitle.includes("crude") || lowerTitle.includes("cargo"))
+  ) {
+    return "ホルムズ海峡周辺の原油輸送動向に注意";
   }
 
   if (
@@ -117,6 +158,10 @@ export function buildJapaneseSignalTitle(title: string): string {
   });
 
   if (localized === title) {
+    return `原文確認: ${title}`;
+  }
+
+  if (isMostlyUntranslatedEnglish(localized)) {
     return `原文確認: ${title}`;
   }
 

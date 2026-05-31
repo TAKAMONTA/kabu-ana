@@ -53,6 +53,33 @@ describe("signal localization helpers", () => {
     ).toBe("米国制裁がロシア原油タンカー網に影響");
   });
 
+  it("uses Japanese summaries for common Hormuz and LNG signal headlines", () => {
+    expect(
+      buildJapaneseSignalTitle(
+        "America’s LNG Boom Is Real — But China Is Planning Beyond It"
+      )
+    ).toBe("米国LNG増産と中国の調達戦略に注目");
+
+    expect(
+      buildJapaneseSignalTitle(
+        "Philippines Receives First Iranian Crude Cargo Since Hormuz Blockade"
+      )
+    ).toBe("ホルムズ海峡封鎖リスクによる原油輸送への影響に注意");
+
+    expect(
+      buildJapaneseSignalTitle("Strait of Hormuz Ship Transits Are Rising")
+    ).toBe("ホルムズ海峡の船舶通航動向に注意");
+  });
+
+  it("does not treat partial keyword replacement as a full translation", () => {
+    expect(buildJapaneseSignalTitle("Dark Hormuz transits")).toBe(
+      "ホルムズ海峡の船舶通航動向に注意"
+    );
+    expect(
+      buildJapaneseSignalTitle("Market Analysts Discuss Hormuz Risk Today")
+    ).toBe("原文確認: Market Analysts Discuss Hormuz Risk Today");
+  });
+
   it("avoids pretending unmatched English headlines are translated", () => {
     expect(buildJapaneseSignalTitle("Company Reports Quarterly Update")).toBe(
       "原文確認: Company Reports Quarterly Update"
