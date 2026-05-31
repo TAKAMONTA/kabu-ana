@@ -17,7 +17,7 @@ function normalizeNewsPayload(payload: NewsPayload | null): NewsPayload | null {
     ...payload,
     items: payload.items.map(item => ({
       ...item,
-      titleJa: item.titleJa || buildJapaneseSignalTitle(item.title),
+      titleJa: buildJapaneseSignalTitle(item.title),
     })),
   };
 }
