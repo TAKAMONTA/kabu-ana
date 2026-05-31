@@ -1,4 +1,5 @@
 import { calculateKeywordWeight, findKeywordMatches } from "../keywords";
+import { buildJapaneseSignalTitle } from "../localize";
 
 export interface RssSource {
   id: string;
@@ -12,6 +13,7 @@ export interface RssSource {
 export interface EnergyNewsItem {
   id: string;
   title: string;
+  titleJa: string;
   link: string;
   source: string;
   sourceWeight: number;
@@ -137,6 +139,7 @@ export function parseRssFeed(xml: string, source: RssSource): EnergyNewsItem[] {
           .toString("base64url")
           .slice(0, 24)}`,
         title,
+        titleJa: buildJapaneseSignalTitle(title),
         link,
         source: source.name,
         sourceWeight: source.weight,

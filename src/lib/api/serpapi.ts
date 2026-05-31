@@ -53,6 +53,14 @@ export interface FinancialData {
   period?: string;
 }
 
+export interface FastSearchResult {
+  companyInfo: CompanyInfo;
+  stockData: StockData;
+  newsData: any[];
+  chartData: ChartDataPoint[];
+  financialData: FinancialData | null;
+}
+
 export class SerpApiClient {
   private apiKey: string;
 
@@ -60,39 +68,326 @@ export class SerpApiClient {
     this.apiKey = apiKey;
   }
 
-  async searchCompany(query: string): Promise<CompanyInfo | null> {
-    try {
-      // 全角→半角。企業名検索時はスペースを保持し、ティッカー時のみスペース除去＋大文字化
-      let half = toHalfWidth(query).trim();
-      let formattedQuery = half;
+  private googleFinanceCache = new Map<string, Promise<any>>();
 
-      if (!half.includes(":")) {
-        const compactUpper = half.replace(/\s+/g, "").toUpperCase();
-        const isFourDigitJapaneseCode = /^\d{4}$/.test(compactUpper);
-        const isLikelyTicker = /^[A-Z.]+$/.test(compactUpper);
+  private formatCompanySearchQuery(query: string): string {
+    return this.formatCompanySearchQueries(query)[0];
+  }
 
-        if (isFourDigitJapaneseCode) {
-          formattedQuery = `${compactUpper}:TYO`;
-        } else if (isLikelyTicker) {
-          formattedQuery = `${compactUpper}:NASDAQ`;
-        } else {
-          // 企業名想定。大文字化のみ（日本語は影響なし）、スペース保持
-          formattedQuery = half.toUpperCase();
+  private formatCompanySearchQueries(query: string): string[] {
+    const half = toHalfWidth(query).trim();
+    if (half.includes(":")) return [half.toUpperCase()];
+
+    const compactUpper = half.replace(/\s+/g, "").toUpperCase();
+    const isFourDigitJapaneseCode = /^\d{4}$/.test(compactUpper);
+    const isLikelyTicker = /^[A-Z.]+$/.test(compactUpper);
+
+    if (isFourDigitJapaneseCode) return [compactUpper + ":TYO"];
+    if (isLikelyTicker) {
+      return [
+        compactUpper + ":NASDAQ",
+        compactUpper + ":NYSE",
+        compactUpper + ":NYSEARCA",
+      ];
+    }
+    return [half.toUpperCase()];
+  }
+
+  private formatSymbolQuery(symbol: string): string {
+    const formattedQuery = normalizeQuery(symbol).toUpperCase();
+    if (formattedQuery.includes(":")) return formattedQuery;
+    return /^\d{4}$/.test(formattedQuery)
+      ? formattedQuery + ":TYO"
+      : formattedQuery + ":NASDAQ";
+  }
+
+  private async getGoogleFinanceData(
+    formattedQuery: string,
+    extraParams: Record<string, string> = {},
+    options: { timeoutMs?: number } = {}
+  ): Promise<any> {
+    const params = {
+      engine: "google_finance",
+      q: formattedQuery,
+      api_key: this.apiKey,
+      hl: "ja",
+      ...extraParams,
+    };
+    const cacheKey = JSON.stringify({
+      params,
+      timeoutMs: options.timeoutMs || 0,
+    });
+    const cached = this.googleFinanceCache.get(cacheKey);
+    if (cached) return cached;
+
+    const request = axios
+      .get(SERPAPI_BASE_URL, {
+        params,
+        timeout: options.timeoutMs,
+      })
+      .then(response => response.data)
+      .catch(error => {
+        this.googleFinanceCache.delete(cacheKey);
+        throw error;
+      });
+    this.googleFinanceCache.set(cacheKey, request);
+    return request;
+  }
+
+  private buildCompanyInfo(data: any, fallbackQuery: string): CompanyInfo | null {
+    if (!data?.summary) return null;
+
+    const about = data.knowledge_graph?.about?.[0];
+    return {
+      name: data.summary.title || "",
+      symbol: data.summary.stock || fallbackQuery,
+      market: data.summary.exchange || "",
+      price: data.summary.extracted_price || 0,
+      change: data.summary.price_movement?.value || 0,
+      changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+      description: about?.description?.snippet || "",
+      website: "",
+      employees: "",
+      founded: "",
+      headquarters: "",
+    };
+  }
+
+  private buildStockData(data: any, symbol: string): StockData | null {
+    if (!data?.summary) return null;
+
+    const stats = data.knowledge_graph?.key_stats?.stats || [];
+
+    const getStatValue = (...labels: string[]) => {
+      for (const label of labels) {
+        const stat = stats.find((s: any) => s.label === label);
+        if (stat?.value) {
+          return stat.value;
         }
-      } else {
-        formattedQuery = half.toUpperCase();
+      }
+      return "";
+    };
+
+    const avgVolumeStr = getStatValue(
+      "平均出来高",
+      "Avg Volume",
+      "平均取引高"
+    );
+    let volume = 0;
+    if (avgVolumeStr) {
+      const match = avgVolumeStr.match(/([\d,.]+)([MK万億百千]?)/);
+      if (match) {
+        const value = parseFloat(match[1].replace(/,/g, ""));
+        const unit = match[2];
+        if (unit === "M" || unit === "百万") volume = value * 1000000;
+        else if (unit === "K" || unit === "千") volume = value * 1000;
+        else if (unit === "万") volume = value * 10000;
+        else if (unit === "億") volume = value * 100000000;
+        else volume = value;
+      }
+    }
+
+    const yearRange = getStatValue(
+      "52 週の範囲",
+      "Year range",
+      "52週範囲",
+      "52週の範囲"
+    );
+    const yearRangeParts = yearRange
+      .replace(/[¥$,円]/g, "")
+      .trim()
+      .split(/\s*-\s*/);
+
+    const marketCapStr = getStatValue("時価総額", "Market cap");
+    const peStr = getStatValue(
+      "株価収益率",
+      "P/E ratio",
+      "PER",
+      "株価純資産倍率",
+      "PBR"
+    );
+    const dividendStr = getStatValue(
+      "配当利回り",
+      "Dividend yield",
+      "配当"
+    );
+
+    return {
+      symbol: data.summary.stock || symbol,
+      price: data.summary.extracted_price || 0,
+      change: data.summary.price_movement?.value || 0,
+      changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+      volume,
+      marketCap: marketCapStr || "N/A",
+      pe: parseFloat(peStr.replace(/[^0-9.-]/g, "")) || 0,
+      eps: 0,
+      dividend: parseFloat(dividendStr.replace(/[%％]/g, "")) || 0,
+      high52: parseFloat(yearRangeParts[1]) || 0,
+      low52: parseFloat(yearRangeParts[0]) || 0,
+    };
+  }
+
+  private buildNewsData(data: any, limit: number = 10): any[] {
+    const newsResults = data?.news_results || [];
+    const news = newsResults.flatMap((result: any) => result.items || []);
+
+    return news
+      .map((item: any) => ({
+        title: item.title || item.snippet,
+        snippet: item.snippet || item.title,
+        source: item.source || "Google Finance",
+        date: item.date
+          ? new Date(item.date).toLocaleDateString("ja-JP")
+          : "不明",
+        link: item.link,
+      }))
+      .slice(0, limit);
+  }
+
+  private buildChartData(data: any): ChartDataPoint[] {
+    const graphData = data?.graph || [];
+
+    return graphData.map((point: any) => {
+      const dataPoint: ChartDataPoint = {
+        date: point.date || "",
+        price: point.price || 0,
+        volume: point.volume || 0,
+      };
+
+      if (point.key_event) {
+        dataPoint.keyEvent = {
+          title: point.key_event.title,
+          link: point.key_event.link,
+          source: point.key_event.source,
+        };
       }
 
-      const response = await axios.get(SERPAPI_BASE_URL, {
-        params: {
-          engine: "google_finance",
-          q: formattedQuery,
-          api_key: this.apiKey,
-          hl: "ja", // 日本語で結果を取得
-        },
-      });
+      return dataPoint;
+    });
+  }
 
-      const data = response.data;
+  private buildFinancialData(data: any): FinancialData | null {
+    const financials = data?.financials || [];
+
+    const incomeStatement = financials.find(
+      (f: any) => f.title === "Income Statement" || f.title === "損益計算書"
+    );
+    const balanceSheet = financials.find(
+      (f: any) => f.title === "Balance Sheet" || f.title === "貸借対照表"
+    );
+
+    if (!incomeStatement) {
+      return null;
+    }
+
+    const latestPeriod = incomeStatement.results?.[0];
+    const latestBalance = balanceSheet?.results?.[0];
+
+    const getValue = (table: any[], ...titles: string[]) => {
+      if (!table) return undefined;
+      for (const title of titles) {
+        const item = table.find((row: any) => row.title === title);
+        if (item?.value) return item.value;
+      }
+      return undefined;
+    };
+
+    return {
+      revenue: getValue(
+        latestPeriod?.table || [],
+        "Revenue",
+        "売上高",
+        "Total revenue"
+      ),
+      netIncome: getValue(
+        latestPeriod?.table || [],
+        "Net income",
+        "純利益",
+        "当期純利益"
+      ),
+      operatingIncome: getValue(
+        latestPeriod?.table || [],
+        "Operating income",
+        "営業利益"
+      ),
+      totalAssets: getValue(
+        latestBalance?.table || [],
+        "Total assets",
+        "総資産"
+      ),
+      totalLiabilities: getValue(
+        latestBalance?.table || [],
+        "Total liabilities",
+        "総負債"
+      ),
+      cash: getValue(
+        latestBalance?.table || [],
+        "Cash and short-term investments",
+        "現金及び現金同等物",
+        "現金・預金"
+      ),
+      eps: getValue(
+        latestPeriod?.table || [],
+        "EPS",
+        "Basic EPS",
+        "Diluted EPS",
+        "1株当たり利益"
+      ),
+      period: `${latestPeriod?.date || ""} (${
+        latestPeriod?.period_type || ""
+      })`,
+    };
+  }
+
+  async getFastSearchResult(
+    query: string,
+    window: string = "1M"
+  ): Promise<FastSearchResult | null> {
+    const formattedQueries = this.formatCompanySearchQueries(query);
+    let detailedDataPromise: Promise<any> | null = null;
+    let chartWindowData: any = null;
+
+    for (const formattedQuery of formattedQueries) {
+      detailedDataPromise = this.getGoogleFinanceData(
+        formattedQuery,
+        {},
+        { timeoutMs: 1800 }
+      ).catch(() => null);
+      chartWindowData = await this.getGoogleFinanceData(
+        formattedQuery,
+        { window },
+        { timeoutMs: 3000 }
+      ).catch(() => null);
+
+      if (chartWindowData?.summary) {
+        break;
+      }
+      detailedDataPromise = null;
+    }
+
+    const detailedData = detailedDataPromise ? await detailedDataPromise : null;
+    const primaryData = detailedData || chartWindowData;
+    const companyInfo = this.buildCompanyInfo(primaryData, query);
+    if (!companyInfo) return null;
+
+    const stockData =
+      this.buildStockData(detailedData || chartWindowData, companyInfo.symbol) ||
+      this.buildStockData(primaryData, companyInfo.symbol);
+    if (!stockData) return null;
+
+    return {
+      companyInfo,
+      stockData,
+      newsData: detailedData ? this.buildNewsData(detailedData, 5) : [],
+      chartData: this.buildChartData(chartWindowData || detailedData),
+      financialData: detailedData ? this.buildFinancialData(detailedData) : null,
+    };
+  }
+
+  async searchCompany(query: string): Promise<CompanyInfo | null> {
+    try {
+      const formattedQuery = this.formatCompanySearchQuery(query);
+      const data = await this.getGoogleFinanceData(formattedQuery);
 
       // Google Finance APIのレスポンス構造に合わせて修正
       if (data.summary) {
@@ -204,27 +499,8 @@ export class SerpApiClient {
 
   async getStockData(symbol: string): Promise<StockData | null> {
     try {
-      // 全角→半角変換 & クエリの形式を整える
-      let formattedQuery = normalizeQuery(symbol).toUpperCase();
-
-      if (!formattedQuery.includes(":")) {
-        if (/^\d{4}$/.test(formattedQuery)) {
-          formattedQuery = `${formattedQuery}:TYO`;
-        } else {
-          formattedQuery = `${formattedQuery}:NASDAQ`;
-        }
-      }
-
-      const response = await axios.get(SERPAPI_BASE_URL, {
-        params: {
-          engine: "google_finance",
-          q: formattedQuery,
-          api_key: this.apiKey,
-          hl: "ja", // 日本語で結果を取得
-        },
-      });
-
-      const data = response.data;
+      const formattedQuery = this.formatSymbolQuery(symbol);
+      const data = await this.getGoogleFinanceData(formattedQuery);
 
       if (data.summary) {
         const stats = data.knowledge_graph?.key_stats?.stats || [];
@@ -317,28 +593,11 @@ export class SerpApiClient {
 
   async getCompanyNews(symbol: string, limit: number = 10): Promise<any[]> {
     try {
-      // 全角→半角変換 & クエリの形式を整える
-      let formattedQuery = normalizeQuery(symbol).toUpperCase();
-
-      if (!formattedQuery.includes(":")) {
-        if (/^\d{4}$/.test(formattedQuery)) {
-          formattedQuery = `${formattedQuery}:TYO`;
-        } else {
-          formattedQuery = `${formattedQuery}:NASDAQ`;
-        }
-      }
-
-      const response = await axios.get(SERPAPI_BASE_URL, {
-        params: {
-          engine: "google_finance",
-          q: formattedQuery,
-          api_key: this.apiKey,
-          hl: "ja", // 日本語で結果を取得
-        },
-      });
+      const formattedQuery = this.formatSymbolQuery(symbol);
+      const data = await this.getGoogleFinanceData(formattedQuery);
 
       // Google Finance APIからニュースを取得
-      const newsResults = response.data.news_results || [];
+      const newsResults = data.news_results || [];
       const news = newsResults.flatMap((result: any) => result.items || []);
 
       // ニュースデータを整形
@@ -417,28 +676,8 @@ export class SerpApiClient {
     window: string = "1M"
   ): Promise<ChartDataPoint[]> {
     try {
-      // 全角→半角変換 & クエリの形式を整える
-      let formattedQuery = normalizeQuery(symbol).toUpperCase();
-
-      if (!formattedQuery.includes(":")) {
-        if (/^\d{4}$/.test(formattedQuery)) {
-          formattedQuery = `${formattedQuery}:TYO`;
-        } else {
-          formattedQuery = `${formattedQuery}:NASDAQ`;
-        }
-      }
-
-      const response = await axios.get(SERPAPI_BASE_URL, {
-        params: {
-          engine: "google_finance",
-          q: formattedQuery,
-          api_key: this.apiKey,
-          hl: "ja",
-          window: window, // 期間指定（1D, 5D, 1M, 6M, 1Y, 5Y, MAX）
-        },
-      });
-
-      const data = response.data;
+      const formattedQuery = this.formatSymbolQuery(symbol);
+      const data = await this.getGoogleFinanceData(formattedQuery, { window });
       const graphData = data.graph || [];
 
       // グラフデータをChartDataPoint形式に変換
@@ -470,27 +709,8 @@ export class SerpApiClient {
 
   async getFinancialData(symbol: string): Promise<FinancialData | null> {
     try {
-      // 全角→半角変換 & クエリの形式を整える
-      let formattedQuery = normalizeQuery(symbol).toUpperCase();
-
-      if (!formattedQuery.includes(":")) {
-        if (/^\d{4}$/.test(formattedQuery)) {
-          formattedQuery = `${formattedQuery}:TYO`;
-        } else {
-          formattedQuery = `${formattedQuery}:NASDAQ`;
-        }
-      }
-
-      const response = await axios.get(SERPAPI_BASE_URL, {
-        params: {
-          engine: "google_finance",
-          q: formattedQuery,
-          api_key: this.apiKey,
-          hl: "ja",
-        },
-      });
-
-      const data = response.data;
+      const formattedQuery = this.formatSymbolQuery(symbol);
+      const data = await this.getGoogleFinanceData(formattedQuery);
       const financials = data.financials || [];
 
       // 最新の四半期または年次データを取得

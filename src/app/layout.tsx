@@ -1,18 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { VercelAnalytics } from "@/components/VercelAnalytics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
 export const metadata: Metadata = {
   title: "AI Market Analyzer - 株式分析アプリ",
-  description: "AIを活用した株式分析と投資アドバイスを提供するアプリケーション",
+  description: "AIを活用して株式情報の整理と分析補助を行うアプリケーション",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -68,7 +62,7 @@ export default function RootLayout({
         />
         */}
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
