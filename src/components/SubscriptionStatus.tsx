@@ -6,7 +6,7 @@ import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { usePurchase } from "@/hooks/usePurchase";
 import { useIOSPurchase } from "@/hooks/useIOSPurchase";
-import { isIOSNative } from "@/lib/utils/platformDetect";
+import { isAndroidNative, isIOSNative } from "@/lib/utils/platformDetect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -32,11 +32,23 @@ export function SubscriptionStatus() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isiOS = isIOSNative();
-  const currentlyPurchasing = isiOS ? isIOSPurchasing : isPurchasing;
-  const currentError = isiOS ? iosError : purchaseError;
+  const isAndroid = isAndroidNative();
+  const usesNativeBilling = isiOS || isAndroid;
+  const currentlyPurchasing = usesNativeBilling ? isIOSPurchasing : isPurchasing;
+  const currentError = usesNativeBilling ? iosError : purchaseError;
+  const billingAccountLabel = isAndroid
+    ? "Google Playアカウント"
+    : isiOS
+      ? "Apple IDアカウント"
+      : "決済サービス";
+  const billingManagementLabel = isAndroid
+    ? "Google Playの定期購入管理"
+    : isiOS
+      ? "設定アプリのApple IDサブスクリプション管理"
+      : "決済サービスの管理画面";
 
   const handlePurchase = async () => {
-    if (isiOS) {
+    if (usesNativeBilling) {
       await purchaseProduct(selectedPlan);
     } else {
       startCheckout(selectedPlan);
@@ -80,9 +92,8 @@ export function SubscriptionStatus() {
           プレミアム月額プラン: ¥700/月（1ヶ月ごとに自動更新）
           プレミアム年額プラン: ¥7,000/年（1年ごとに自動更新）
           サブスクリプションは期間終了の少なくとも24時間前に自動更新をオフにしない限り自動的に更新されます。
-          お支払いはApple IDアカウントに請求されます。
-          購入後の管理・キャンセルは「設定」＞「Apple
-          ID」＞「サブスクリプション」から行えます。
+          お支払いは{billingAccountLabel}に請求されます。
+          購入後の管理・キャンセルは{billingManagementLabel}から行えます。
         </p>
         <div className="flex items-center justify-center gap-3 text-xs">
           <Link
@@ -98,15 +109,19 @@ export function SubscriptionStatus() {
           >
             プライバシーポリシー
           </Link>
-          <span className="text-muted-foreground">|</span>
-          <a
-            href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary hover:underline font-medium"
-          >
-            EULA
-          </a>
+          {isiOS && (
+            <>
+              <span className="text-muted-foreground">|</span>
+              <a
+                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline font-medium"
+              >
+                EULA
+              </a>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -297,7 +312,7 @@ export function SubscriptionStatus() {
                 >
                   {currentlyPurchasing ? "処理中..." : "再購入する"}
                 </Button>
-                {isiOS && (
+                {usesNativeBilling && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -405,7 +420,7 @@ export function SubscriptionStatus() {
                     ? "処理中..."
                     : `${selectedPlan === "monthly" ? "月額" : "年額"}プランで開始する`}
                 </Button>
-                {isiOS && (
+                {usesNativeBilling && (
                   <Button
                     variant="ghost"
                     size="sm"

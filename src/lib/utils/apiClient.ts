@@ -9,7 +9,8 @@
 export function getApiBaseUrl(): string {
     // Capacitor環境かどうかをチェック
     const isCapacitor = typeof window !== "undefined" &&
-        ((window as any).Capacitor !== undefined || window.location.protocol === 'capacitor:');
+        (((window as any).Capacitor?.isNativePlatform?.() === true) ||
+            window.location.protocol === 'capacitor:');
 
     if (isCapacitor) {
         // Capacitorアプリの場合は本番環境のURLを使用

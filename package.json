@@ -7,6 +7,12 @@
     "build": "next build",
     "build:ios": "npm run build:static && npx cap sync ios",
     "build:static": "EXPORT_STATIC=true next build",
+    "check:release-env": "node scripts/check-release-env.mjs",
+    "check:release-env:ios": "node scripts/check-release-env.mjs --target=ios",
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "preflight:release": "node scripts/release-preflight.mjs",
+    "preflight:release:ios": "node scripts/release-preflight.mjs --target=ios",
+    "preflight:release:native": "node scripts/release-preflight.mjs --native",
     "start": "next start",
     "lint": "next lint",
     "test:signals": "vitest run src/lib/signals"
