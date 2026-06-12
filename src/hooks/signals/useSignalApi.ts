@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CapacitorHttp } from "@capacitor/core";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 
-interface SignalApiResponse<T> {
+export interface SignalApiResponse<T> {
   data: T | null;
   error?: string;
   lastSuccessfulAt?: string;
@@ -18,7 +18,9 @@ function isCapacitorNative(): boolean {
   return cap?.isNativePlatform?.() === true;
 }
 
-async function fetchSignal<T>(endpoint: string): Promise<SignalApiResponse<T>> {
+export async function fetchSignal<T>(
+  endpoint: string
+): Promise<SignalApiResponse<T>> {
   const url = getApiUrl(endpoint);
   const headers = await getAuthHeaders();
 

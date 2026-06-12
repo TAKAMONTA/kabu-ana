@@ -5,44 +5,28 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Droplet, Flame, Radio } from "lucide-react";
-
-interface PulseData {
-  wti: { value: number | null; change24h: number | null } | null;
-  hotCount: number;
-  criticalCount: number;
-}
+import { fetchSignal } from "@/hooks/signals/useSignalApi";
+import {
+  derivePulse,
+  type PulseData,
+  type PulseNewsItem,
+  type PulsePricePoint,
+} from "@/lib/signals/derivePulse";
 
 async function fetchPulse(): Promise<PulseData> {
   const [pricesRes, newsRes] = await Promise.allSettled([
-    fetch("/api/signals/prices", { cache: "no-store" }).then(r => r.json()),
-    fetch("/api/signals/news", { cache: "no-store" }).then(r => r.json()),
+    fetchSignal<{ prices: PulsePricePoint[] }>("/api/signals/prices"),
+    fetchSignal<{ items: PulseNewsItem[] }>("/api/signals/news"),
   ]);
 
   const prices =
     pricesRes.status === "fulfilled"
-      ? (pricesRes.value?.data?.prices ?? [])
+      ? (pricesRes.value.data?.prices ?? [])
       : [];
   const items =
-    newsRes.status === "fulfilled" ? (newsRes.value?.data?.items ?? []) : [];
+    newsRes.status === "fulfilled" ? (newsRes.value.data?.items ?? []) : [];
 
-  const wti = prices.find((p: { key?: string }) => p?.key === "wti");
-  const hotCount = items.filter(
-    (i: { label?: string }) => i?.label === "Hot" || i?.label === "Critical"
-  ).length;
-  const criticalCount = items.filter(
-    (i: { label?: string }) => i?.label === "Critical"
-  ).length;
-
-  return {
-    wti: wti
-      ? {
-          value: typeof wti.value === "number" ? wti.value : null,
-          change24h: typeof wti.change24h === "number" ? wti.change24h : null,
-        }
-      : null,
-    hotCount,
-    criticalCount,
-  };
+  return derivePulse(prices, items);
 }
 
 export function LivePulseStrip() {
@@ -78,7 +62,7 @@ export function LivePulseStrip() {
       sub:
         wtiChange != null
           ? `${wtiChange >= 0 ? "+" : ""}${wtiChange.toFixed(2)} (24h)`
-          : "API キー未設定",
+          : "データ未取得",
       tone:
         wtiChange != null && wtiChange < 0
           ? ("down" as const)
