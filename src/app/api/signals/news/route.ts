@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { fail, ok, readSignalDoc, todayId, writeSignalDoc } from "@/lib/signals/cache";
 import { fetchEnergyNews, type EnergyNewsItem } from "@/lib/signals/sources/rss";
+import { buildJapaneseSignalTitle } from "@/lib/signals/localize";
 
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -9,12 +10,24 @@ interface NewsPayload {
   fetchedAt: string;
 }
 
+function normalizeNewsPayload(payload: NewsPayload | null): NewsPayload | null {
+  if (!payload) return null;
+
+  return {
+    ...payload,
+    items: payload.items.map(item => ({
+      ...item,
+      titleJa: buildJapaneseSignalTitle(item.title),
+    })),
+  };
+}
+
 export async function GET() {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json(ok<NewsPayload>(null));
   }
 
-  const cached = await readSignalDoc<NewsPayload>("signals_news", todayId());
+  const cached = normalizeNewsPayload(await readSignalDoc<NewsPayload>("signals_news", todayId()));
   try {
     const items = await fetchEnergyNews();
     const payload = { items, fetchedAt: new Date().toISOString() };

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { doc, getDoc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Subscription, SubscriptionStatus, SubscriptionPlatform } from "@/lib/types/subscription";
+import type { Subscription } from "@/lib/types/subscription";
 import { useAuth } from "./useAuth";
 
 /**
@@ -60,50 +60,6 @@ export function useSubscription() {
   }, [user]);
 
   /**
-   * 購入状態を更新する（主にAPI経由で使用）
-   */
-  const updateSubscription = async (
-    status: SubscriptionStatus,
-    platform: SubscriptionPlatform,
-    productId: string,
-    options?: {
-      purchaseToken?: string;
-      orderId?: string;
-      expiryDate?: Date;
-      isTrial?: boolean;
-    }
-  ) => {
-    if (!user || !db) {
-      throw new Error("ユーザーがログインしていません");
-    }
-
-    try {
-      const subscriptionRef = doc(db, "subscriptions", user.uid);
-      const now = new Date();
-      
-      await setDoc(
-        subscriptionRef,
-        {
-          userId: user.uid,
-          status,
-          platform,
-          productId,
-          purchaseToken: options?.purchaseToken,
-          orderId: options?.orderId,
-          purchaseDate: now,
-          expiryDate: options?.expiryDate,
-          isTrial: options?.isTrial || false,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
-    } catch (err) {
-      console.error("購入状態の更新エラー:", err);
-      throw err;
-    }
-  };
-
-  /**
    * 購入状態が有効かどうかを判定
    */
   const isActive = subscription?.status === "active" || subscription?.status === "trial";
@@ -119,7 +75,5 @@ export function useSubscription() {
     isPremium,
     isActive,
     hasExpired,
-    updateSubscription,
   };
 }
-

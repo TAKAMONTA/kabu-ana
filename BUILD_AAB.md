@@ -1,7 +1,7 @@
 # Android AAB ビルド手順
 
 ## バージョン情報
-- **現在のバージョン**: versionCode 11, versionName "1.1"
+- **現在のバージョン**: versionCode 25, versionName "1.5.3"
 
 ## ビルド手順
 
@@ -18,6 +18,15 @@ npx cap sync android
 これにより、Next.jsアプリのビルド結果がAndroidプロジェクトに同期されます。
 
 ### 3. AABファイルをビルド
+
+リリース署名は `android/key.properties` ではなく、以下の環境変数で指定できます。実値はコミットしないでください。
+
+```bash
+export ANDROID_KEYSTORE_FILE=/absolute/path/to/upload-keystore.jks
+export ANDROID_KEYSTORE_PASSWORD=your_secure_store_password
+export ANDROID_KEY_ALIAS=upload
+export ANDROID_KEY_PASSWORD=your_secure_key_password
+```
 
 #### 方法1: npmスクリプトを使用（推奨）
 ```bash
@@ -48,7 +57,7 @@ android/app/build/outputs/bundle/release/app-release.aab
 ## トラブルシューティング
 
 ### ビルドエラーが発生する場合
-- `key.properties` ファイルが `android/` ディレクトリに存在するか確認
+- `ANDROID_KEYSTORE_FILE` などの署名用環境変数、またはローカル専用の `android/key.properties` が設定されているか確認
 - キーストアファイル（`upload-keystore.jks`）が存在するか確認
 - Android SDKが正しくインストールされているか確認
 
@@ -58,4 +67,3 @@ android/app/build/outputs/bundle/release/app-release.aab
 versionCode 12  // 前回より1増やす
 versionName "1.2"  // セマンティックバージョニングに従って更新
 ```
-

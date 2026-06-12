@@ -125,7 +125,7 @@ export function NewsSection({
                     </span>
                   </div>
                   <p className="text-sm text-purple-700 mb-3 dark:text-purple-300">
-                    AIによる最新ニュースの株価影響評価
+                    AIによる最新ニュースの材料整理
                   </p>
                 </div>
               </div>
@@ -153,11 +153,11 @@ export function NewsSection({
                   </div>
                 )}
 
-                {/* 推奨事項 */}
+                {/* 確認ポイント */}
                 {newsAnalysis.recommendations.length > 0 && (
                   <div>
                     <h5 className="font-semibold text-purple-800 mb-2 text-sm dark:text-purple-200">
-                      💡 投資家への推奨事項
+                      💡 確認ポイント
                     </h5>
                     <ul className="space-y-1">
                       {newsAnalysis.recommendations.map((rec, idx) => (
@@ -214,7 +214,7 @@ export function NewsSection({
         ) : newsData && newsData.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-4">
-              最新ニュースを取得済みです。「関連ニュースを取得」ボタンをクリックしてAI分析を実行してください。
+              最新ニュースを取得済みです。「関連ニュースをAI分析」ボタンで材料整理を開始できます。
             </p>
             {newsData.slice(0, 3).map((news, idx) => (
               <a

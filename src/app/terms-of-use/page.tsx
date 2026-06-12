@@ -9,7 +9,7 @@ export default function TermsOfUsePage() {
             利用規約
           </CardTitle>
           <p className="text-center text-muted-foreground">
-            最終更新日: 2026年4月10日
+            最終更新日: 2026年5月11日
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -79,17 +79,17 @@ export default function TermsOfUsePage() {
               <div>
                 <h3 className="text-lg font-medium mb-2">4.2 課金・更新</h3>
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                  <li>お支払いは、購入確認時にApple IDアカウントに請求されます。</li>
+                  <li>お支払いは、購入確認時にご利用のプラットフォームのアカウント（Google Playアカウント、Apple IDアカウント、またはWeb決済サービス）に請求されます。</li>
                   <li>サブスクリプションは、現在の期間終了の少なくとも24時間前に自動更新をオフにしない限り、自動的に更新されます。</li>
                   <li>更新料金は、現在の期間終了前の24時間以内にアカウントに請求されます。</li>
-                  <li>購入後、サブスクリプションの管理と自動更新のキャンセルは、Apple IDアカウントの設定から行えます。</li>
+                  <li>購入後、サブスクリプションの管理と自動更新のキャンセルは、ご利用のプラットフォームのサブスクリプション管理画面から行えます。</li>
                 </ul>
               </div>
 
               <div>
                 <h3 className="text-lg font-medium mb-2">4.3 キャンセル</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  サブスクリプションはいつでもキャンセルできます。キャンセルは、お使いのデバイスの「設定」＞「Apple ID」＞「サブスクリプション」から行えます。
+                  サブスクリプションはいつでもキャンセルできます。Android版ではGoogle Playの定期購入管理、iOS版では「設定」アプリのApple IDサブスクリプション管理、Web版では決済サービスの管理画面から行えます。
                   キャンセル後も、現在の課金期間の終了まではプレミアム機能をご利用いただけます。
                   サブスクリプション期間中の返金は行われません。
                 </p>
@@ -182,9 +182,9 @@ export default function TermsOfUsePage() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-3">Apple標準利用規約（EULA）</h2>
+            <h2 className="text-xl font-semibold mb-3">iOS版の標準利用規約（EULA）</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              本アプリのご利用には、Apple Inc.の標準エンドユーザーライセンス契約（EULA）も適用されます。
+              iOS版のご利用には、Apple Inc.の標準エンドユーザーライセンス契約（EULA）も適用されます。
               詳細は以下のリンクをご確認ください：
             </p>
             <a

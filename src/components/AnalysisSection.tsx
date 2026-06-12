@@ -38,16 +38,20 @@ export function AnalysisSection({
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Brain className="h-5 w-5" />
-          AI投資分析
+          AI分析（参考情報）
         </CardTitle>
         <CardDescription>
-          AIが企業の投資価値を分析し、投資判断をサポートします
+          基本データを表示した後、必要なタイミングでAIが判断材料を整理します
         </CardDescription>
       </CardHeader>
       <CardContent>
         {analysisResult ? (
           <div className="space-y-6">
-            {/* 投資アドバイス */}
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+              本分析は情報提供を目的とした参考情報であり、投資助言・売買推奨ではありません。最終的な判断はご自身で行ってください。
+            </div>
+
+            {/* 分析サマリー */}
             <div className="p-6 bg-gradient-to-r from-blue-50 to-blue-100/50 rounded-lg border-2 border-blue-300 shadow-sm dark:from-blue-950 dark:to-blue-900/50 dark:border-blue-800">
               <div className="flex items-start gap-3 mb-4">
                 <div className="p-2 bg-blue-200 rounded-lg dark:bg-blue-900">
@@ -55,10 +59,10 @@ export function AnalysisSection({
                 </div>
                 <div>
                   <h4 className="font-bold text-blue-950 text-lg dark:text-blue-100">
-                    📊 投資アドバイス
+                    📊 分析サマリー
                   </h4>
                   <p className="text-sm text-blue-700 mt-1 dark:text-blue-300">
-                    総合的な投資判断とリスク評価
+                    主要材料とリスクの整理
                   </p>
                 </div>
               </div>
@@ -79,9 +83,9 @@ export function AnalysisSection({
               </div>
             </div>
 
-            {/* 目標株価 */}
+            {/* AI推定レンジ */}
             <div>
-              <h4 className="font-bold mb-4 text-base">🎯 目標株価</h4>
+              <h4 className="font-bold mb-4 text-base">🎯 AI推定レンジ</h4>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   {
@@ -113,9 +117,9 @@ export function AnalysisSection({
               </div>
             </div>
 
-            {/* 損切りライン */}
+            {/* リスク目安 */}
             <div>
-              <h4 className="font-bold mb-4 text-base">⚠️ 損切りライン</h4>
+              <h4 className="font-bold mb-4 text-base">⚠️ 下振れリスク目安</h4>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   {
@@ -169,7 +173,7 @@ export function AnalysisSection({
               </span>
             </div>
 
-            {/* 重要な要因と推奨事項を横並びに配置 */}
+            {/* 重要な要因と確認ポイントを横並びに配置 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* 重要な要因 */}
               {analysisResult.keyFactors.length > 0 && (
@@ -188,10 +192,10 @@ export function AnalysisSection({
                 </div>
               )}
 
-              {/* 推奨事項 */}
+              {/* 確認ポイント */}
               {analysisResult.recommendations.length > 0 && (
                 <div>
-                  <h4 className="font-semibold mb-3">推奨事項</h4>
+                  <h4 className="font-semibold mb-3">確認ポイント</h4>
                   <ul className="space-y-2">
                     {analysisResult.recommendations.map((rec, idx) => (
                       <li
@@ -300,7 +304,7 @@ export function AnalysisSection({
           <div className="text-center py-8">
             <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
             <p className="text-sm text-muted-foreground mb-4">
-              AI分析はまだ実行されていません。下のボタンで分析を開始できます。
+              株価・チャート・ニュースは先に確認できます。AI分析は必要なときだけ開始できます。
             </p>
 
             {/* 残り回数バッジ（プレミアムでない場合） */}

@@ -1,6 +1,32 @@
 import axios from "axios";
 
 const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
+const FMP_FORBIDDEN_COOLDOWN_MS = 10 * 60 * 1000;
+let fmpForbiddenUntil = 0;
+
+export function resetFMPAccessCacheForTests() {
+  fmpForbiddenUntil = 0;
+}
+
+class FMPForbiddenError extends Error {
+  constructor(message = "FMP API access forbidden") {
+    super(message);
+    this.name = "FMPForbiddenError";
+  }
+}
+
+function isFMPForbidden(error: any): boolean {
+  return error?.response?.status === 403;
+}
+
+function handleFMPError(error: any, label: string): never | null {
+  console.error(`${label}:`, error.message);
+  if (isFMPForbidden(error)) {
+    fmpForbiddenUntil = Date.now() + FMP_FORBIDDEN_COOLDOWN_MS;
+    throw new FMPForbiddenError(error.message);
+  }
+  return null;
+}
 
 export interface FMPCompanyProfile {
   symbol: string;
@@ -191,7 +217,7 @@ export class FMPClient {
       }
       return null;
     } catch (error: any) {
-      console.error("FMP企業プロファイル取得エラー:", error.message);
+      handleFMPError(error, "FMP企業プロファイル取得エラー");
       return null;
     }
   }
@@ -212,7 +238,7 @@ export class FMPClient {
       }
       return null;
     } catch (error: any) {
-      console.error("FMP株価データ取得エラー:", error.message);
+      handleFMPError(error, "FMP株価データ取得エラー");
       return null;
     }
   }
@@ -237,7 +263,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMP財務諸表取得エラー:", error.message);
+      handleFMPError(error, "FMP財務諸表取得エラー");
       return [];
     }
   }
@@ -262,7 +288,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMP主要指標取得エラー:", error.message);
+      handleFMPError(error, "FMP主要指標取得エラー");
       return [];
     }
   }
@@ -282,7 +308,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMP企業検索エラー:", error.message);
+      handleFMPError(error, "FMP企業検索エラー");
       return [];
     }
   }
@@ -302,7 +328,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMPシンボル検索エラー:", error.message);
+      handleFMPError(error, "FMPシンボル検索エラー");
       return [];
     }
   }
@@ -322,7 +348,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMP企業名検索エラー:", error.message);
+      handleFMPError(error, "FMP企業名検索エラー");
       return [];
     }
   }
@@ -341,7 +367,7 @@ export class FMPClient {
 
       return response.data || [];
     } catch (error: any) {
-      console.error("FMP CIK検索エラー:", error.message);
+      handleFMPError(error, "FMP CIK検索エラー");
       return [];
     }
   }
@@ -350,6 +376,8 @@ export class FMPClient {
    * 統合検索（複数の検索方法を試行）
    */
   async comprehensiveSearch(query: string): Promise<any[]> {
+    if (Date.now() < fmpForbiddenUntil) return [];
+
     const results: any[] = [];
 
     try {
@@ -405,6 +433,9 @@ export class FMPClient {
 
       return uniqueResults.slice(0, 10);
     } catch (error: any) {
+      if (error instanceof FMPForbiddenError) {
+        return [];
+      }
       console.error("FMP統合検索エラー:", error.message);
       return [];
     }
