@@ -4,8 +4,12 @@ export function formatSSE(
   event: "narrative" | "result" | "error",
   data: string
 ): string {
-  const escaped = data.replace(/\n/g, "\\n");
-  return `event: ${event}\ndata: ${escaped}\n\n`;
+  // JSON-encode the payload so arbitrary content (newlines, quotes, backslashes)
+  // survives the round-trip on a single data line. A naive \n→\\n escape is not
+  // reversible: the `result` payload is itself JSON.stringify output that already
+  // contains literal "\n" sequences, which the inverse replace would corrupt into
+  // raw newlines and break JSON.parse on the client.
+  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
 export function parseSSE(
@@ -20,15 +24,19 @@ export function parseSSE(
     if (!frame.trim()) continue;
     const lines = frame.split("\n");
     let event = "";
-    let data = "";
+    let data: string | null = null;
     for (const line of lines) {
       if (line.startsWith("event: ")) {
         event = line.slice(7);
       } else if (line.startsWith("data: ")) {
-        data = line.slice(6).replace(/\\n/g, "\n");
+        try {
+          data = JSON.parse(line.slice(6));
+        } catch {
+          data = null;
+        }
       }
     }
-    if (event && data !== undefined && data !== "") {
+    if (event && data !== null && data !== "") {
       events.push({ event, data });
     }
   }

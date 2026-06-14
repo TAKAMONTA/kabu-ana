@@ -76,4 +76,15 @@ describe("formatSSE / parseSSE round-trip", () => {
     expect(events).toHaveLength(1);
     expect(events[0].data).toBe("complete");
   });
+
+  it("round-trips a result payload with newlines so it stays valid JSON", () => {
+    // result data is itself JSON.stringify output; if a string field contains a
+    // newline, a naive \n unescape corrupts it and JSON.parse throws on the client.
+    const obj = { aiReflection: "1行目\n2行目", investmentAdvice: 'コメント"引用"' };
+    const frame = formatSSE("result", JSON.stringify(obj));
+    const events = parseSSE(frame);
+    expect(events).toHaveLength(1);
+    expect(events[0].event).toBe("result");
+    expect(JSON.parse(events[0].data)).toEqual(obj);
+  });
 });
