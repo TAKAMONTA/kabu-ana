@@ -82,6 +82,7 @@ export default function HomePage() {
     isAnalyzing,
     error: analysisError,
     analysisResult,
+    streamingText,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
     retry: retryAnalysis,
@@ -601,6 +602,7 @@ export default function HomePage() {
                   remainingUses={remainingUses}
                   dailyLimit={dailyLimit}
                   isPremium={isPremium}
+                  streamingText={streamingText}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}
