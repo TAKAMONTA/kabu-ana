@@ -163,7 +163,12 @@ export class OpenRouterClient {
     newsData: any[]
   ): Promise<AnalysisResult> {
     try {
-      const prompt = buildAnalysisPrompt(companyInfo, stockData, newsData, false);
+      const prompt = buildAnalysisPrompt(
+        companyInfo,
+        stockData,
+        newsData,
+        false
+      );
 
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,

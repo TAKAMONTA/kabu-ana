@@ -47,12 +47,14 @@ export function AnalysisSection({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {(analysisResult || (isAnalyzing && streamingText)) ? (
+        {analysisResult || (isAnalyzing && streamingText) ? (
           <div className="space-y-6">
             {/* AIブリーフィング：ストリーミング中の自然文所見 */}
             {streamingText && (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-xs font-semibold text-slate-500 mb-2 dark:text-slate-400">AIブリーフィング</p>
+                <p className="text-xs font-semibold text-slate-500 mb-2 dark:text-slate-400">
+                  AIブリーフィング
+                </p>
                 <p className="text-sm text-slate-800 leading-relaxed dark:text-slate-200 whitespace-pre-wrap">
                   {streamingText}
                   {isAnalyzing && <span className="animate-pulse">▋</span>}
@@ -135,7 +137,9 @@ export function AnalysisSection({
 
                 {/* リスク目安 */}
                 <div>
-                  <h4 className="font-bold mb-4 text-base">⚠️ 下振れリスク目安</h4>
+                  <h4 className="font-bold mb-4 text-base">
+                    ⚠️ 下振れリスク目安
+                  </h4>
                   <div className="grid grid-cols-3 gap-3">
                     {[
                       {
@@ -271,14 +275,16 @@ export function AnalysisSection({
                           💡 機会 (Opportunities)
                         </h5>
                         <ul className="space-y-2">
-                          {analysisResult.swot.opportunities.map((item, idx) => (
-                            <li
-                              key={idx}
-                              className="text-xs text-blue-800 pl-3 relative before:content-['→'] before:absolute before:left-0 before:font-bold dark:text-blue-200"
-                            >
-                              {item}
-                            </li>
-                          ))}
+                          {analysisResult.swot.opportunities.map(
+                            (item, idx) => (
+                              <li
+                                key={idx}
+                                className="text-xs text-blue-800 pl-3 relative before:content-['→'] before:absolute before:left-0 before:font-bold dark:text-blue-200"
+                              >
+                                {item}
+                              </li>
+                            )
+                          )}
                         </ul>
                       </div>
 
