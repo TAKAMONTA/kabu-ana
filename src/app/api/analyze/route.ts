@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import { formatSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const num = typeof value === "number" ? value : Number(value);
@@ -37,8 +39,14 @@ function normalizeAnalysisBody(body: any) {
     stockData: {
       ...rawStockData,
       symbol: String(rawStockData.symbol || companyInfo.symbol || "UNKNOWN"),
-      price: toFiniteNumber(rawStockData.price, toFiniteNumber(companyInfo.price)),
-      change: toFiniteNumber(rawStockData.change, toFiniteNumber(companyInfo.change)),
+      price: toFiniteNumber(
+        rawStockData.price,
+        toFiniteNumber(companyInfo.price)
+      ),
+      change: toFiniteNumber(
+        rawStockData.change,
+        toFiniteNumber(companyInfo.change)
+      ),
       changePercent: toFiniteNumber(
         rawStockData.changePercent,
         toFiniteNumber(companyInfo.changePercent)
@@ -49,7 +57,8 @@ function normalizeAnalysisBody(body: any) {
           ? "N/A"
           : String(rawStockData.marketCap),
       pe: rawStockData.pe == null ? undefined : toFiniteNumber(rawStockData.pe),
-      eps: rawStockData.eps == null ? undefined : toFiniteNumber(rawStockData.eps),
+      eps:
+        rawStockData.eps == null ? undefined : toFiniteNumber(rawStockData.eps),
       dividend:
         rawStockData.dividend == null
           ? undefined
@@ -73,9 +82,10 @@ async function analyzeHandler(request: NextRequest) {
   }
   const startedAt = Date.now();
   try {
-    // 入力データの検証
     const body = await request.json();
-    const validationResult = analysisSchema.safeParse(normalizeAnalysisBody(body));
+    const validationResult = analysisSchema.safeParse(
+      normalizeAnalysisBody(body)
+    );
 
     if (!validationResult.success) {
       return NextResponse.json(
@@ -104,31 +114,88 @@ async function analyzeHandler(request: NextRequest) {
     }
 
     const openRouter = new OpenRouterClient(apiKey);
-
-    // AI分析を実行
-    const analysisResult = await openRouter.analyzeStock(
+    const generator = openRouter.analyzeStockStream(
       companyInfo,
       stockData,
       newsData || []
     );
 
-    console.info("Analyze API timings", {
-      symbol: companyInfo.symbol,
-      durationMs: Date.now() - startedAt,
-      newsCount: newsData?.length || 0,
+    // preflight: advance to first chunk before returning 200 so that
+    // withDailyLimit only increments on a genuinely successful stream
+    let firstChunk: string;
+    try {
+      const first = await generator.next();
+      if (first.done) {
+        return NextResponse.json(
+          { error: "AI分析中にエラーが発生しました。" },
+          { status: 500 }
+        );
+      }
+      firstChunk = first.value;
+    } catch (preflightError) {
+      const message =
+        preflightError instanceof Error
+          ? preflightError.message
+          : "AI分析中にエラーが発生しました。";
+      const status = message.includes("認証")
+        ? 401
+        : message.includes("残高")
+          ? 402
+          : message.includes("制限")
+            ? 429
+            : 500;
+      return NextResponse.json({ error: message }, { status });
+    }
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const enqueue = (chunk: string) =>
+          controller.enqueue(new TextEncoder().encode(chunk));
+
+        let fullText = firstChunk;
+        enqueue(formatSSE("narrative", firstChunk));
+
+        try {
+          for await (const delta of generator) {
+            fullText += delta;
+            enqueue(formatSSE("narrative", delta));
+          }
+
+          const { json } = splitNarrativeAndJson(fullText);
+          if (json) {
+            const analysisResult = openRouter.parseAnalysisResult(json);
+            enqueue(formatSSE("result", JSON.stringify(analysisResult)));
+          }
+
+          console.info("Analyze API timings", {
+            symbol: companyInfo.symbol,
+            durationMs: Date.now() - startedAt,
+            newsCount: newsData?.length || 0,
+          });
+        } catch (streamError) {
+          const message =
+            streamError instanceof Error
+              ? streamError.message
+              : "AI分析中にエラーが発生しました。";
+          enqueue(formatSSE("error", message));
+        } finally {
+          controller.close();
+        }
+      },
     });
 
-    return NextResponse.json({
-      analysis: analysisResult,
-      timestamp: new Date().toISOString(),
-      metadata: {
-        durationMs: Date.now() - startedAt,
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
       },
     });
   } catch (error) {
     const { logError } = await import("@/lib/utils/errorHandler");
     logError(error, "Analysis API");
-    const message = error instanceof Error ? error.message : "分析中にエラーが発生しました";
+    const message =
+      error instanceof Error ? error.message : "分析中にエラーが発生しました";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -5,18 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  TrendingUp,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,6 +72,7 @@ export default function HomePage() {
     isAnalyzing,
     error: analysisError,
     analysisResult,
+    streamingText,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
     retry: retryAnalysis,
@@ -601,6 +592,7 @@ export default function HomePage() {
                   remainingUses={remainingUses}
                   dailyLimit={dailyLimit}
                   isPremium={isPremium}
+                  streamingText={streamingText}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}
