@@ -109,30 +109,30 @@ export function LivePulseStrip() {
             <Card
               className={`relative overflow-hidden border bg-gradient-to-br ${c.bg} transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lg ${c.tone === "alert" ? "animate-pulse-soft" : ""}`}
             >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <c.icon className="size-3.5" />
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    <c.icon className="size-4" />
                     <span>{c.label}</span>
                   </div>
                   {i === cards.length - 1 && (
                     <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   )}
                 </div>
-                <div className="text-2xl font-bold tracking-tight">
+                <div className="text-4xl font-bold tracking-tight tabular-nums mb-2">
                   {c.value}
                 </div>
                 <div
-                  className={`mt-1 text-xs ${
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                     c.tone === "alert"
-                      ? "text-red-700 dark:text-red-300 font-semibold"
+                      ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
                       : c.tone === "down"
-                        ? "text-red-700 dark:text-red-300"
+                        ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
                         : c.tone === "up"
-                          ? "text-emerald-700 dark:text-emerald-300"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                           : c.tone === "calm"
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-muted-foreground"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {c.sub}
