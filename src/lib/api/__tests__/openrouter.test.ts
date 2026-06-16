@@ -60,11 +60,13 @@ describe("OpenRouterClient", () => {
 
     expect(result.aiReflection).toBe("長期の事業変化を見たい銘柄です。");
     expect(post).toHaveBeenCalledTimes(1);
-    expect(post.mock.calls[0][1]).toMatchObject({
+    const payload = post.mock.calls[0]![1] as {
+      max_tokens: number;
+      messages: Array<{ content: string }>;
+    };
+    expect(payload).toMatchObject({
       max_tokens: 2500,
     });
-    expect(post.mock.calls[0][1].messages[1].content).toContain(
-      "\"aiReflection\""
-    );
+    expect(payload.messages[1]!.content).toContain('"aiReflection"');
   });
 });

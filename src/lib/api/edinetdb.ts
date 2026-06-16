@@ -131,6 +131,32 @@ export interface EdinetIndustry {
   company_count?: number;
 }
 
+type EdinetEnvelope<T> = {
+  data?: T | null;
+  [key: string]: unknown;
+};
+
+/** EDINET検索用の証券コードを、アプリ内の株式シンボル表現から抽出する */
+export function getEdinetSearchQueryFromSymbol(
+  symbol?: string | null,
+  market?: string | null
+): string | null {
+  const normalizedSymbol = symbol?.trim().toUpperCase();
+  if (!normalizedSymbol) return null;
+
+  const secCode = normalizedSymbol.match(/^([0-9A-Z]{4})(?:\.T)?$/)?.[1];
+  if (!secCode) return null;
+
+  const normalizedMarket = market?.trim().toUpperCase();
+  const isTokyoStock =
+    normalizedSymbol.endsWith(".T") ||
+    normalizedMarket === "TYO" ||
+    normalizedMarket === "TSE" ||
+    normalizedMarket === "TOKYO";
+
+  return isTokyoStock ? secCode : null;
+}
+
 // ---- クライアント ----
 
 export class EdinetDBClient {
@@ -147,16 +173,24 @@ export class EdinetDBClient {
     };
   }
 
-  private async request<T>(path: string, params?: Record<string, string | number>): Promise<T | null> {
+  private async request<T>(
+    path: string,
+    params?: Record<string, string | number>
+  ): Promise<T | null> {
     try {
       const url = new URL(`${EDINETDB_BASE_URL}${path}`);
       if (params) {
-        Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, String(v)));
+        Object.entries(params).forEach(([k, v]) =>
+          url.searchParams.set(k, String(v))
+        );
       }
       const res = await fetch(url.toString(), { headers: this.headers });
       if (!res.ok) {
         const text = await res.text();
-        console.error(`EDINET DB APIエラー [${path}] ${res.status}:`, text.substring(0, 200));
+        console.error(
+          `EDINET DB APIエラー [${path}] ${res.status}:`,
+          text.substring(0, 200)
+        );
         return null;
       }
       return (await res.json()) as T;
@@ -166,64 +200,107 @@ export class EdinetDBClient {
     }
   }
 
+  private readDataEnvelope<T>(
+    path: string,
+    response: EdinetEnvelope<T> | null
+  ): T | null {
+    if (!response) return null;
+    if (Object.prototype.hasOwnProperty.call(response, "data")) {
+      return response.data ?? null;
+    }
+
+    console.error("EDINET DB レスポンス形式エラー:", {
+      path,
+      keys: Object.keys(response).slice(0, 10),
+    });
+    return null;
+  }
+
   /** 企業検索 */
   async searchCompanies(query: string, limit = 10): Promise<EdinetCompany[]> {
-    const data = await this.request<{ data: EdinetCompany[] }>("/search", { q: query, per_page: limit });
-    return data?.data ?? [];
+    const path = "/search";
+    const response = await this.request<EdinetEnvelope<EdinetCompany[]>>(path, {
+      q: query,
+      per_page: limit,
+    });
+    return this.readDataEnvelope(path, response) ?? [];
   }
 
   /** 企業詳細 */
   async getCompany(edinetCode: string): Promise<EdinetCompanyDetail | null> {
-    const data = await this.request<{ data: EdinetCompanyDetail }>(`/companies/${edinetCode}`);
-    return data?.data ?? null;
+    const path = `/companies/${edinetCode}`;
+    const response =
+      await this.request<EdinetEnvelope<EdinetCompanyDetail>>(path);
+    return this.readDataEnvelope(path, response);
   }
 
   /** 財務時系列（最大6年分） */
   async getFinancials(edinetCode: string): Promise<EdinetFinancials[]> {
-    const data = await this.request<{ data: EdinetFinancials[] }>(`/companies/${edinetCode}/financials`);
-    return data?.data ?? [];
+    const path = `/companies/${edinetCode}/financials`;
+    const response =
+      await this.request<EdinetEnvelope<EdinetFinancials[]>>(path);
+    return this.readDataEnvelope(path, response) ?? [];
   }
 
   /** 計算済み財務指標（時系列配列の最新年度を返す） */
   async getRatios(edinetCode: string): Promise<EdinetRatios | null> {
-    const data = await this.request<{ data: EdinetRatios | EdinetRatios[] }>(`/companies/${edinetCode}/ratios`);
-    if (!data?.data) return null;
-    if (Array.isArray(data.data)) {
+    const path = `/companies/${edinetCode}/ratios`;
+    const response =
+      await this.request<EdinetEnvelope<EdinetRatios | EdinetRatios[]>>(path);
+    const data = this.readDataEnvelope(path, response);
+    if (!data) return null;
+    if (Array.isArray(data)) {
       // 最新年度（fiscal_year が最大）を返す
-      const sorted = [...data.data].sort((a, b) => (b.fiscal_year ?? 0) - (a.fiscal_year ?? 0));
+      const sorted = [...data].sort(
+        (a, b) => (b.fiscal_year ?? 0) - (a.fiscal_year ?? 0)
+      );
       return sorted[0] ?? null;
     }
-    return data.data;
+    return data;
   }
 
   /** AI財務健全性スコア */
   async getAnalysis(edinetCode: string): Promise<EdinetAnalysis | null> {
-    const data = await this.request<{ data: EdinetAnalysis }>(`/companies/${edinetCode}/analysis`);
-    return data?.data ?? null;
+    const path = `/companies/${edinetCode}/analysis`;
+    const response = await this.request<EdinetEnvelope<EdinetAnalysis>>(path);
+    return this.readDataEnvelope(path, response);
   }
 
   /** 有報テキストブロック */
   async getTextBlocks(edinetCode: string): Promise<EdinetTextBlock[]> {
-    const data = await this.request<{ data: EdinetTextBlock[] }>(`/companies/${edinetCode}/text-blocks`);
-    return data?.data ?? [];
+    const path = `/companies/${edinetCode}/text-blocks`;
+    const response =
+      await this.request<EdinetEnvelope<EdinetTextBlock[]>>(path);
+    return this.readDataEnvelope(path, response) ?? [];
   }
 
   /** ランキング */
   async getRanking(metric: string, limit = 20): Promise<EdinetRankingItem[]> {
-    const data = await this.request<{ data: EdinetRankingItem[] }>(`/rankings/${metric}`, { limit });
-    return data?.data ?? [];
+    const path = `/rankings/${metric}`;
+    const response = await this.request<EdinetEnvelope<EdinetRankingItem[]>>(
+      path,
+      { limit }
+    );
+    return this.readDataEnvelope(path, response) ?? [];
   }
 
   /** 業種一覧 */
   async getIndustries(): Promise<EdinetIndustry[]> {
-    const data = await this.request<{ data: EdinetIndustry[] }>("/industries");
-    return data?.data ?? [];
+    const path = "/industries";
+    const response = await this.request<EdinetEnvelope<EdinetIndustry[]>>(path);
+    return this.readDataEnvelope(path, response) ?? [];
   }
 
   /** 業種別企業一覧 */
-  async getIndustry(slug: string): Promise<{ industry: EdinetIndustry; companies: EdinetCompany[] } | null> {
-    const data = await this.request<{ data: { industry: EdinetIndustry; companies: EdinetCompany[] } }>(`/industries/${slug}`);
-    return data?.data ?? null;
+  async getIndustry(
+    slug: string
+  ): Promise<{ industry: EdinetIndustry; companies: EdinetCompany[] } | null> {
+    const path = `/industries/${slug}`;
+    const response =
+      await this.request<
+        EdinetEnvelope<{ industry: EdinetIndustry; companies: EdinetCompany[] }>
+      >(path);
+    return this.readDataEnvelope(path, response);
   }
 }
 
