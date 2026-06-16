@@ -34,7 +34,17 @@ const googleFinanceResponse = {
       },
     },
     news_results: [
-      { items: [{ title: "トヨタ、国内販売が好調", snippet: "販売増", source: "News", date: "2026-05-28", link: "https://example.com" }] },
+      {
+        items: [
+          {
+            title: "トヨタ、国内販売が好調",
+            snippet: "販売増",
+            source: "News",
+            date: "2026-05-28",
+            link: "https://example.com",
+          },
+        ],
+      },
     ],
     financials: [
       {
@@ -156,11 +166,10 @@ describe("SerpApiClient", () => {
     expect(result?.companyInfo.market).toBe("NYSE");
     expect(result?.stockData.symbol).toBe("ORCL");
     expect(result?.chartData).toHaveLength(1);
-    expect(get.mock.calls.map(call => call[1].params.q)).toEqual([
-      "ORCL:NASDAQ",
-      "ORCL:NASDAQ",
-      "ORCL:NYSE",
-      "ORCL:NYSE",
-    ]);
+    expect(
+      get.mock.calls.map(
+        call => (call[1] as { params: { q: string } }).params.q
+      )
+    ).toEqual(["ORCL:NASDAQ", "ORCL:NASDAQ", "ORCL:NYSE", "ORCL:NYSE"]);
   });
 });

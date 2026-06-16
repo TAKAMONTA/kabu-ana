@@ -7,7 +7,10 @@ import {
   JPX_STOCK_BY_CODE,
   type JpxStock,
 } from "@/lib/jpx/stockMaster";
-import { EdinetDBClient } from "@/lib/api/edinetdb";
+import {
+  EdinetDBClient,
+  getEdinetSearchQueryFromSymbol,
+} from "@/lib/api/edinetdb";
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 export const dynamic =
@@ -561,19 +564,20 @@ async function searchHandler(request: NextRequest) {
     }> | null = null;
 
     const edinetDbKey = process.env.EDINETDB_API_KEY;
-    const isJpStock = companyInfo?.symbol?.endsWith(".T");
+    const edinetSearchQuery = getEdinetSearchQueryFromSymbol(
+      companyInfo?.symbol,
+      companyInfo?.market
+    );
 
     if (
       edinetDbKey &&
       edinetDbKey !== "your_edinetdb_api_key_here" &&
-      isJpStock
+      edinetSearchQuery
     ) {
       try {
         const edinetApi = new EdinetDBClient(edinetDbKey);
-        // 4桁証券コードを抽出して EDINET 検索
-        const secCode = companyInfo.symbol.replace(".T", "").slice(0, 4);
         const edinetResults = await Promise.race([
-          edinetApi.searchCompanies(secCode, 3),
+          edinetApi.searchCompanies(edinetSearchQuery, 3),
           new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error("EDINET timeout")), 2000)
           ),
