@@ -91,11 +91,12 @@ export function AskSection({
               onClick={() => handlePreset(question)}
               disabled={!canUseFeature || isAnalyzing}
               className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all
-                ${!canUseFeature || isAnalyzing
-                  ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
-                  : activeQuestion === question && hasResponse
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "border-border hover:border-primary/60 hover:bg-accent text-foreground"
+                ${
+                  !canUseFeature || isAnalyzing
+                    ? "opacity-40 cursor-not-allowed border-border text-muted-foreground"
+                    : activeQuestion === question && hasResponse
+                      ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                      : "border-border hover:border-primary/60 hover:bg-accent text-foreground"
                 }`}
             >
               {label}

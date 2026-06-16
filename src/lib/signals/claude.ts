@@ -7,32 +7,56 @@ const morningBriefStockRaw = z.object({
   direction: z.unknown(),
 });
 
-const morningBriefStockParsed = morningBriefStockRaw.transform((row): { ticker: string; reason: string; direction: "up" | "down" | "watch" } | null => {
-  const ticker = typeof row.ticker === "string" ? row.ticker.trim() : "";
-  if (!ticker) return null;
-  const d = row.direction;
-  const direction: "up" | "down" | "watch" =
-    d === "up" || d === "down" || d === "watch" ? d : "watch";
-  const r = row.reason;
-  const reason =
-    typeof r === "string" ? r.trim() : r !== null && r !== undefined ? String(r).trim() : "";
-  return { ticker, reason: reason.length > 0 ? reason : "（補足なし）", direction };
-});
+const morningBriefStockParsed = morningBriefStockRaw.transform(
+  (
+    row
+  ): {
+    ticker: string;
+    reason: string;
+    direction: "up" | "down" | "watch";
+  } | null => {
+    const ticker = typeof row.ticker === "string" ? row.ticker.trim() : "";
+    if (!ticker) return null;
+    const d = row.direction;
+    const direction: "up" | "down" | "watch" =
+      d === "up" || d === "down" || d === "watch" ? d : "watch";
+    const r = row.reason;
+    const reason =
+      typeof r === "string"
+        ? r.trim()
+        : r !== null && r !== undefined
+          ? String(r).trim()
+          : "";
+    return {
+      ticker,
+      reason: reason.length > 0 ? reason : "（補足なし）",
+      direction,
+    };
+  }
+);
 
 export const claudeMorningBriefSchema = z.object({
   headline_jp: z.string().max(15),
   summary_jp: z.string().max(120),
-  key_drivers: z.array(z.object({ factor: z.string(), impact: z.string() })).default([]),
+  key_drivers: z
+    .array(z.object({ factor: z.string(), impact: z.string() }))
+    .default([]),
   stocks_to_watch: z
     .array(morningBriefStockParsed)
     .default([])
-    .transform((items) => items.filter((item): item is NonNullable<typeof item> => item !== null)),
+    .transform(items =>
+      items.filter((item): item is NonNullable<typeof item> => item !== null)
+    ),
   risk_outlook: z.enum(["low", "elevated", "high", "critical"]),
 });
 
 export const claudeDeepDiveSchema = z.object({
-  causes: z.array(z.object({ hypothesis: z.string(), rationale: z.string() })).length(3),
-  scenarios: z.array(z.object({ scenario: z.string(), trigger: z.string() })).length(3),
+  causes: z
+    .array(z.object({ hypothesis: z.string(), rationale: z.string() }))
+    .length(3),
+  scenarios: z
+    .array(z.object({ scenario: z.string(), trigger: z.string() }))
+    .length(3),
 });
 
 export type ClaudeMorningBrief = z.infer<typeof claudeMorningBriefSchema>;

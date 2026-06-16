@@ -212,8 +212,7 @@ export default function HomePage() {
       if (!canUseFeature) return;
       incrementUsage();
       const edinetExtras =
-        searchResult.ratios != null ||
-        searchResult.financialHistory != null
+        searchResult.ratios != null || searchResult.financialHistory != null
           ? {
               ratios: searchResult.ratios ?? undefined,
               financialHistory: searchResult.financialHistory ?? undefined,

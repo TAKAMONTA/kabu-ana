@@ -50,7 +50,13 @@ export function useAIAnalysis() {
       },
       question?: string
     ) => {
-      lastArgsRef.current = { companyInfo, stockData, newsData, edinetExtras, question };
+      lastArgsRef.current = {
+        companyInfo,
+        stockData,
+        newsData,
+        edinetExtras,
+        question,
+      };
       setStreamingText("");
       setAnalysisResult(null);
       setError(null);
