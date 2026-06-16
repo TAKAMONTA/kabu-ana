@@ -22,6 +22,11 @@ import {
   type ClaudeDeepDive,
   type ClaudeMorningBrief,
 } from "@/lib/signals/claude";
+import {
+  hasBriefSourceData,
+  shouldUseCachedBrief,
+  type BriefSourceInput,
+} from "@/lib/signals/briefCache";
 
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -29,6 +34,43 @@ export const dynamic =
 interface BriefPayload {
   brief: ClaudeMorningBrief;
   generatedAt: string;
+}
+
+async function readBriefSources(): Promise<BriefSourceInput> {
+  const [prices, news, seismic, risk] = await Promise.all([
+    readSignalDoc<NonNullable<BriefSourceInput["prices"]>>(
+      "signals_prices",
+      todayId()
+    ),
+    readSignalDoc<NonNullable<BriefSourceInput["news"]>>(
+      "signals_news",
+      todayId()
+    ),
+    readSignalDoc<NonNullable<BriefSourceInput["seismic"]>>(
+      "signals_seismic",
+      todayId()
+    ),
+    readSignalDoc<NonNullable<BriefSourceInput["risk"]>>(
+      "signals_risk",
+      todayId()
+    ),
+  ]);
+  return { prices, news, seismic, risk };
+}
+
+async function callInternalSignal(path: string, origin: string) {
+  const response = await fetch(`${origin}${path}`, { cache: "no-store" });
+  return response.json().catch(() => null);
+}
+
+async function refreshBriefSources(origin: string): Promise<BriefSourceInput> {
+  await Promise.all([
+    callInternalSignal("/api/signals/prices", origin),
+    callInternalSignal("/api/signals/news", origin),
+    callInternalSignal("/api/signals/seismic", origin),
+  ]);
+  await callInternalSignal("/api/signals/risk", origin);
+  return readBriefSources();
 }
 
 async function callOpenRouterJson<T>(
@@ -78,23 +120,26 @@ async function callOpenRouterJson<T>(
   return schema.parse(extractJsonObject(content));
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json(ok<BriefPayload>(null));
   }
   const cached = await readSignalDoc<BriefPayload>("signals_brief", todayId());
   const cachedGeneratedAt = cached?.generatedAt;
-  if (cached) return NextResponse.json(ok(cached, cached.generatedAt));
+  let sources = await readBriefSources();
+  if (cached && shouldUseCachedBrief(cached, sources)) {
+    return NextResponse.json(ok(cached, cached.generatedAt));
+  }
 
   try {
-    const [prices, news, seismic, risk] = await Promise.all([
-      readSignalDoc("signals_prices", todayId()),
-      readSignalDoc("signals_news", todayId()),
-      readSignalDoc("signals_seismic", todayId()),
-      readSignalDoc("signals_risk", todayId()),
-    ]);
+    if (!hasBriefSourceData(sources)) {
+      sources = await refreshBriefSources(request.nextUrl.origin);
+    }
+    if (!hasBriefSourceData(sources)) {
+      throw new Error("朝ブリーフ生成に必要な市場シグナルが未取得です");
+    }
     const brief = await callOpenRouterJson(
-      buildMorningBriefPrompt({ prices, news, seismic, risk }),
+      buildMorningBriefPrompt(sources),
       claudeMorningBriefSchema
     );
     const payload = { brief, generatedAt: new Date().toISOString() };

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ok, writeSignalDoc } from "@/lib/signals/cache";
+import { SIGNAL_REFRESH_GROUPS } from "@/lib/signals/refreshPlan";
 
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -25,13 +26,12 @@ export async function GET(request: NextRequest) {
 
   const startedAt = Date.now();
   const origin = request.nextUrl.origin;
-  const results = await Promise.all([
-    callInternal("/api/signals/prices", origin),
-    callInternal("/api/signals/news", origin),
-    callInternal("/api/signals/seismic", origin),
-    callInternal("/api/signals/risk", origin),
-    callInternal("/api/signals/claude-brief", origin),
-  ]);
+  const results = [];
+  for (const group of SIGNAL_REFRESH_GROUPS) {
+    results.push(
+      ...(await Promise.all(group.map(path => callInternal(path, origin))))
+    );
+  }
   const payload = {
     ranAt: new Date().toISOString(),
     durationMs: Date.now() - startedAt,
