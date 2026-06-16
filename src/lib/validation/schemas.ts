@@ -68,6 +68,8 @@ export const analysisSchema = z.object({
     })
     .optional()
     .nullable(),
+  // 会話型UIからの質問（任意）
+  question: z.string().max(500).optional().nullable(),
 });
 
 // 型のエクスポート

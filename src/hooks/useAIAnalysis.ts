@@ -28,6 +28,7 @@ export function useAIAnalysis() {
       financialHistory?: any[] | null;
       accountingStandard?: string | null;
     };
+    question?: string;
   } | null>(null);
   const mountedRef = useRef(true);
 
@@ -46,9 +47,10 @@ export function useAIAnalysis() {
         ratios?: any;
         financialHistory?: any[] | null;
         accountingStandard?: string | null;
-      }
+      },
+      question?: string
     ) => {
-      lastArgsRef.current = { companyInfo, stockData, newsData, edinetExtras };
+      lastArgsRef.current = { companyInfo, stockData, newsData, edinetExtras, question };
       setStreamingText("");
       setAnalysisResult(null);
       setError(null);
@@ -66,6 +68,7 @@ export function useAIAnalysis() {
               stockData,
               newsData,
               ...(edinetExtras ? { edinetExtras } : {}),
+              ...(question ? { question } : {}),
             },
           });
 
@@ -108,6 +111,7 @@ export function useAIAnalysis() {
               stockData,
               newsData,
               ...(edinetExtras ? { edinetExtras } : {}),
+              ...(question ? { question } : {}),
             }),
           });
 
@@ -172,9 +176,9 @@ export function useAIAnalysis() {
 
   const retry = useCallback(() => {
     if (lastArgsRef.current) {
-      const { companyInfo, stockData, newsData, edinetExtras } =
+      const { companyInfo, stockData, newsData, edinetExtras, question } =
         lastArgsRef.current;
-      analyzeStock(companyInfo, stockData, newsData, edinetExtras);
+      analyzeStock(companyInfo, stockData, newsData, edinetExtras, question);
     }
   }, [analyzeStock]);
 

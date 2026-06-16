@@ -100,7 +100,7 @@ async function analyzeHandler(request: NextRequest) {
       );
     }
 
-    const { companyInfo, stockData, newsData, edinetExtras } =
+    const { companyInfo, stockData, newsData, edinetExtras, question } =
       validationResult.data;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
@@ -119,7 +119,8 @@ async function analyzeHandler(request: NextRequest) {
       companyInfo,
       stockData,
       newsData || [],
-      edinetExtras ?? undefined
+      edinetExtras ?? undefined,
+      question ?? undefined
     );
 
     // preflight: advance to first chunk before returning 200 so that

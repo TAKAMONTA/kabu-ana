@@ -110,12 +110,19 @@ export function buildAnalysisPrompt(
   stockData: any,
   newsData: any[],
   streaming = false,
-  edinetExtras?: EdinetExtras | null
+  edinetExtras?: EdinetExtras | null,
+  question?: string
 ): string {
   const edinetSections = buildEdinetSections(edinetExtras);
+  const questionSection = question
+    ? `\n\n【質問】\n${question}`
+    : "";
+  const instruction = question
+    ? "上記の質問に対して、企業データを参照しながら回答してください。投資助言は避け、分析・参考情報として整理してください。"
+    : "以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。";
 
   const base = `
-以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。
+${instruction}
 
 【企業情報】
 - 企業名: ${companyInfo?.name || "N/A"}
@@ -129,12 +136,12 @@ export function buildAnalysisPrompt(
 - 配当: ${stockData?.dividend || "N/A"}${edinetSections}
 
 【最新ニュース】
-${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}`;
+${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}${questionSection}`;
 
   if (streaming) {
     return `${base}
 
-まず、この企業の状況について200〜400字の自然文で所見を述べてください。その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
+まず、この企業について${question ? "質問への回答を" : "状況を"}200〜400字の自然文で述べてください。その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
 ${STRUCTURED_JSON_SENTINEL}
 {
   "investmentAdvice": "参考情報としての総合コメント",
@@ -509,14 +516,16 @@ ${newsText}
     companyInfo: any,
     stockData: any,
     newsData: any[],
-    edinetExtras?: EdinetExtras | null
+    edinetExtras?: EdinetExtras | null,
+    question?: string
   ): AsyncGenerator<string> {
     const prompt = buildAnalysisPrompt(
       companyInfo,
       stockData,
       newsData,
       true,
-      edinetExtras
+      edinetExtras,
+      question
     );
 
     const res = await fetch(`${this.baseURL}/chat/completions`, {

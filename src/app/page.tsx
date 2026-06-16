@@ -20,7 +20,7 @@ import { useFinancialEvaluation } from "@/hooks/useFinancialEvaluation";
 import { useDailyUsage } from "@/hooks/useDailyUsage";
 import { SearchSection } from "@/components/SearchSection";
 import { TopTradingValueSection } from "@/components/TopTradingValueSection";
-import { AnalysisSection } from "@/components/AnalysisSection";
+import { AskSection } from "@/components/AskSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
@@ -206,16 +206,30 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleAnalyze = useCallback(async () => {
-    if (!searchResult) return;
-    if (!canUseFeature) return;
-    incrementUsage();
-    await analyzeStock(
-      searchResult.companyInfo,
-      searchResult.stockData,
-      searchResult.newsData
-    );
-  }, [searchResult, analyzeStock, canUseFeature, incrementUsage]);
+  const handleAsk = useCallback(
+    async (question: string) => {
+      if (!searchResult) return;
+      if (!canUseFeature) return;
+      incrementUsage();
+      const edinetExtras =
+        searchResult.ratios != null ||
+        searchResult.financialHistory != null
+          ? {
+              ratios: searchResult.ratios ?? undefined,
+              financialHistory: searchResult.financialHistory ?? undefined,
+              accountingStandard: searchResult.accountingStandard ?? undefined,
+            }
+          : undefined;
+      await analyzeStock(
+        searchResult.companyInfo,
+        searchResult.stockData,
+        searchResult.newsData,
+        edinetExtras,
+        question
+      );
+    },
+    [searchResult, analyzeStock, canUseFeature, incrementUsage]
+  );
 
   const getCurrencySymbol = useMemo(() => {
     if (!searchResult) return "$";
@@ -582,17 +596,17 @@ export default function HomePage() {
                   </Card>
                 )}
 
-                {/* AI分析セクション */}
-                <AnalysisSection
-                  analysisResult={analysisResult}
+                {/* AIに質問するセクション（会話型UI） */}
+                <AskSection
+                  onAsk={handleAsk}
                   isAnalyzing={isAnalyzing}
-                  onAnalyze={handleAnalyze}
-                  currencySymbol={getCurrencySymbol}
+                  streamingText={streamingText}
+                  analysisResult={analysisResult}
                   canUseFeature={canUseFeature}
                   remainingUses={remainingUses}
                   dailyLimit={dailyLimit}
                   isPremium={isPremium}
-                  streamingText={streamingText}
+                  currencySymbol={getCurrencySymbol}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}
