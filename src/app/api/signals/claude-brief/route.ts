@@ -29,7 +29,7 @@ async function callOpenRouterJson<T>(prompt: string, schema: { parse: (value: un
   const response = await axios.post(
     `${client.baseURL}/chat/completions`,
     {
-      model: "anthropic/claude-sonnet-4",
+      model: "anthropic/claude-sonnet-4-5",
       messages: [
         { role: "system", content: "あなたは日本株市場向けの地政学・エネルギー市場アナリストです。回答はJSONのみです。" },
         { role: "user", content: prompt },

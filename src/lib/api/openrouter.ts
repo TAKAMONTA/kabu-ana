@@ -114,9 +114,7 @@ export function buildAnalysisPrompt(
   question?: string
 ): string {
   const edinetSections = buildEdinetSections(edinetExtras);
-  const questionSection = question
-    ? `\n\n【質問】\n${question}`
-    : "";
+  const questionSection = question ? `\n\n【質問】\n${question}` : "";
   const instruction = question
     ? "上記の質問に対して、企業データを参照しながら回答してください。投資助言は避け、分析・参考情報として整理してください。"
     : "以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。";
@@ -225,7 +223,7 @@ export class OpenRouterClient {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-sonnet-4", // コスト効率の良いモデル
+          model: "anthropic/claude-sonnet-4-5",
           messages: [
             {
               role: "system",
@@ -356,7 +354,7 @@ export class OpenRouterClient {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-sonnet-4",
+          model: "anthropic/claude-sonnet-4-5",
           messages: [
             {
               role: "system",
@@ -455,7 +453,7 @@ ${newsText}
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: "anthropic/claude-sonnet-4",
+          model: "anthropic/claude-sonnet-4-5",
           messages: [
             {
               role: "system",
@@ -537,7 +535,7 @@ ${newsText}
         "X-Title": "AI Market Analyzer",
       },
       body: JSON.stringify({
-        model: "anthropic/claude-sonnet-4",
+        model: "anthropic/claude-sonnet-4-5",
         messages: [
           {
             role: "system",
