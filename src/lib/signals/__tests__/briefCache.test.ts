@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getLatestBriefSourceAt,
   hasBriefSourceData,
+  mergeBriefSourceFallbacks,
   shouldUseCachedBrief,
   type BriefSourceInput,
 } from "../briefCache";
@@ -50,5 +51,14 @@ describe("brief cache freshness", () => {
         prices: { fetchedAt: "2026-06-16T09:42:09.799Z", prices: [{}] },
       })
     ).toBe(true);
+  });
+
+  it("uses freshly fetched source payloads when persisted source docs are empty", () => {
+    const persisted: BriefSourceInput = {};
+    const fetched: BriefSourceInput = {
+      news: { fetchedAt: "2026-06-16T09:52:00.000Z", items: [{ score: 5 }] },
+    };
+
+    expect(mergeBriefSourceFallbacks(persisted, fetched)).toEqual(fetched);
   });
 });

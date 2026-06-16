@@ -54,3 +54,15 @@ export function hasBriefSourceData(input: BriefSourceInput): boolean {
     (input.risk?.anomalies?.length ?? 0) > 0
   );
 }
+
+export function mergeBriefSourceFallbacks(
+  persisted: BriefSourceInput,
+  fetched: BriefSourceInput
+): BriefSourceInput {
+  return {
+    prices: persisted.prices ?? fetched.prices,
+    news: persisted.news ?? fetched.news,
+    seismic: persisted.seismic ?? fetched.seismic,
+    risk: persisted.risk ?? fetched.risk,
+  };
+}

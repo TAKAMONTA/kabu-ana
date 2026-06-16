@@ -24,6 +24,7 @@ import {
 } from "@/lib/signals/claude";
 import {
   hasBriefSourceData,
+  mergeBriefSourceFallbacks,
   shouldUseCachedBrief,
   type BriefSourceInput,
 } from "@/lib/signals/briefCache";
@@ -64,13 +65,19 @@ async function callInternalSignal(path: string, origin: string) {
 }
 
 async function refreshBriefSources(origin: string): Promise<BriefSourceInput> {
-  await Promise.all([
+  const [prices, news, seismic] = await Promise.all([
     callInternalSignal("/api/signals/prices", origin),
     callInternalSignal("/api/signals/news", origin),
     callInternalSignal("/api/signals/seismic", origin),
   ]);
-  await callInternalSignal("/api/signals/risk", origin);
-  return readBriefSources();
+  const risk = await callInternalSignal("/api/signals/risk", origin);
+  const persisted = await readBriefSources();
+  return mergeBriefSourceFallbacks(persisted, {
+    prices: prices?.data ?? null,
+    news: news?.data ?? null,
+    seismic: seismic?.data ?? null,
+    risk: risk?.data ?? null,
+  });
 }
 
 async function callOpenRouterJson<T>(
