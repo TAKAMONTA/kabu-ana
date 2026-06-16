@@ -5,44 +5,28 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Droplet, Flame, Radio } from "lucide-react";
-
-interface PulseData {
-  wti: { value: number | null; change24h: number | null } | null;
-  hotCount: number;
-  criticalCount: number;
-}
+import { fetchSignal } from "@/hooks/signals/useSignalApi";
+import {
+  derivePulse,
+  type PulseData,
+  type PulseNewsItem,
+  type PulsePricePoint,
+} from "@/lib/signals/derivePulse";
 
 async function fetchPulse(): Promise<PulseData> {
   const [pricesRes, newsRes] = await Promise.allSettled([
-    fetch("/api/signals/prices", { cache: "no-store" }).then(r => r.json()),
-    fetch("/api/signals/news", { cache: "no-store" }).then(r => r.json()),
+    fetchSignal<{ prices: PulsePricePoint[] }>("/api/signals/prices"),
+    fetchSignal<{ items: PulseNewsItem[] }>("/api/signals/news"),
   ]);
 
   const prices =
     pricesRes.status === "fulfilled"
-      ? (pricesRes.value?.data?.prices ?? [])
+      ? (pricesRes.value.data?.prices ?? [])
       : [];
   const items =
-    newsRes.status === "fulfilled" ? (newsRes.value?.data?.items ?? []) : [];
+    newsRes.status === "fulfilled" ? (newsRes.value.data?.items ?? []) : [];
 
-  const wti = prices.find((p: { key?: string }) => p?.key === "wti");
-  const hotCount = items.filter(
-    (i: { label?: string }) => i?.label === "Hot" || i?.label === "Critical"
-  ).length;
-  const criticalCount = items.filter(
-    (i: { label?: string }) => i?.label === "Critical"
-  ).length;
-
-  return {
-    wti: wti
-      ? {
-          value: typeof wti.value === "number" ? wti.value : null,
-          change24h: typeof wti.change24h === "number" ? wti.change24h : null,
-        }
-      : null,
-    hotCount,
-    criticalCount,
-  };
+  return derivePulse(prices, items);
 }
 
 export function LivePulseStrip() {
@@ -78,7 +62,7 @@ export function LivePulseStrip() {
       sub:
         wtiChange != null
           ? `${wtiChange >= 0 ? "+" : ""}${wtiChange.toFixed(2)} (24h)`
-          : "API キー未設定",
+          : "データ未取得",
       tone:
         wtiChange != null && wtiChange < 0
           ? ("down" as const)
@@ -91,13 +75,13 @@ export function LivePulseStrip() {
       icon: Radio,
       label: "マーケット・シグナル",
       value: loaded ? `${hot} 件` : "...",
-      sub: hot > 0 ? "Hot / Critical 含む" : "現在 Normal のみ",
+      sub: hot > 0 ? "注目・緊急シグナルあり" : "現在は通常範囲",
       tone: "neutral" as const,
       bg: "from-sky-500/15 to-blue-500/5 border-sky-400/40 dark:from-sky-500/20 dark:to-blue-500/5 dark:border-sky-500/30",
     },
     {
       icon: Flame,
-      label: "Critical Alert",
+      label: "緊急アラート",
       value: loaded ? `${critical} 件` : "...",
       sub: critical > 0 ? "緊急シグナル発生中" : "現在 0 件",
       tone: critical > 0 ? ("alert" as const) : ("calm" as const),
@@ -125,30 +109,30 @@ export function LivePulseStrip() {
             <Card
               className={`relative overflow-hidden border bg-gradient-to-br ${c.bg} transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lg ${c.tone === "alert" ? "animate-pulse-soft" : ""}`}
             >
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-1.5">
-                  <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-muted-foreground">
-                    <c.icon className="size-3.5" />
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+                    <c.icon className="size-4" />
                     <span>{c.label}</span>
                   </div>
                   {i === cards.length - 1 && (
                     <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                   )}
                 </div>
-                <div className="text-2xl font-bold tracking-tight">
+                <div className="text-4xl font-bold tracking-tight tabular-nums mb-2">
                   {c.value}
                 </div>
                 <div
-                  className={`mt-1 text-xs ${
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                     c.tone === "alert"
-                      ? "text-red-700 dark:text-red-300 font-semibold"
+                      ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
                       : c.tone === "down"
-                        ? "text-red-700 dark:text-red-300"
+                        ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
                         : c.tone === "up"
-                          ? "text-emerald-700 dark:text-emerald-300"
+                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                           : c.tone === "calm"
-                            ? "text-emerald-700 dark:text-emerald-400"
-                            : "text-muted-foreground"
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                            : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {c.sub}

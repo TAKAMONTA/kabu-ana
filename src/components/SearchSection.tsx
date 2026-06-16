@@ -89,7 +89,7 @@ export function SearchSection({
     <div className="mb-6">
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="flex-1 relative">
               <Label htmlFor="search" className="sr-only">
                 企業検索
@@ -196,10 +196,10 @@ export function SearchSection({
               onClick={onSearch}
               disabled={!searchQuery.trim() || isLoading}
               size="lg"
-              className="px-8 bg-gradient-to-r from-primary to-purple-600 text-white shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:shadow-primary/40 hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 disabled:shadow-primary/15"
+              className="w-full justify-center bg-gradient-to-r from-primary to-purple-600 px-8 text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/40 disabled:opacity-60 disabled:hover:translate-y-0 disabled:shadow-primary/15 sm:w-auto"
             >
               <Search className="h-4 w-4 mr-2" />
-              {isLoading ? "検索中..." : "企業を検索"}
+              {isLoading ? "基本データ取得中..." : "企業を検索"}
             </Button>
           </div>
         </CardContent>

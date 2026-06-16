@@ -13,6 +13,7 @@
 
 # testing
 /coverage
+/.playwright-mcp/
 
 # next.js
 /.next/
@@ -20,10 +21,14 @@
 
 # production
 /build
+/ios/build/
 
 # misc
 .DS_Store
 *.pem
+*.jks
+*.keystore
+/android/key.properties
 
 # debug
 npm-debug.log*
@@ -43,3 +48,7 @@ yarn-error.log*
 next-env.d.ts
 nul 
 HANDOFF_TO_CURSOR.md
+
+# local agent workspaces
+/.claude/worktrees/
+/docs/superpowers/plans/

@@ -1,10 +1,36 @@
 # 新しいキーストアファイルを生成するスクリプト
 # 使用方法: PowerShellで実行してください
+# 秘密情報はこのファイルに書かず、環境変数または対話入力で指定します。
 
-$keystorePath = "C:\Users\tnaka\kabuana\android\app\upload-keystore.jks"
-$keystorePassword = "taka0213"
-$keyAlias = "upload"
-$keyPassword = "taka0213"
+$keystorePath = if ($env:ANDROID_KEYSTORE_FILE) {
+    $env:ANDROID_KEYSTORE_FILE
+} else {
+    Join-Path $PSScriptRoot "app\upload-keystore.jks"
+}
+$keyAlias = if ($env:ANDROID_KEY_ALIAS) { $env:ANDROID_KEY_ALIAS } else { "upload" }
+
+function Read-PlainSecret {
+    param(
+        [string]$Prompt,
+        [string]$EnvironmentVariable
+    )
+
+    $envValue = [Environment]::GetEnvironmentVariable($EnvironmentVariable)
+    if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+        return $envValue
+    }
+
+    $secureValue = Read-Host $Prompt -AsSecureString
+    $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureValue)
+    try {
+        return [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr)
+    } finally {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr)
+    }
+}
+
+$keystorePassword = Read-PlainSecret "キーストアのパスワードを入力してください" "ANDROID_KEYSTORE_PASSWORD"
+$keyPassword = Read-PlainSecret "キーのパスワードを入力してください" "ANDROID_KEY_PASSWORD"
 
 # キーストアファイルが既に存在する場合は確認
 if (Test-Path $keystorePath) {
@@ -42,4 +68,3 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "キーストアファイルの生成に失敗しました。" -ForegroundColor Red
     Write-Host "keytoolコマンドがPATHに含まれていることを確認してください。" -ForegroundColor Yellow
 }
-

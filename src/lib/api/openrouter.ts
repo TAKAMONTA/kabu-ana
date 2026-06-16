@@ -1,4 +1,5 @@
 import axios from "axios";
+import { STRUCTURED_JSON_SENTINEL } from "./analysisStream";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -64,6 +65,89 @@ export interface OpenRouterResponse {
   };
 }
 
+export function buildAnalysisPrompt(
+  companyInfo: any,
+  stockData: any,
+  newsData: any[],
+  streaming = false
+): string {
+  const base = `
+以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。
+
+【企業情報】
+- 企業名: ${companyInfo?.name || "N/A"}
+- シンボル: ${companyInfo?.symbol || "N/A"}
+- 市場: ${companyInfo?.market || "N/A"}
+- 現在価格: ${stockData?.price || "N/A"}
+- 変動: ${stockData?.change || "N/A"} (${stockData?.changePercent || "N/A"}%)
+- 時価総額: ${stockData?.marketCap || "N/A"}
+- PER: ${stockData?.pe || "N/A"}
+- EPS: ${stockData?.eps || "N/A"}
+- 配当: ${stockData?.dividend || "N/A"}
+
+【最新ニュース】
+${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}`;
+
+  if (streaming) {
+    return `${base}
+
+まず、この企業の状況について200〜400字の自然文で所見を述べてください。その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
+${STRUCTURED_JSON_SENTINEL}
+{
+  "investmentAdvice": "参考情報としての総合コメント",
+  "targetPrice": {
+    "shortTerm": 短期目標価格,
+    "mediumTerm": 中期目標価格,
+    "longTerm": 長期目標価格
+  },
+  "stopLoss": {
+    "shortTerm": 短期の下振れ目安,
+    "mediumTerm": 中期の下振れ目安,
+    "longTerm": 長期の下振れ目安
+  },
+  "riskLevel": "low|medium|high",
+  "confidence": 信頼度(0-100),
+  "keyFactors": ["重要な要因1", "重要な要因2", "..."],
+  "recommendations": ["確認ポイント1", "確認ポイント2", "..."],
+  "swot": {
+    "strengths": ["強み1", "強み2"],
+    "weaknesses": ["弱み1", "弱み2"],
+    "opportunities": ["機会1", "機会2"],
+    "threats": ["脅威1", "脅威2"]
+  },
+  "aiReflection": "200文字前後の自然な感想・考察"
+}`.trim();
+  }
+
+  return `${base}
+
+以下のJSON形式で分析結果を返してください：
+{
+  "investmentAdvice": "参考情報としての総合コメント",
+  "targetPrice": {
+    "shortTerm": 短期目標価格,
+    "mediumTerm": 中期目標価格,
+    "longTerm": 長期目標価格
+  },
+  "stopLoss": {
+    "shortTerm": 短期の下振れ目安,
+    "mediumTerm": 中期の下振れ目安,
+    "longTerm": 長期の下振れ目安
+  },
+  "riskLevel": "low|medium|high",
+  "confidence": 信頼度(0-100),
+  "keyFactors": ["重要な要因1", "重要な要因2", "..."],
+  "recommendations": ["確認ポイント1", "確認ポイント2", "..."],
+  "swot": {
+    "strengths": ["強み1", "強み2"],
+    "weaknesses": ["弱み1", "弱み2"],
+    "opportunities": ["機会1", "機会2"],
+    "threats": ["脅威1", "脅威2"]
+  },
+  "aiReflection": "200文字前後の自然な感想・考察"
+}`.trim();
+}
+
 export class OpenRouterClient {
   private apiKey: string;
   private baseURL: string;
@@ -79,7 +163,12 @@ export class OpenRouterClient {
     newsData: any[]
   ): Promise<AnalysisResult> {
     try {
-      const prompt = this.buildAnalysisPrompt(companyInfo, stockData, newsData);
+      const prompt = buildAnalysisPrompt(
+        companyInfo,
+        stockData,
+        newsData,
+        false
+      );
 
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
@@ -88,7 +177,7 @@ export class OpenRouterClient {
           messages: [
             {
               role: "system",
-              content: `あなたは経験豊富な証券アナリストです。企業の財務データ、株価情報、最新ニュースを基に、投資判断をサポートする分析を行ってください。回答はJSON形式で返してください。`,
+              content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。回答はJSON形式で返してください。`,
             },
             {
               role: "user",
@@ -116,165 +205,36 @@ export class OpenRouterClient {
         throw new Error("AI分析結果が取得できませんでした");
       }
 
-      const analysisResult = this.parseAnalysisResult(content);
-
-      // AI感想を生成
-      const reflection = await this.generateReflection(
-        companyInfo,
-        stockData,
-        newsData
-      );
-      analysisResult.aiReflection = reflection;
-
-      return analysisResult;
+      return this.parseAnalysisResult(content);
     } catch (error: any) {
-      console.error("OpenRouter分析エラー:", error instanceof Error ? error.message : "Unknown error");
+      console.error(
+        "OpenRouter分析エラー:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
       if (axios.isAxiosError(error)) {
         const status = error.response?.status;
         const apiMessage = error.response?.data?.error?.message;
-        if (status === 401) throw new Error("AI分析サービスの認証に失敗しました。APIキーを確認してください。");
-        if (status === 402) throw new Error("AI分析サービスの残高が不足しています。");
-        if (status === 429) throw new Error("AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。");
-        if (error.code === "ECONNABORTED") throw new Error("AI分析がタイムアウトしました。しばらくしてから再試行してください。");
+        if (status === 401)
+          throw new Error(
+            "AI分析サービスの認証に失敗しました。APIキーを確認してください。"
+          );
+        if (status === 402)
+          throw new Error("AI分析サービスの残高が不足しています。");
+        if (status === 429)
+          throw new Error(
+            "AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。"
+          );
+        if (error.code === "ECONNABORTED")
+          throw new Error(
+            "AI分析がタイムアウトしました。しばらくしてから再試行してください。"
+          );
         throw new Error(apiMessage || "AI分析中にエラーが発生しました。");
       }
       throw error;
     }
   }
 
-  private buildAnalysisPrompt(
-    companyInfo: any,
-    stockData: any,
-    newsData: any[]
-  ): string {
-    return `
-以下の企業情報を基に、投資分析を行ってください。
-
-【企業情報】
-- 企業名: ${companyInfo?.name || "N/A"}
-- シンボル: ${companyInfo?.symbol || "N/A"}
-- 市場: ${companyInfo?.market || "N/A"}
-- 現在価格: ${stockData?.price || "N/A"}
-- 変動: ${stockData?.change || "N/A"} (${stockData?.changePercent || "N/A"}%)
-- 時価総額: ${stockData?.marketCap || "N/A"}
-- PER: ${stockData?.pe || "N/A"}
-- EPS: ${stockData?.eps || "N/A"}
-- 配当: ${stockData?.dividend || "N/A"}
-
-【最新ニュース】
-${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
-
-以下のJSON形式で分析結果を返してください：
-{
-  "investmentAdvice": "投資判断の総合的なアドバイス",
-  "targetPrice": {
-    "shortTerm": 短期目標価格,
-    "mediumTerm": 中期目標価格,
-    "longTerm": 長期目標価格
-  },
-  "stopLoss": {
-    "shortTerm": 短期損切りライン,
-    "mediumTerm": 中期損切りライン,
-    "longTerm": 長期損切りライン
-  },
-  "riskLevel": "low|medium|high",
-  "confidence": 信頼度(0-100),
-  "keyFactors": ["重要な要因1", "重要な要因2", "..."],
-  "recommendations": ["推奨事項1", "推奨事項2", "..."],
-  "swot": {
-    "strengths": ["強み1", "強み2"],
-    "weaknesses": ["弱み1", "弱み2"],
-    "opportunities": ["機会1", "機会2"],
-    "threats": ["脅威1", "脅威2"]
-  }
-}
-    `.trim();
-  }
-
-  private async generateReflection(
-    companyInfo: any,
-    stockData: any,
-    newsData: any[]
-  ): Promise<string> {
-    try {
-      const reflectionPrompt = this.buildReflectionPrompt(
-        companyInfo,
-        stockData,
-        newsData
-      );
-
-      const response = await axios.post(
-        `${this.baseURL}/chat/completions`,
-        {
-          model: "anthropic/claude-sonnet-4",
-          messages: [
-            {
-              role: "system",
-              content: `あなたは経験豊富な投資家です。企業の情報を基に、個人的な感想や考察を自然な日本語で述べてください。分析とは違った角度から、直感的な印象や長期的な視点での考えを共有してください。`,
-            },
-            {
-              role: "user",
-              content: reflectionPrompt,
-            },
-          ],
-          temperature: 0.7, // より創造的で自然な文章のため
-          max_tokens: 800,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://kabu-ana.com",
-            "X-Title": "AI Market Analyzer",
-          },
-          timeout: 30000,
-        }
-      );
-
-      const data: OpenRouterResponse = response.data;
-      const content = data.choices[0]?.message?.content;
-
-      return content || "感想を生成できませんでした。";
-    } catch (error) {
-      console.error("AI感想生成エラー:", error instanceof Error ? error.message : error);
-      return "感想の生成中にエラーが発生しました。";
-    }
-  }
-
-  private buildReflectionPrompt(
-    companyInfo: any,
-    stockData: any,
-    newsData: any[]
-  ): string {
-    return `
-以下の企業について、私ならこう考えるという観点から、自然な感想を述べてください。
-
-【企業情報】
-- 企業名: ${companyInfo?.name || "N/A"}
-- シンボル: ${companyInfo?.symbol || "N/A"}
-- 市場: ${companyInfo?.market || "N/A"}
-- 現在価格: ${stockData?.price || "N/A"}
-- 変動: ${stockData?.change || "N/A"} (${stockData?.changePercent || "N/A"}%)
-- 時価総額: ${stockData?.marketCap || "N/A"}
-- PER: ${stockData?.pe || "N/A"}
-- EPS: ${stockData?.eps || "N/A"}
-- 配当: ${stockData?.dividend || "N/A"}
-
-【最新ニュース】
-${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
-
-以下の観点から、個人的な感想を述べてください：
-- この企業の印象や直感
-- 長期的な成長性への期待
-- 投資家としての興味深い点
-- 市場での位置づけや競争優位性
-- 将来性やリスクへの個人的な見解
-
-自然で親しみやすい日本語で、200-300文字程度で述べてください。
-    `.trim();
-  }
-
-  private parseAnalysisResult(content: string): AnalysisResult {
+  parseAnalysisResult(content: string): AnalysisResult {
     try {
       // JSON部分を抽出
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -300,6 +260,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         confidence: result.confidence || 50,
         keyFactors: result.keyFactors || [],
         recommendations: result.recommendations || [],
+        aiReflection: result.aiReflection || "",
         swot: result.swot || {
           strengths: [],
           weaknesses: [],
@@ -347,7 +308,7 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
           messages: [
             {
               role: "system",
-              content: `あなたは経験豊富な株式アナリストです。最新のニュースを分析し、企業の株価に与える影響を評価してください。`,
+              content: `あなたは企業ニュースを整理する分析アシスタントです。投資助言や売買推奨は行わず、最新ニュースの材料性、注意点、確認ポイントを中立的にまとめてください。`,
             },
             {
               role: "user",
@@ -379,7 +340,10 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
         recommendations: analysisResult.recommendations,
       };
     } catch (error: any) {
-      console.error("ニュース分析エラー:", error instanceof Error ? error.message : error);
+      console.error(
+        "ニュース分析エラー:",
+        error instanceof Error ? error.message : error
+      );
       return {
         impact: "neutral",
         impactScore: 0,
@@ -408,17 +372,17 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}
 企業名: ${companyName}
 証券コード: ${symbol}
 
-以下の最新ニュースを分析し、この企業の株価に与える影響を評価してください：
+以下の最新ニュースを分析し、この企業にとっての材料性と注意点を参考情報として整理してください：
 
 ${newsText}
 
 以下のJSON形式で分析結果を返してください：
 {
   "impact": "positive|negative|neutral",
-  "impactScore": 数値(-100から100の間で、正の値は株価上昇要因、負の値は下落要因を示す),
-  "analysis": "ニュースの総合的な分析と株価への影響の詳細説明",
+  "impactScore": 数値(-100から100の間で、正の値は好材料寄り、負の値は悪材料寄りを示す),
+  "analysis": "ニュースの総合的な材料整理と注意点",
   "keyPoints": ["重要なポイント1", "重要なポイント2", "..."],
-  "recommendations": ["投資家への推奨事項1", "推奨事項2", "..."]
+  "recommendations": ["確認ポイント1", "確認ポイント2", "..."]
 }
     `.trim();
   }
@@ -442,7 +406,7 @@ ${newsText}
             {
               role: "system",
               content:
-                "あなたは熟練の財務アナリストです。BS/PL/CFを観点に、企業の財務健全性を5段階(1=弱い,5=強い)で評価し、日本語で簡潔に説明してください。必ず有効なJSONのみを返してください。",
+                "あなたは財務データを整理する分析アシスタントです。BS/PL/CFを観点に、企業の財務健全性を5段階(1=弱い,5=強い)で評価し、日本語で簡潔に説明してください。投資助言や売買推奨は避け、必ず有効なJSONのみを返してください。",
             },
             { role: "user", content: prompt },
           ],
@@ -478,7 +442,10 @@ ${newsText}
         recommendations: json.recommendations || [],
       };
     } catch (error) {
-      console.error("財務評価エラー:", error instanceof Error ? error.message : error);
+      console.error(
+        "財務評価エラー:",
+        error instanceof Error ? error.message : error
+      );
       return {
         bs: { score: 3, summary: "BSの評価を取得できませんでした。" },
         pl: { score: 3, summary: "PLの評価を取得できませんでした。" },
@@ -487,6 +454,85 @@ ${newsText}
         analysis: "財務評価中にエラーが発生しました。",
         recommendations: [],
       };
+    }
+  }
+
+  // fetch is used here instead of axios because axios does not natively support streaming SSE responses
+  async *analyzeStockStream(
+    companyInfo: any,
+    stockData: any,
+    newsData: any[]
+  ): AsyncGenerator<string> {
+    const prompt = buildAnalysisPrompt(companyInfo, stockData, newsData, true);
+
+    const res = await fetch(`${this.baseURL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://kabu-ana.com",
+        "X-Title": "AI Market Analyzer",
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-sonnet-4",
+        messages: [
+          {
+            role: "system",
+            content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。`,
+          },
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
+        temperature: 0.3,
+        max_tokens: 3000,
+        stream: true,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!res.ok) {
+      const status = res.status;
+      if (status === 401)
+        throw new Error(
+          "AI分析サービスの認証に失敗しました。APIキーを確認してください。"
+        );
+      if (status === 402)
+        throw new Error("AI分析サービスの残高が不足しています。");
+      if (status === 429)
+        throw new Error(
+          "AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。"
+        );
+      throw new Error("AI分析中にエラーが発生しました。");
+    }
+
+    if (!res.body) throw new Error("AI分析中にエラーが発生しました。");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const payload = line.slice(6).trim();
+        if (payload === "[DONE]") return;
+        try {
+          const parsed = JSON.parse(payload);
+          const delta = parsed.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta.length > 0) {
+            yield delta;
+          }
+        } catch {
+          // ignore malformed SSE lines
+        }
+      }
     }
   }
 
@@ -506,6 +552,6 @@ ${newsText}
       fd.operatingCashFlow ?? "N/A"
     }\n- 投資CF: ${fd.investingCashFlow ?? "N/A"}\n- 財務CF: ${
       fd.financingCashFlow ?? "N/A"
-    }\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["投資家への提言1", "提言2"]\n}`;
+    }\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["確認ポイント1", "確認ポイント2"]\n}`;
   }
 }

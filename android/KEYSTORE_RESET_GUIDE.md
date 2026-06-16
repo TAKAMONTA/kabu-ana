@@ -20,12 +20,12 @@
 
    または、手動でkeytoolコマンドを実行：
    ```powershell
-   keytool -genkeypair -v -storetype PKCS12 -keystore android\app\upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass taka0213 -keypass taka0213 -dname "CN=Kabuana, OU=Development, O=TakaApps, L=Tokyo, ST=Tokyo, C=JP"
+   keytool -genkeypair -v -storetype PKCS12 -keystore android\app\upload-keystore.jks -alias upload -keyalg RSA -keysize 2048 -validity 10000 -storepass "<store-password>" -keypass "<key-password>" -dname "CN=Kabuana, OU=Development, O=TakaApps, L=Tokyo, ST=Tokyo, C=JP"
    ```
 
 4. 公開鍵証明書をエクスポート：
    ```powershell
-   keytool -export -rfc -keystore android\app\upload-keystore.jks -alias upload -file android\app\upload-keystore.pem -storepass taka0213
+   keytool -export -rfc -keystore android\app\upload-keystore.jks -alias upload -file android\app\upload-keystore.pem -storepass "<store-password>"
    ```
 
 ### ステップ2: Google Play Consoleでアップロード鍵のリセットをリクエスト
@@ -51,9 +51,18 @@
 
 ```properties
 storeFile=C:\\Users\\tnaka\\kabuana\\android\\app\\upload-keystore.jks
-storePassword=taka0213
+storePassword=<store-password>
 keyAlias=upload
-keyPassword=taka0213
+keyPassword=<key-password>
+```
+
+`key.properties` は Git にコミットしないでください。CI やローカルの一時ビルドでは、代わりに以下の環境変数でも署名できます。
+
+```powershell
+$env:ANDROID_KEYSTORE_FILE = "C:\Users\tnaka\kabuana\android\app\upload-keystore.jks"
+$env:ANDROID_KEYSTORE_PASSWORD = "<store-password>"
+$env:ANDROID_KEY_ALIAS = "upload"
+$env:ANDROID_KEY_PASSWORD = "<key-password>"
 ```
 
 ### ステップ5: 新しい鍵でビルド
@@ -157,4 +166,3 @@ JDKがインストールされていない場合は、[Oracle JDK](https://www.o
 
 - [Google Play App Signing の概要](https://support.google.com/googleplay/android-developer/answer/9842756)
 - [アップロード鍵をリセットする](https://support.google.com/googleplay/android-developer/answer/9842756#reset)
-

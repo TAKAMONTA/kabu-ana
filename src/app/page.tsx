@@ -5,22 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  TrendingUp,
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Sparkles,
-  Radar,
-  Brain,
-} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,7 +27,10 @@ import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LivePulseStrip } from "@/components/LivePulseStrip";
-import { HeroIllustration } from "@/components/HeroIllustration";
+import { MarketFrontPage } from "@/components/frontpage/MarketFrontPage";
+import type { TradingValueItem } from "@/hooks/useTopTradingValue";
+import { isNative } from "@/lib/utils/platformDetect";
+import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -77,11 +66,13 @@ export default function HomePage() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isNativeApp, setIsNativeApp] = useState(true);
   const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
   const {
     isAnalyzing,
     error: analysisError,
     analysisResult,
+    streamingText,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
     retry: retryAnalysis,
@@ -106,6 +97,7 @@ export default function HomePage() {
     items: tradingRanking,
     isLoading: isRankingLoading,
     error: rankingError,
+    warning: rankingWarning,
   } = useTopTradingValue();
   const {
     isLoading: isFinancialLoading,
@@ -121,6 +113,14 @@ export default function HomePage() {
     incrementUsage,
     dailyLimit,
   } = useDailyUsage();
+  const showSponsoredAds = shouldShowSponsoredAds({
+    isPremium,
+    isNativeApp,
+  });
+
+  useEffect(() => {
+    setIsNativeApp(isNative());
+  }, []);
 
   const handleSearchAndAnalyze = useCallback(async () => {
     const queryToUse = searchQuery.trim();
@@ -306,19 +306,97 @@ export default function HomePage() {
     ]
   );
 
+  const handleFrontPageIdeaSelect = useCallback(
+    (item: TradingValueItem) => {
+      const symbol =
+        item.code && /^\d{4}$/.test(item.code) ? `${item.code}:TYO` : item.code;
+      handlePickSelect(symbol || item.name);
+    },
+    [handlePickSelect]
+  );
+
+  const searchSection = (
+    <SearchSection
+      searchQuery={searchQuery}
+      setSearchQuery={setSearchQuery}
+      showSuggestions={showSuggestions}
+      setShowSuggestions={setShowSuggestions}
+      activeSuggestion={activeSuggestion}
+      setActiveSuggestion={setActiveSuggestion}
+      suggestions={suggestions}
+      isSuggestLoading={isSuggestLoading}
+      isLoading={isLoading}
+      onSearch={handleSearchAndAnalyze}
+      onInputChange={handleInputChange}
+      onSelectSuggestion={handleSelectSuggestion}
+      renderHighlighted={renderHighlighted}
+    />
+  );
+
+  const sampleStockSlot = !isLoading ? (
+    <Card className="border-dashed">
+      <CardContent className="py-4">
+        <div className="space-y-3">
+          <div className="text-sm font-medium">サンプル銘柄</div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              {
+                symbol: "7203",
+                name: "トヨタ自動車",
+                display: "7203 トヨタ",
+                dotColor: "bg-emerald-500",
+              },
+              {
+                symbol: "AAPL",
+                name: "Apple",
+                display: "AAPL Apple",
+                dotColor: "bg-sky-500",
+              },
+              {
+                symbol: "9984",
+                name: "ソフトバンクグループ",
+                display: "9984 SBG",
+                dotColor: "bg-purple-500",
+              },
+              {
+                symbol: "5020",
+                name: "ENEOSホールディングス",
+                display: "5020 ENEOS",
+                dotColor: "bg-amber-500",
+              },
+            ].map(stock => (
+              <Button
+                key={stock.symbol}
+                variant="outline"
+                size="sm"
+                onClick={() => handleSelectSuggestion(stock.symbol, stock.name)}
+                className="font-medium gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/50"
+              >
+                <span
+                  className={`size-2 rounded-full ${stock.dotColor}`}
+                  aria-hidden="true"
+                />
+                {stock.display}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  ) : null;
+
+  const stockIdeasSection = (
+    <TopTradingValueSection
+      items={tradingRanking}
+      isLoading={isRankingLoading}
+      error={rankingError}
+      warning={rankingWarning}
+      onSelect={handlePickSelect}
+    />
+  );
+
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
-      {/* ヒーローオーラ（ヘッダー〜検索エリアの背景に柔らかい青紫のグロー） */}
-      <div
-        aria-hidden="true"
-        className="hero-aurora pointer-events-none absolute inset-x-0 top-0 h-[680px] -z-0"
-      />
-      {/* ドットパターン（オーラの上に重ねる、テック HUD 感） */}
-      <div
-        aria-hidden="true"
-        className="hero-pattern pointer-events-none absolute inset-x-0 top-0 h-[680px] opacity-50 -z-0"
-      />
-
       {/* ヘッダー */}
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
@@ -369,105 +447,6 @@ export default function HomePage() {
           <PurchaseSuccessHandler />
         </Suspense>
 
-        {/* ヒーローゾーン（初回訪問者向け、検索前のみ） */}
-        {!searchResult && (
-          <section className="mb-6 flex flex-col-reverse gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex-1">
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-snug">
-                AIで{" "}
-                <span className="brand-gradient">株式分析と市場シグナル</span>{" "}
-                を 30 秒で
-              </h2>
-              <p className="mt-2 text-sm text-muted-foreground max-w-xl">
-                原油・地震・地政学リスクをリアルタイムに連動分析し、銘柄判断をサポート。
-              </p>
-            </div>
-            <HeroIllustration className="w-full max-w-[320px] h-[120px] sm:w-[280px] sm:h-[120px] lg:w-[340px] lg:h-[140px] flex-shrink-0" />
-          </section>
-        )}
-
-        {/* このアプリでできること（初回訪問者向け、検索前のみ） */}
-        {!searchResult && (
-          <section className="mb-6" aria-label="このアプリでできること">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {[
-                {
-                  Icon: Sparkles,
-                  title: "銘柄を AI 分析",
-                  desc: "投資アドバイス・SWOT・5 段階財務スコアを30秒で",
-                  iconBg: "bg-blue-500/12 ring-blue-500/30",
-                  iconColor: "text-blue-600 dark:text-blue-400",
-                  cardBg:
-                    "from-blue-500/8 to-blue-500/2 dark:from-blue-500/12 dark:to-blue-500/2",
-                },
-                {
-                  Icon: Radar,
-                  title: "世界シグナル連動",
-                  desc: "原油・地震・地政学・サイバーを 5 次元でリアルタイム監視",
-                  iconBg: "bg-purple-500/12 ring-purple-500/30",
-                  iconColor: "text-purple-600 dark:text-purple-400",
-                  cardBg:
-                    "from-purple-500/8 to-purple-500/2 dark:from-purple-500/12 dark:to-purple-500/2",
-                },
-                {
-                  Icon: Brain,
-                  title: "Claude が文脈解説",
-                  desc: "「なぜ動いた」「次に何が起きるか」を日本語で要約",
-                  iconBg: "bg-fuchsia-500/12 ring-fuchsia-500/30",
-                  iconColor: "text-fuchsia-600 dark:text-fuchsia-400",
-                  cardBg:
-                    "from-fuchsia-500/8 to-pink-500/2 dark:from-fuchsia-500/12 dark:to-pink-500/2",
-                },
-              ].map(f => (
-                <Card
-                  key={f.title}
-                  className={`border bg-gradient-to-br ${f.cardBg} backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:shadow-md`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <div className={`rounded-lg p-2 ring-1 ${f.iconBg}`}>
-                        <f.Icon className={`size-4 ${f.iconColor}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-semibold leading-tight">
-                          {f.title}
-                        </h3>
-                        <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                          {f.desc}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* 無料プラン案内 */}
-        <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-          <div className="flex items-center justify-between">
-            <span>
-              無料プランではAI機能を1日{dailyLimit}
-              回までご利用いただけます。ログイン不要ですぐにお試しください。
-            </span>
-            {!isPremium && (
-              <span
-                className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
-                  canUseFeature
-                    ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
-                    : "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
-                }`}
-              >
-                残り{remainingUses}/{dailyLimit}回
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Live Pulse: 「今、世界はこう動いている」3 stat カード → /signals */}
-        <LivePulseStrip />
-
         {/* 購入状態表示（ログイン時のみ） */}
         {user && (
           <div className="mb-6">
@@ -475,90 +454,46 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* 検索セクション */}
-        <SearchSection
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          showSuggestions={showSuggestions}
-          setShowSuggestions={setShowSuggestions}
-          activeSuggestion={activeSuggestion}
-          setActiveSuggestion={setActiveSuggestion}
-          suggestions={suggestions}
-          isSuggestLoading={isSuggestLoading}
-          isLoading={isLoading}
-          onSearch={handleSearchAndAnalyze}
-          onInputChange={handleInputChange}
-          onSelectSuggestion={handleSelectSuggestion}
-          renderHighlighted={renderHighlighted}
-        />
-
-        {/* サンプル銘柄（初回訪問者向け、検索結果なし時のみ） */}
-        {!searchResult && !isLoading && (
-          <Card className="mb-6 border-dashed">
-            <CardContent className="py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="flex items-center gap-2 shrink-0">
-                  <span aria-hidden="true">✨</span>
-                  <span className="text-sm font-medium">
-                    サンプル銘柄でお試し
+        {!searchResult ? (
+          <MarketFrontPage
+            searchSlot={searchSection}
+            pulseSlot={<LivePulseStrip />}
+            stockIdeasSlot={stockIdeasSection}
+            sampleSlot={sampleStockSlot}
+            topIdea={tradingRanking[0]}
+            isStockIdeasLoading={isRankingLoading}
+            warning={rankingWarning}
+            remainingUses={remainingUses}
+            dailyLimit={dailyLimit}
+            isPremium={isPremium}
+            onSelectIdea={handleFrontPageIdeaSelect}
+          />
+        ) : (
+          <>
+            {/* 無料プラン案内 */}
+            <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+              <div className="flex items-center justify-between">
+                <span>
+                  無料プランではAI機能を1日{dailyLimit}
+                  回までご利用いただけます。
+                </span>
+                {!isPremium && (
+                  <span
+                    className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
+                      canUseFeature
+                        ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
+                    }`}
+                  >
+                    残り{remainingUses}/{dailyLimit}回
                   </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    {
-                      symbol: "7203",
-                      name: "トヨタ自動車",
-                      display: "7203 トヨタ",
-                      dotColor: "bg-emerald-500",
-                    },
-                    {
-                      symbol: "AAPL",
-                      name: "Apple",
-                      display: "AAPL Apple",
-                      dotColor: "bg-sky-500",
-                    },
-                    {
-                      symbol: "9984",
-                      name: "ソフトバンクグループ",
-                      display: "9984 SBG",
-                      dotColor: "bg-purple-500",
-                    },
-                    {
-                      symbol: "5020",
-                      name: "ENEOSホールディングス",
-                      display: "5020 ENEOS",
-                      dotColor: "bg-amber-500",
-                    },
-                  ].map(stock => (
-                    <Button
-                      key={stock.symbol}
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        handleSelectSuggestion(stock.symbol, stock.name)
-                      }
-                      className="font-medium gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/50"
-                    >
-                      <span
-                        className={`size-2 rounded-full ${stock.dotColor}`}
-                        aria-hidden="true"
-                      />
-                      {stock.display}
-                    </Button>
-                  ))}
-                </div>
+                )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+            <LivePulseStrip />
+            {searchSection}
+          </>
         )}
-
-        {/* 本日の売買代金ランキング */}
-        <TopTradingValueSection
-          items={tradingRanking}
-          isLoading={isRankingLoading}
-          error={rankingError}
-          onSelect={handlePickSelect}
-        />
 
         {/* エラー表示 */}
         {(error || analysisError || newsError) && (
@@ -595,34 +530,7 @@ export default function HomePage() {
           </Card>
         )}
 
-        {/* 検索結果がない場合 */}
-        {!searchResult ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-2">
-              <Card>
-                <CardContent className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <TrendingUp className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-lg text-muted-foreground">
-                      株式を検索して分析を開始してください
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="md:col-span-1">
-              <Card>
-                <CardContent className="flex items-center justify-center h-96">
-                  <div className="text-center">
-                    <p className="text-sm text-muted-foreground">
-                      企業情報がここに表示されます
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        ) : (
+        {searchResult && (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             {/* チャート部分（左側 - 3カラム） */}
             <div className="lg:col-span-3">
@@ -684,6 +592,7 @@ export default function HomePage() {
                   remainingUses={remainingUses}
                   dailyLimit={dailyLimit}
                   isPremium={isPremium}
+                  streamingText={streamingText}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}
@@ -727,7 +636,7 @@ export default function HomePage() {
         )}
 
         {/* フッター広告セクション（フリーユーザーのみ表示） */}
-        {!isPremium && (
+        {showSponsoredAds && (
           <aside
             aria-label="スポンサー広告"
             className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6 dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"

@@ -419,26 +419,26 @@ export default function HomePage() {
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
                     <Brain className="h-5 w-5" />
-                    <span>AI投資分析</span>
+                    <span>AI分析（参考情報）</span>
                   </CardTitle>
                   <CardDescription>
-                    AIが企業の投資価値を分析し、投資判断をサポートします
+                    AIが企業情報・株価・ニュースを整理し、確認ポイントをまとめます
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   {analysisResult ? (
                     <div className="space-y-6">
-                      {/* 投資アドバイス */}
+                      {/* 分析サマリー */}
                       <div>
-                        <h4 className="font-semibold mb-2">投資アドバイス</h4>
+                        <h4 className="font-semibold mb-2">分析サマリー</h4>
                         <p className="text-muted-foreground">
                           {analysisResult.investmentAdvice}
                         </p>
                       </div>
 
-                      {/* 目標株価 */}
+                      {/* AI推定レンジ */}
                       <div>
-                        <h4 className="font-semibold mb-4">目標株価</h4>
+                        <h4 className="font-semibold mb-4">AI推定レンジ</h4>
                         <div className="grid grid-cols-3 gap-4">
                           <div className="text-center p-4 border rounded-lg">
                             <h5 className="font-medium text-sm text-muted-foreground">
@@ -470,9 +470,9 @@ export default function HomePage() {
                         </div>
                       </div>
 
-                      {/* 損切りライン */}
+                      {/* 下振れリスク目安 */}
                       <div>
-                        <h4 className="font-semibold mb-4">損切りライン</h4>
+                        <h4 className="font-semibold mb-4">下振れリスク目安</h4>
                         <div className="grid grid-cols-3 gap-4">
                           <div className="text-center p-4 border rounded-lg">
                             <h5 className="font-medium text-sm text-muted-foreground">
@@ -543,10 +543,10 @@ export default function HomePage() {
                         </div>
                       )}
 
-                      {/* 推奨事項 */}
+                      {/* 確認ポイント */}
                       {analysisResult.recommendations.length > 0 && (
                         <div>
-                          <h4 className="font-semibold mb-2">推奨事項</h4>
+                          <h4 className="font-semibold mb-2">確認ポイント</h4>
                           <ul className="list-disc list-inside space-y-1">
                             {analysisResult.recommendations.map(
                               (recommendation, index) => (

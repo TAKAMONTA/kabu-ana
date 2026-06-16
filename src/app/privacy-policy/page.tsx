@@ -9,7 +9,7 @@ export default function PrivacyPolicyPage() {
             プライバシーポリシー
           </CardTitle>
           <p className="text-center text-muted-foreground">
-            最終更新日: 2025年10月24日
+            最終更新日: 2026年5月11日
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -38,7 +38,9 @@ export default function PrivacyPolicyPage() {
                 <h3 className="text-lg font-medium mb-2">2.2 ユーザー入力情報</h3>
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                   <li>検索クエリ（企業名、証券コード等）</li>
-                  <li>認証情報（ログイン時のみ）</li>
+                  <li>認証情報（ログイン時のみ。メールアドレス、ユーザーID等）</li>
+                  <li>購入・サブスクリプション情報（プラン、購入プラットフォーム、購入トークン、購入日時、有効期限等）</li>
+                  <li>AI機能の利用状況（利用回数、更新日時等）</li>
                   <li>設定情報（ユーザー設定）</li>
                 </ul>
               </div>
@@ -53,6 +55,7 @@ export default function PrivacyPolicyPage() {
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                   <li>株式情報の検索と表示</li>
                   <li>AI分析機能の提供</li>
+                  <li>プレミアム機能、サブスクリプション状態、利用上限の管理</li>
                   <li>チャートデータの表示</li>
                   <li>ニュース情報の提供</li>
                 </ul>
@@ -81,7 +84,9 @@ export default function PrivacyPolicyPage() {
                 <h3 className="text-lg font-medium mb-2">4.2 ユーザー入力データ</h3>
                 <p className="text-sm text-muted-foreground">
                   検索クエリ: セッション終了時に削除<br />
-                  認証情報: アカウント削除まで保存
+                  認証情報: アカウント削除まで保存<br />
+                  購入・サブスクリプション情報: サービス提供、課金状態確認、法令上必要な期間保存<br />
+                  AI機能の利用状況: 利用上限管理に必要な期間保存
                 </p>
               </div>
             </div>
@@ -104,9 +109,15 @@ export default function PrivacyPolicyPage() {
               <div>
                 <h3 className="text-lg font-medium mb-2">5.2 外部サービス連携</h3>
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                  <li>Firebase Authentication / Firestore: 認証、購入状態、利用状況の管理</li>
+                  <li>Apple App Store / StoreKit: iOSアプリ内課金、サブスクリプション管理、購入検証</li>
+                  <li>Google Play Billing: Androidアプリ内課金、サブスクリプション管理</li>
                   <li>SERPAPI: 検索データ取得</li>
                   <li>OpenRouter: AI分析処理</li>
                   <li>Financial Modeling Prep: 財務データ取得</li>
+                  <li>NewsAPI / Google News RSS / Yahoo Finance: 関連ニュース取得</li>
+                  <li>EIA / FRED: マーケットシグナル関連データ取得</li>
+                  <li>Lemon Squeezy: Web版の決済処理</li>
                 </ul>
               </div>
             </div>
@@ -186,7 +197,7 @@ export default function PrivacyPolicyPage() {
                 <h3 className="text-lg font-medium mb-2">連絡先情報</h3>
                 <p className="text-sm text-muted-foreground">
                   アプリ名: AI Market Analyzer<br />
-                  連絡先: support@kabuana.com<br />
+                  連絡先: admin@takaapps.com<br />
                   対応時間: 平日 9:00-18:00（JST）
                 </p>
               </div>
