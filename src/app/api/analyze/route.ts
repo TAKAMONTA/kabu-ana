@@ -100,7 +100,8 @@ async function analyzeHandler(request: NextRequest) {
       );
     }
 
-    const { companyInfo, stockData, newsData } = validationResult.data;
+    const { companyInfo, stockData, newsData, edinetExtras, question } =
+      validationResult.data;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || apiKey === "your_openrouter_key_here") {
@@ -117,7 +118,9 @@ async function analyzeHandler(request: NextRequest) {
     const generator = openRouter.analyzeStockStream(
       companyInfo,
       stockData,
-      newsData || []
+      newsData || [],
+      edinetExtras ?? undefined,
+      question ?? undefined
     );
 
     // preflight: advance to first chunk before returning 200 so that

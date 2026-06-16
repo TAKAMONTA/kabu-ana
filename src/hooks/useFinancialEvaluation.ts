@@ -17,11 +17,22 @@ export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FinancialEvaluationResult | null>(null);
-  const lastArgsRef = useRef<{ symbol: string; companyName: string; financialData?: any } | null>(null);
+  const lastArgsRef = useRef<{
+    symbol: string;
+    companyName: string;
+    financialData?: any;
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[] | null;
+      accountingStandard?: string | null;
+    };
+  } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const evaluate = useCallback(
@@ -29,6 +40,11 @@ export function useFinancialEvaluation() {
       symbol: string;
       companyName: string;
       financialData?: any;
+      edinetExtras?: {
+        ratios?: any;
+        financialHistory?: any[] | null;
+        accountingStandard?: string | null;
+      };
     }) => {
       lastArgsRef.current = args;
       setIsLoading(true);
@@ -42,7 +58,8 @@ export function useFinancialEvaluation() {
         };
         const response = await CapacitorHttp.post(options);
         const data = response.data;
-        if (response.status !== 200) throw new Error(data.error || "財務評価に失敗しました");
+        if (response.status !== 200)
+          throw new Error(data.error || "財務評価に失敗しました");
         if (!mountedRef.current) return;
         setResult(data.analysis);
       } catch (e: any) {

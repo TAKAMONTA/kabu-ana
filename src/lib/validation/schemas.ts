@@ -59,6 +59,17 @@ export const analysisSchema = z.object({
     )
     .optional()
     .default([]),
+  // EDINET DB由来の拡張データ（AI分析の燃料・日本企業のみ）
+  edinetExtras: z
+    .object({
+      ratios: z.any().optional().nullable(),
+      financialHistory: z.array(z.any()).optional().nullable(),
+      accountingStandard: z.string().optional().nullable(),
+    })
+    .optional()
+    .nullable(),
+  // 会話型UIからの質問（任意）
+  question: z.string().max(500).optional().nullable(),
 });
 
 // 型のエクスポート

@@ -23,6 +23,12 @@ export function useAIAnalysis() {
     companyInfo: any;
     stockData: any;
     newsData: any[];
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[] | null;
+      accountingStandard?: string | null;
+    };
+    question?: string;
   } | null>(null);
   const mountedRef = useRef(true);
 
@@ -33,8 +39,24 @@ export function useAIAnalysis() {
   }, []);
 
   const analyzeStock = useCallback(
-    async (companyInfo: any, stockData: any, newsData: any[]) => {
-      lastArgsRef.current = { companyInfo, stockData, newsData };
+    async (
+      companyInfo: any,
+      stockData: any,
+      newsData: any[],
+      edinetExtras?: {
+        ratios?: any;
+        financialHistory?: any[] | null;
+        accountingStandard?: string | null;
+      },
+      question?: string
+    ) => {
+      lastArgsRef.current = {
+        companyInfo,
+        stockData,
+        newsData,
+        edinetExtras,
+        question,
+      };
       setStreamingText("");
       setAnalysisResult(null);
       setError(null);
@@ -47,7 +69,13 @@ export function useAIAnalysis() {
           const response = await CapacitorHttp.post({
             url: getApiUrl("/api/analyze"),
             headers,
-            data: { companyInfo, stockData, newsData },
+            data: {
+              companyInfo,
+              stockData,
+              newsData,
+              ...(edinetExtras ? { edinetExtras } : {}),
+              ...(question ? { question } : {}),
+            },
           });
 
           if (response.status !== 200) {
@@ -84,7 +112,13 @@ export function useAIAnalysis() {
           const res = await fetch(getApiUrl("/api/analyze"), {
             method: "POST",
             headers,
-            body: JSON.stringify({ companyInfo, stockData, newsData }),
+            body: JSON.stringify({
+              companyInfo,
+              stockData,
+              newsData,
+              ...(edinetExtras ? { edinetExtras } : {}),
+              ...(question ? { question } : {}),
+            }),
           });
 
           if (
@@ -148,8 +182,9 @@ export function useAIAnalysis() {
 
   const retry = useCallback(() => {
     if (lastArgsRef.current) {
-      const { companyInfo, stockData, newsData } = lastArgsRef.current;
-      analyzeStock(companyInfo, stockData, newsData);
+      const { companyInfo, stockData, newsData, edinetExtras, question } =
+        lastArgsRef.current;
+      analyzeStock(companyInfo, stockData, newsData, edinetExtras, question);
     }
   }, [analyzeStock]);
 
