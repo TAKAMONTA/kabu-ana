@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 async function financialEvaluationHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json({ status: "static_export" });
   }
   try {
-    const { symbol, companyName, financialData, edinetExtras } = await request.json();
+    const { symbol, companyName, financialData, edinetExtras } =
+      await request.json();
     if (!symbol || !companyName) {
       return NextResponse.json(
         { error: "シンボルと企業名が必要です" },

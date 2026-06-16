@@ -531,7 +531,10 @@ export class FMPClient {
     }
   }
 
-  async getCashFlowStatement(symbol: string, limit: number = 1): Promise<any[]> {
+  async getCashFlowStatement(
+    symbol: string,
+    limit: number = 1
+  ): Promise<any[]> {
     try {
       const response = await axios.get(
         `${FMP_BASE_URL}/cash-flow-statement/${symbol}`,

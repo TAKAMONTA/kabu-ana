@@ -30,7 +30,9 @@ export function useFinancialEvaluation() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const evaluate = useCallback(
@@ -56,7 +58,8 @@ export function useFinancialEvaluation() {
         };
         const response = await CapacitorHttp.post(options);
         const data = response.data;
-        if (response.status !== 200) throw new Error(data.error || "財務評価に失敗しました");
+        if (response.status !== 200)
+          throw new Error(data.error || "財務評価に失敗しました");
         if (!mountedRef.current) return;
         setResult(data.analysis);
       } catch (e: any) {

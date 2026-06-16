@@ -10,7 +10,8 @@ import {
 import { EdinetDBClient } from "@/lib/api/edinetdb";
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 const SEARCH_OPTIONAL_TIMEOUT_MS = 2200;
 const NEWS_OPTIONAL_TIMEOUT_MS = 1800;
@@ -174,7 +175,8 @@ async function searchHandler(request: NextRequest) {
     const requestStartedAt = Date.now();
     let dataSource = "none";
     const localJpxStock = findLocalJpxStock(query);
-    const shouldSkipSerpFast = Boolean(localJpxStock) || isLikelyPlainUsTicker(query);
+    const shouldSkipSerpFast =
+      Boolean(localJpxStock) || isLikelyPlainUsTicker(query);
 
     if (localJpxStock && serpApi) {
       companyInfo = {
@@ -204,40 +206,39 @@ async function searchHandler(request: NextRequest) {
         serpChartData,
         serpFinancialData,
         googleNews,
-      ] =
-        await measureSearchStep(timings, "jpx.serp_enrichment", () =>
-          Promise.all([
-            optionalWithTimeout(
-              serpApi.getStockData(localJpxStock.code),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "serp.getStockData.localJpx"
+      ] = await measureSearchStep(timings, "jpx.serp_enrichment", () =>
+        Promise.all([
+          optionalWithTimeout(
+            serpApi.getStockData(localJpxStock.code),
+            SEARCH_OPTIONAL_TIMEOUT_MS,
+            "serp.getStockData.localJpx"
+          ),
+          optionalWithTimeout(
+            serpApi.getCompanyNews(localJpxStock.code, 5),
+            NEWS_OPTIONAL_TIMEOUT_MS,
+            "serp.getCompanyNews.localJpx"
+          ),
+          optionalWithTimeout(
+            serpApi.getChartData(localJpxStock.code, chartPeriod),
+            SEARCH_OPTIONAL_TIMEOUT_MS,
+            "serp.getChartData.localJpx"
+          ),
+          optionalWithTimeout(
+            serpApi.getFinancialData(localJpxStock.code),
+            SEARCH_OPTIONAL_TIMEOUT_MS,
+            "serp.getFinancialData.localJpx"
+          ),
+          optionalWithTimeout(
+            serpApi.getCompanyNewsFromGoogle(
+              localJpxStock.code,
+              localJpxStock.name,
+              5
             ),
-            optionalWithTimeout(
-              serpApi.getCompanyNews(localJpxStock.code, 5),
-              NEWS_OPTIONAL_TIMEOUT_MS,
-              "serp.getCompanyNews.localJpx"
-            ),
-            optionalWithTimeout(
-              serpApi.getChartData(localJpxStock.code, chartPeriod),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "serp.getChartData.localJpx"
-            ),
-            optionalWithTimeout(
-              serpApi.getFinancialData(localJpxStock.code),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "serp.getFinancialData.localJpx"
-            ),
-            optionalWithTimeout(
-              serpApi.getCompanyNewsFromGoogle(
-                localJpxStock.code,
-                localJpxStock.name,
-                5
-              ),
-              NEWS_OPTIONAL_TIMEOUT_MS,
-              "serp.getCompanyNewsFromGoogle.localJpx"
-            ),
-          ])
-        );
+            NEWS_OPTIONAL_TIMEOUT_MS,
+            "serp.getCompanyNewsFromGoogle.localJpx"
+          ),
+        ])
+      );
 
       if (serpStockData) {
         stockData = serpStockData;
@@ -290,9 +291,9 @@ async function searchHandler(request: NextRequest) {
           async () => {
             const [financeLookup, googleLookup] = await Promise.all([
               optionalWithTimeout(
-              serpApi.searchCompany(query),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "serp.searchCompany"
+                serpApi.searchCompany(query),
+                SEARCH_OPTIONAL_TIMEOUT_MS,
+                "serp.searchCompany"
               ),
               optionalWithTimeout(
                 serpApi.searchCompanyByGoogle(query),
@@ -452,27 +453,29 @@ async function searchHandler(request: NextRequest) {
             };
           }
 
-          const [financialStatements, keyMetrics, freeNews] = await Promise.all([
-            optionalWithTimeout(
-              fmpApi.getFinancialStatements(company.symbol, 1),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "fmp.getFinancialStatements"
-            ),
-            optionalWithTimeout(
-              fmpApi.getKeyMetrics(company.symbol, 1),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "fmp.getKeyMetrics"
-            ),
-            optionalWithTimeout(
-              new FreeNewsClient().getComprehensiveNews(
-                company.name || company.companyName || company.symbol,
-                company.symbol,
-                5
+          const [financialStatements, keyMetrics, freeNews] = await Promise.all(
+            [
+              optionalWithTimeout(
+                fmpApi.getFinancialStatements(company.symbol, 1),
+                SEARCH_OPTIONAL_TIMEOUT_MS,
+                "fmp.getFinancialStatements"
               ),
-              NEWS_OPTIONAL_TIMEOUT_MS,
-              "freeNews.getComprehensiveNews"
-            ),
-          ]);
+              optionalWithTimeout(
+                fmpApi.getKeyMetrics(company.symbol, 1),
+                SEARCH_OPTIONAL_TIMEOUT_MS,
+                "fmp.getKeyMetrics"
+              ),
+              optionalWithTimeout(
+                new FreeNewsClient().getComprehensiveNews(
+                  company.name || company.companyName || company.symbol,
+                  company.symbol,
+                  5
+                ),
+                NEWS_OPTIONAL_TIMEOUT_MS,
+                "freeNews.getComprehensiveNews"
+              ),
+            ]
+          );
 
           if (financialStatements && financialStatements.length > 0) {
             const latest = financialStatements[0];
@@ -548,39 +551,59 @@ async function searchHandler(request: NextRequest) {
     let accountingStandard: string | null = null;
     let ratios: Record<string, number | undefined> | null = null;
     let financialHistory: Array<{
-      fiscalYear: number; revenue?: number; operatingIncome?: number;
-      netIncome?: number; eps?: number; totalAssets?: number; cfOperating?: number;
+      fiscalYear: number;
+      revenue?: number;
+      operatingIncome?: number;
+      netIncome?: number;
+      eps?: number;
+      totalAssets?: number;
+      cfOperating?: number;
     }> | null = null;
 
     const edinetDbKey = process.env.EDINETDB_API_KEY;
     const isJpStock = companyInfo?.symbol?.endsWith(".T");
 
-    if (edinetDbKey && edinetDbKey !== "your_edinetdb_api_key_here" && isJpStock) {
+    if (
+      edinetDbKey &&
+      edinetDbKey !== "your_edinetdb_api_key_here" &&
+      isJpStock
+    ) {
       try {
         const edinetApi = new EdinetDBClient(edinetDbKey);
         // 4桁証券コードを抽出して EDINET 検索
         const secCode = companyInfo.symbol.replace(".T", "").slice(0, 4);
         const edinetResults = await Promise.race([
           edinetApi.searchCompanies(secCode, 3),
-          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("EDINET timeout")), 2000)),
-        ]).catch(() => [] as Awaited<ReturnType<EdinetDBClient["searchCompanies"]>>);
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("EDINET timeout")), 2000)
+          ),
+        ]).catch(
+          () => [] as Awaited<ReturnType<EdinetDBClient["searchCompanies"]>>
+        );
 
         if (Array.isArray(edinetResults) && edinetResults.length > 0) {
           const company = edinetResults[0];
           edinetCode = company.edinet_code;
 
-          const [detail, financialsData, ratiosData] = await Promise.allSettled([
-            edinetApi.getCompany(company.edinet_code),
-            edinetApi.getFinancials(company.edinet_code),
-            edinetApi.getRatios(company.edinet_code),
-          ]);
+          const [detail, financialsData, ratiosData] = await Promise.allSettled(
+            [
+              edinetApi.getCompany(company.edinet_code),
+              edinetApi.getFinancials(company.edinet_code),
+              edinetApi.getRatios(company.edinet_code),
+            ]
+          );
 
           if (detail.status === "fulfilled" && detail.value) {
             accountingStandard = detail.value.accounting_standard ?? null;
           }
 
-          if (financialsData.status === "fulfilled" && financialsData.value.length > 0) {
-            const sorted = [...financialsData.value].sort((a, b) => b.fiscal_year - a.fiscal_year).slice(0, 6);
+          if (
+            financialsData.status === "fulfilled" &&
+            financialsData.value.length > 0
+          ) {
+            const sorted = [...financialsData.value]
+              .sort((a, b) => b.fiscal_year - a.fiscal_year)
+              .slice(0, 6);
             financialHistory = sorted.map(f => ({
               fiscalYear: f.fiscal_year,
               revenue: f.revenue ?? undefined,
@@ -595,13 +618,20 @@ async function searchHandler(request: NextRequest) {
           if (ratiosData.status === "fulfilled" && ratiosData.value) {
             const r = ratiosData.value;
             ratios = {
-              roe: r.roe ?? undefined, roa: r.roa ?? undefined,
-              operatingMargin: r.operating_margin ?? undefined, netMargin: r.net_margin ?? undefined,
-              grossMargin: r.gross_margin ?? undefined, equityRatio: r.equity_ratio ?? undefined,
-              currentRatio: r.current_ratio ?? undefined, deRatio: r.de_ratio ?? undefined,
-              fcf: r.fcf ?? undefined, ebitda: r.ebitda ?? undefined,
-              revenueGrowth: r.revenue_growth ?? undefined, niGrowth: r.ni_growth ?? undefined,
-              revenueCagr3y: r.revenue_cagr_3y ?? undefined, niCagr3y: r.ni_cagr_3y ?? undefined,
+              roe: r.roe ?? undefined,
+              roa: r.roa ?? undefined,
+              operatingMargin: r.operating_margin ?? undefined,
+              netMargin: r.net_margin ?? undefined,
+              grossMargin: r.gross_margin ?? undefined,
+              equityRatio: r.equity_ratio ?? undefined,
+              currentRatio: r.current_ratio ?? undefined,
+              deRatio: r.de_ratio ?? undefined,
+              fcf: r.fcf ?? undefined,
+              ebitda: r.ebitda ?? undefined,
+              revenueGrowth: r.revenue_growth ?? undefined,
+              niGrowth: r.ni_growth ?? undefined,
+              revenueCagr3y: r.revenue_cagr_3y ?? undefined,
+              niCagr3y: r.ni_cagr_3y ?? undefined,
               dividendYield: r.dividend_yield ?? undefined,
             };
           }
@@ -627,7 +657,9 @@ async function searchHandler(request: NextRequest) {
       newsData,
       chartData,
       financialData,
-      ...(edinetCode ? { edinetCode, accountingStandard, ratios, financialHistory } : {}),
+      ...(edinetCode
+        ? { edinetCode, accountingStandard, ratios, financialHistory }
+        : {}),
       metadata: {
         dataSource,
         timings,
@@ -635,9 +667,8 @@ async function searchHandler(request: NextRequest) {
     });
   } catch (error) {
     // セキュアなエラーハンドリング
-    const { createErrorResponse, logError } = await import(
-      "@/lib/utils/errorHandler"
-    );
+    const { createErrorResponse, logError } =
+      await import("@/lib/utils/errorHandler");
     logError(error, "Search API");
     return createErrorResponse(error, "検索中にエラーが発生しました");
   }

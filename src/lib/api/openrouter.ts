@@ -511,7 +511,13 @@ ${newsText}
     newsData: any[],
     edinetExtras?: EdinetExtras | null
   ): AsyncGenerator<string> {
-    const prompt = buildAnalysisPrompt(companyInfo, stockData, newsData, true, edinetExtras);
+    const prompt = buildAnalysisPrompt(
+      companyInfo,
+      stockData,
+      newsData,
+      true,
+      edinetExtras
+    );
 
     const res = await fetch(`${this.baseURL}/chat/completions`, {
       method: "POST",

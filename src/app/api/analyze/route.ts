@@ -100,7 +100,8 @@ async function analyzeHandler(request: NextRequest) {
       );
     }
 
-    const { companyInfo, stockData, newsData, edinetExtras } = validationResult.data;
+    const { companyInfo, stockData, newsData, edinetExtras } =
+      validationResult.data;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
     if (!apiKey || apiKey === "your_openrouter_key_here") {

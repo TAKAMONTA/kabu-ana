@@ -56,7 +56,9 @@ export function useCompanySearch() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const searchCompany = async (query: string, chartPeriod: string = "1M") => {
