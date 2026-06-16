@@ -8,7 +8,7 @@ async function financialEvaluationHandler(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
   try {
-    const { symbol, companyName, financialData } = await request.json();
+    const { symbol, companyName, financialData, edinetExtras } = await request.json();
     if (!symbol || !companyName) {
       return NextResponse.json(
         { error: "シンボルと企業名が必要です" },
@@ -28,7 +28,8 @@ async function financialEvaluationHandler(request: NextRequest) {
     const result = await client.analyzeFinancials(
       companyName,
       symbol,
-      financialData || {}
+      financialData || {},
+      edinetExtras ?? undefined
     );
 
     return NextResponse.json({ analysis: result });

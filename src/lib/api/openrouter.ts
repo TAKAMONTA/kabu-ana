@@ -65,12 +65,55 @@ export interface OpenRouterResponse {
   };
 }
 
+export interface EdinetExtras {
+  ratios?: any;
+  financialHistory?: any[] | null;
+  accountingStandard?: string | null;
+}
+
+function buildEdinetSections(edinetExtras?: EdinetExtras | null): string {
+  const ratios = edinetExtras?.ratios;
+  const history = edinetExtras?.financialHistory;
+  const acctStd = edinetExtras?.accountingStandard;
+  const pct = (v: number | undefined | null, d = 1) =>
+    v != null ? (v * 100).toFixed(d) + "%" : "N/A";
+  const oku = (v: number | undefined | null) =>
+    v != null ? (v / 1e8).toFixed(1) + "億円" : "N/A";
+
+  const ratiosSection = ratios
+    ? `\n\n【財務指標（EDINET DB・公式有価証券報告書ベース）】
+- 会計基準: ${acctStd || "N/A"}
+- ROE: ${pct(ratios.roe)} / ROA: ${pct(ratios.roa)}
+- 営業利益率: ${pct(ratios.operatingMargin)} / 純利益率: ${pct(ratios.netMargin)}
+- 自己資本比率: ${pct(ratios.equityRatio)} / 流動比率: ${pct(ratios.currentRatio)}
+- D/Eレシオ: ${ratios.deRatio != null ? ratios.deRatio.toFixed(2) : "N/A"}
+- FCF: ${oku(ratios.fcf)} / EBITDA: ${oku(ratios.ebitda)}
+- 売上成長率(YoY): ${pct(ratios.revenueGrowth)} / 純利益成長率(YoY): ${pct(ratios.niGrowth)}
+- 売上CAGR(3年): ${pct(ratios.revenueCagr3y)} / 配当利回り: ${pct(ratios.dividendYield)}`
+    : "";
+
+  const historySection =
+    history && history.length > 0
+      ? `\n\n【財務推移（EDINET DB・直近${history.length}年）】\n${history
+          .map(
+            (h: any) =>
+              `- FY${h.fiscalYear}: 売上=${oku(h.revenue)} / 営業利益=${oku(h.operatingIncome)} / 純利益=${oku(h.netIncome)} / 営業CF=${oku(h.cfOperating)}`
+          )
+          .join("\n")}`
+      : "";
+
+  return ratiosSection + historySection;
+}
+
 export function buildAnalysisPrompt(
   companyInfo: any,
   stockData: any,
   newsData: any[],
-  streaming = false
+  streaming = false,
+  edinetExtras?: EdinetExtras | null
 ): string {
+  const edinetSections = buildEdinetSections(edinetExtras);
+
   const base = `
 以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。
 
@@ -83,7 +126,7 @@ export function buildAnalysisPrompt(
 - 時価総額: ${stockData?.marketCap || "N/A"}
 - PER: ${stockData?.pe || "N/A"}
 - EPS: ${stockData?.eps || "N/A"}
-- 配当: ${stockData?.dividend || "N/A"}
+- 配当: ${stockData?.dividend || "N/A"}${edinetSections}
 
 【最新ニュース】
 ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}`;
@@ -160,14 +203,16 @@ export class OpenRouterClient {
   async analyzeStock(
     companyInfo: any,
     stockData: any,
-    newsData: any[]
+    newsData: any[],
+    edinetExtras?: EdinetExtras | null
   ): Promise<AnalysisResult> {
     try {
       const prompt = buildAnalysisPrompt(
         companyInfo,
         stockData,
         newsData,
-        false
+        false,
+        edinetExtras
       );
 
       const response = await axios.post(
@@ -390,13 +435,15 @@ ${newsText}
   async analyzeFinancials(
     companyName: string,
     symbol: string,
-    financialData: any
+    financialData: any,
+    edinetExtras?: EdinetExtras | null
   ) {
     try {
       const prompt = this.buildFinancialsPrompt(
         companyName,
         symbol,
-        financialData
+        financialData,
+        edinetExtras
       );
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
@@ -461,9 +508,10 @@ ${newsText}
   async *analyzeStockStream(
     companyInfo: any,
     stockData: any,
-    newsData: any[]
+    newsData: any[],
+    edinetExtras?: EdinetExtras | null
   ): AsyncGenerator<string> {
-    const prompt = buildAnalysisPrompt(companyInfo, stockData, newsData, true);
+    const prompt = buildAnalysisPrompt(companyInfo, stockData, newsData, true, edinetExtras);
 
     const res = await fetch(`${this.baseURL}/chat/completions`, {
       method: "POST",
@@ -539,9 +587,11 @@ ${newsText}
   private buildFinancialsPrompt(
     companyName: string,
     symbol: string,
-    financialData: any
+    financialData: any,
+    edinetExtras?: EdinetExtras | null
   ) {
     const fd = financialData || {};
+    const edinetSections = buildEdinetSections(edinetExtras);
     return `企業名: ${companyName}\nシンボル: ${symbol}\n\n以下の財務データ（存在する場合のみ）を参考に、BS/PL/CFを5段階で評価してください。指標が無い場合は一般的な水準を仮定せず、保守的に評価してください。\n\n【財務データの例】\n- 総資産: ${
       fd.totalAssets ?? "N/A"
     }\n- 自己資本比率: ${fd.equityRatio ?? "N/A"}\n- 負債比率: ${
@@ -552,6 +602,6 @@ ${newsText}
       fd.operatingCashFlow ?? "N/A"
     }\n- 投資CF: ${fd.investingCashFlow ?? "N/A"}\n- 財務CF: ${
       fd.financingCashFlow ?? "N/A"
-    }\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["確認ポイント1", "確認ポイント2"]\n}`;
+    }${edinetSections}\n\n【出力フォーマット（必ずこのJSONのみを返す）】\n{\n  "bs": { "score": 1-5, "summary": "BSの要点(短文)" },\n  "pl": { "score": 1-5, "summary": "PLの要点(短文)" },\n  "cf": { "score": 1-5, "summary": "CFの要点(短文)" },\n  "overall": { "score": 1-5, "label": "総合ラベル" },\n  "analysis": "総合所見(2〜4文)",\n  "recommendations": ["確認ポイント1", "確認ポイント2"]\n}`;
   }
 }

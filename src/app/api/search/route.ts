@@ -7,6 +7,7 @@ import {
   JPX_STOCK_BY_CODE,
   type JpxStock,
 } from "@/lib/jpx/stockMaster";
+import { EdinetDBClient } from "@/lib/api/edinetdb";
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -542,6 +543,74 @@ async function searchHandler(request: NextRequest) {
       }
     }
 
+    // EDINET DB エンリッチメント（日本株かつ EDINETDB_API_KEY 設定時のみ）
+    let edinetCode: string | null = null;
+    let accountingStandard: string | null = null;
+    let ratios: Record<string, number | undefined> | null = null;
+    let financialHistory: Array<{
+      fiscalYear: number; revenue?: number; operatingIncome?: number;
+      netIncome?: number; eps?: number; totalAssets?: number; cfOperating?: number;
+    }> | null = null;
+
+    const edinetDbKey = process.env.EDINETDB_API_KEY;
+    const isJpStock = companyInfo?.symbol?.endsWith(".T");
+
+    if (edinetDbKey && edinetDbKey !== "your_edinetdb_api_key_here" && isJpStock) {
+      try {
+        const edinetApi = new EdinetDBClient(edinetDbKey);
+        // 4桁証券コードを抽出して EDINET 検索
+        const secCode = companyInfo.symbol.replace(".T", "").slice(0, 4);
+        const edinetResults = await Promise.race([
+          edinetApi.searchCompanies(secCode, 3),
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error("EDINET timeout")), 2000)),
+        ]).catch(() => [] as Awaited<ReturnType<EdinetDBClient["searchCompanies"]>>);
+
+        if (Array.isArray(edinetResults) && edinetResults.length > 0) {
+          const company = edinetResults[0];
+          edinetCode = company.edinet_code;
+
+          const [detail, financialsData, ratiosData] = await Promise.allSettled([
+            edinetApi.getCompany(company.edinet_code),
+            edinetApi.getFinancials(company.edinet_code),
+            edinetApi.getRatios(company.edinet_code),
+          ]);
+
+          if (detail.status === "fulfilled" && detail.value) {
+            accountingStandard = detail.value.accounting_standard ?? null;
+          }
+
+          if (financialsData.status === "fulfilled" && financialsData.value.length > 0) {
+            const sorted = [...financialsData.value].sort((a, b) => b.fiscal_year - a.fiscal_year).slice(0, 6);
+            financialHistory = sorted.map(f => ({
+              fiscalYear: f.fiscal_year,
+              revenue: f.revenue ?? undefined,
+              operatingIncome: f.operating_income ?? undefined,
+              netIncome: f.net_income ?? undefined,
+              eps: f.eps ?? undefined,
+              totalAssets: f.total_assets ?? undefined,
+              cfOperating: f.cf_operating ?? undefined,
+            }));
+          }
+
+          if (ratiosData.status === "fulfilled" && ratiosData.value) {
+            const r = ratiosData.value;
+            ratios = {
+              roe: r.roe ?? undefined, roa: r.roa ?? undefined,
+              operatingMargin: r.operating_margin ?? undefined, netMargin: r.net_margin ?? undefined,
+              grossMargin: r.gross_margin ?? undefined, equityRatio: r.equity_ratio ?? undefined,
+              currentRatio: r.current_ratio ?? undefined, deRatio: r.de_ratio ?? undefined,
+              fcf: r.fcf ?? undefined, ebitda: r.ebitda ?? undefined,
+              revenueGrowth: r.revenue_growth ?? undefined, niGrowth: r.ni_growth ?? undefined,
+              revenueCagr3y: r.revenue_cagr_3y ?? undefined, niCagr3y: r.ni_cagr_3y ?? undefined,
+              dividendYield: r.dividend_yield ?? undefined,
+            };
+          }
+        }
+      } catch (edinetError) {
+        console.error("EDINET DB エンリッチメントエラー:", edinetError);
+      }
+    }
+
     timings.total = Date.now() - requestStartedAt;
     console.info("Search API timings", {
       query,
@@ -558,6 +627,7 @@ async function searchHandler(request: NextRequest) {
       newsData,
       chartData,
       financialData,
+      ...(edinetCode ? { edinetCode, accountingStandard, ratios, financialHistory } : {}),
       metadata: {
         dataSource,
         timings,

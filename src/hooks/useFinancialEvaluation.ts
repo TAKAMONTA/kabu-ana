@@ -17,7 +17,16 @@ export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FinancialEvaluationResult | null>(null);
-  const lastArgsRef = useRef<{ symbol: string; companyName: string; financialData?: any } | null>(null);
+  const lastArgsRef = useRef<{
+    symbol: string;
+    companyName: string;
+    financialData?: any;
+    edinetExtras?: {
+      ratios?: any;
+      financialHistory?: any[] | null;
+      accountingStandard?: string | null;
+    };
+  } | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
@@ -29,6 +38,11 @@ export function useFinancialEvaluation() {
       symbol: string;
       companyName: string;
       financialData?: any;
+      edinetExtras?: {
+        ratios?: any;
+        financialHistory?: any[] | null;
+        accountingStandard?: string | null;
+      };
     }) => {
       lastArgsRef.current = args;
       setIsLoading(true);

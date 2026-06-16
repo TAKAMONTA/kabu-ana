@@ -8,12 +8,45 @@ import {
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
-interface SearchResult {
+export interface SearchResultRatios {
+  roe?: number;
+  roa?: number;
+  operatingMargin?: number;
+  netMargin?: number;
+  grossMargin?: number;
+  equityRatio?: number;
+  currentRatio?: number;
+  deRatio?: number;
+  fcf?: number;
+  ebitda?: number;
+  revenueGrowth?: number;
+  niGrowth?: number;
+  revenueCagr3y?: number;
+  niCagr3y?: number;
+  dividendYield?: number;
+}
+
+export interface FinancialHistoryItem {
+  fiscalYear: number;
+  revenue?: number;
+  operatingIncome?: number;
+  netIncome?: number;
+  eps?: number;
+  totalAssets?: number;
+  cfOperating?: number;
+}
+
+export interface SearchResult {
   companyInfo: CompanyInfo;
   stockData: StockData;
   newsData: any[];
   chartData: ChartDataPoint[];
   financialData: FinancialData | null;
+  // EDINET DB 拡張フィールド（日本企業の場合のみ存在）
+  edinetCode?: string | null;
+  accountingStandard?: string | null;
+  ratios?: SearchResultRatios | null;
+  financialHistory?: FinancialHistoryItem[] | null;
 }
 
 export function useCompanySearch() {
