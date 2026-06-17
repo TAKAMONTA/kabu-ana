@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { fail, ok, readSignalDoc, todayId, writeSignalDoc } from "@/lib/signals/cache";
+import {
+  fail,
+  ok,
+  readSignalDocWithFallback,
+  todayId,
+  writeSignalDocWithFallback,
+} from "@/lib/signals/cache";
 import { fetchEnergyNews, type EnergyNewsItem } from "@/lib/signals/sources/rss";
 import { buildJapaneseSignalTitle } from "@/lib/signals/localize";
 
@@ -27,11 +33,13 @@ export async function GET() {
     return NextResponse.json(ok<NewsPayload>(null));
   }
 
-  const cached = normalizeNewsPayload(await readSignalDoc<NewsPayload>("signals_news", todayId()));
+  const cached = normalizeNewsPayload(
+    await readSignalDocWithFallback<NewsPayload>("signals_news", todayId())
+  );
   try {
     const items = await fetchEnergyNews();
     const payload = { items, fetchedAt: new Date().toISOString() };
-    await writeSignalDoc("signals_news", todayId(), payload);
+    await writeSignalDocWithFallback("signals_news", todayId(), payload);
     return NextResponse.json(ok(payload, payload.fetchedAt), {
       headers: { "Cache-Control": "s-maxage=900, stale-while-revalidate=1800" },
     });
