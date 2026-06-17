@@ -1,0 +1,42 @@
+name: Production Smoke Check
+
+on:
+  deployment_status:
+  workflow_dispatch:
+  schedule:
+    # 07:10 JST. This catches overnight breakage and refreshes the morning brief path.
+    - cron: "10 22 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Check kabu-ana.com
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'deployment_status' ||
+      (
+        github.event.deployment_status.state == 'success' &&
+        (
+          github.event.deployment.environment == 'Production' ||
+          github.event.deployment.environment == 'production'
+        )
+      )
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run production smoke check
+        run: npm run check:production
+        env:
+          KABUANA_PRODUCTION_URL: https://kabu-ana.com
+          KABUANA_BRIEF_MAX_AGE_HOURS: "36"
+          KABUANA_SMOKE_TIMEOUT_MS: "60000"

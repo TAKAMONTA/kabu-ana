@@ -9,6 +9,7 @@
     "build:static": "EXPORT_STATIC=true next build",
     "check:release-env": "node scripts/check-release-env.mjs",
     "check:release-env:ios": "node scripts/check-release-env.mjs --target=ios",
+    "check:production": "node scripts/production-smoke-check.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
     "preflight:release": "node scripts/release-preflight.mjs",
     "preflight:release:ios": "node scripts/release-preflight.mjs --target=ios",
