@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { fail, ok, readSignalDoc, todayId, writeSignalDoc } from "@/lib/signals/cache";
+import {
+  fail,
+  ok,
+  readSignalDocWithFallback,
+  todayId,
+  writeSignalDocWithFallback,
+} from "@/lib/signals/cache";
 import { fetchEiaPriceStrip, type SignalPricePoint } from "@/lib/signals/sources/eia";
 import { fetchFredPriceStrip } from "@/lib/signals/sources/fred";
 
@@ -15,7 +21,10 @@ export async function GET() {
     return NextResponse.json(ok<PriceStripPayload>(null));
   }
 
-  const cached = await readSignalDoc<PriceStripPayload>("signals_prices", todayId());
+  const cached = await readSignalDocWithFallback<PriceStripPayload>(
+    "signals_prices",
+    todayId()
+  );
   try {
     const eiaKey = process.env.EIA_API_KEY;
     const fredKey = process.env.FRED_API_KEY;
@@ -25,7 +34,7 @@ export async function GET() {
 
     const [eia, fred] = await Promise.all([fetchEiaPriceStrip(eiaKey), fetchFredPriceStrip(fredKey)]);
     const payload = { prices: [...eia, ...fred], fetchedAt: new Date().toISOString() };
-    await writeSignalDoc("signals_prices", todayId(), payload);
+    await writeSignalDocWithFallback("signals_prices", todayId(), payload);
     return NextResponse.json(ok(payload, payload.fetchedAt), {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" },
     });

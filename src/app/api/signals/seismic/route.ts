@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { fail, ok, readSignalDoc, todayId, writeSignalDoc } from "@/lib/signals/cache";
+import {
+  fail,
+  ok,
+  readSignalDocWithFallback,
+  todayId,
+  writeSignalDocWithFallback,
+} from "@/lib/signals/cache";
 import { fetchUsgsEarthquakes, type EarthquakeSignal } from "@/lib/signals/sources/usgs";
 
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -14,11 +20,14 @@ export async function GET() {
     return NextResponse.json(ok<SeismicPayload>(null));
   }
 
-  const cached = await readSignalDoc<SeismicPayload>("signals_seismic", todayId());
+  const cached = await readSignalDocWithFallback<SeismicPayload>(
+    "signals_seismic",
+    todayId()
+  );
   try {
     const earthquakes = await fetchUsgsEarthquakes();
     const payload = { earthquakes, fetchedAt: new Date().toISOString() };
-    await writeSignalDoc("signals_seismic", todayId(), payload);
+    await writeSignalDocWithFallback("signals_seismic", todayId(), payload);
     return NextResponse.json(ok(payload, payload.fetchedAt), {
       headers: { "Cache-Control": "s-maxage=180, stale-while-revalidate=600" },
     });
