@@ -1,6 +1,6 @@
 {
-  "name": "AI Market Analyzer",
-  "short_name": "Kabuana",
+  "name": "kabuana",
+  "short_name": "kabuana",
   "description": "AIを活用した株式分析と投資アドバイスを提供するアプリケーション",
   "start_url": "/",
   "display": "standalone",

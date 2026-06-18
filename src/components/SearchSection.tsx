@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { normalizeDisplayText } from "@/lib/displayText";
 import { Search } from "lucide-react";
 
 interface Suggestion {
@@ -65,7 +66,7 @@ export function SearchSection({
         const sel =
           activeSuggestion >= 0 ? suggestions[activeSuggestion] : null;
         if (sel?.symbol) {
-          onSelectSuggestion(sel.symbol, `${sel.companyName}`);
+          onSelectSuggestion(sel.symbol, normalizeDisplayText(sel.companyName));
         } else {
           onSearch();
         }
@@ -156,38 +157,39 @@ export function SearchSection({
                       className="m-0 list-none p-0"
                     >
                       {!isSuggestLoading &&
-                        suggestions.map((sug, idx) => (
-                          <li key={`${sug.symbol}-${idx}`} role="presentation">
-                            <button
-                              type="button"
-                              id={`search-suggestion-${idx}`}
-                              role="option"
-                              aria-selected={idx === activeSuggestion}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
-                                idx === activeSuggestion ? "bg-accent" : ""
-                              }`}
-                              onMouseEnter={() => setActiveSuggestion(idx)}
-                              onMouseDown={e => {
-                                e.preventDefault();
-                                onSelectSuggestion(
-                                  sug.symbol,
-                                  `${sug.companyName}`
-                                );
-                              }}
-                            >
-                              <span className="font-medium">
-                                {renderHighlighted(
-                                  sug.companyName,
-                                  searchQuery
-                                )}
-                              </span>
-                              <span className="ml-2 text-xs text-muted-foreground">
-                                {renderHighlighted(sug.symbol, searchQuery)}
-                                {sug.exchange ? ` · ${sug.exchange}` : ""}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
+                        suggestions.map((sug, idx) => {
+                          const companyName = normalizeDisplayText(sug.companyName);
+                          const exchange = sug.exchange
+                            ? normalizeDisplayText(sug.exchange)
+                            : "";
+
+                          return (
+                            <li key={`${sug.symbol}-${idx}`} role="presentation">
+                              <button
+                                type="button"
+                                id={`search-suggestion-${idx}`}
+                                role="option"
+                                aria-selected={idx === activeSuggestion}
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent ${
+                                  idx === activeSuggestion ? "bg-accent" : ""
+                                }`}
+                                onMouseEnter={() => setActiveSuggestion(idx)}
+                                onMouseDown={e => {
+                                  e.preventDefault();
+                                  onSelectSuggestion(sug.symbol, companyName);
+                                }}
+                              >
+                                <span className="font-medium">
+                                  {renderHighlighted(companyName, searchQuery)}
+                                </span>
+                                <span className="ml-2 text-xs text-muted-foreground">
+                                  {renderHighlighted(sug.symbol, searchQuery)}
+                                  {exchange ? ` · ${exchange}` : ""}
+                                </span>
+                              </button>
+                            </li>
+                          );
+                        })}
                     </ul>
                   </div>
                 )}

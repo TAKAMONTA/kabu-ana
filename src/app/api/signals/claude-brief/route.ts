@@ -5,6 +5,7 @@ import {
   type OpenRouterResponse,
 } from "@/lib/api/openrouter";
 import { isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
+import { APP_NAME, APP_URL } from "@/lib/constants";
 import {
   fail,
   getSignalsDb,
@@ -115,8 +116,8 @@ async function callOpenRouterJson<T>(
       headers: {
         Authorization: `Bearer ${client.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://kabu-ana.com",
-        "X-Title": "AI Market Analyzer",
+        "HTTP-Referer": APP_URL,
+        "X-Title": APP_NAME,
       },
       timeout: 30000,
     }

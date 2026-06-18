@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { APP_NAME } from "@/lib/constants";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -16,7 +17,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. はじめに</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              AI Market Analyzer（以下「本アプリ」）は、ユーザーのプライバシーを尊重し、
+              {APP_NAME}（以下「本アプリ」）は、ユーザーのプライバシーを尊重し、
               個人情報の保護に努めます。本プライバシーポリシーは、本アプリがどのような情報を収集し、
               どのように使用するかについて説明します。
             </p>
@@ -196,7 +197,7 @@ export default function PrivacyPolicyPage() {
               <div className="bg-muted p-4 rounded-lg">
                 <h3 className="text-lg font-medium mb-2">連絡先情報</h3>
                 <p className="text-sm text-muted-foreground">
-                  アプリ名: AI Market Analyzer<br />
+                  アプリ名: {APP_NAME}<br />
                   連絡先: admin@takaapps.com<br />
                   対応時間: 平日 9:00-18:00（JST）
                 </p>

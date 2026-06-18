@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
+import { APP_NAME } from "@/lib/constants";
 import { FrontPageLeadStory } from "./FrontPageLeadStory";
 import { FrontPageMarketGrid } from "./FrontPageMarketGrid";
 
@@ -52,7 +53,7 @@ export function MarketFrontPage({
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                  Kabu Ana Market Desk
+                  {APP_NAME} market desk
                 </p>
                 <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
                   今日の市場一面

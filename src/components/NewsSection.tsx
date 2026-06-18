@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Brain, TrendingUp, ExternalLink, Lock } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
+import { normalizeDisplayText } from "@/lib/displayText";
 
 interface NewsItem {
   title?: string;
@@ -36,6 +37,42 @@ export function NewsSection({
   dailyLimit = 5,
   isPremium = false,
 }: NewsSectionProps) {
+  const renderNewsCard = (news: NewsItem, idx: number) => {
+    const title = normalizeDisplayText(news.title || news.snippet);
+    const snippet = normalizeDisplayText(news.snippet);
+    const source = normalizeDisplayText(news.source);
+    const date = normalizeDisplayText(news.date);
+    const showSnippet = snippet.length > 0 && snippet !== title;
+
+    return (
+      <a
+        key={news.link || idx}
+        href={news.link}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="block rounded-lg border p-3 transition-colors hover:bg-accent group"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="line-clamp-2 text-sm font-medium transition-colors group-hover:text-primary">
+              {title}
+            </p>
+            {showSnippet && (
+              <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                {snippet}
+              </p>
+            )}
+            <div className="mt-2 flex min-w-0 items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="truncate">情報源: {source}</span>
+              {date && <span className="shrink-0">{date}</span>}
+            </div>
+          </div>
+          <ExternalLink className="mt-1 h-4 w-4 flex-shrink-0 text-muted-foreground transition-colors group-hover:text-primary" />
+        </div>
+      </a>
+    );
+  };
+
   const AnalyzeButton = () => {
     if (!canUseFeature) {
       return (
@@ -181,32 +218,7 @@ export function NewsSection({
                   📰 分析対象ニュース ({analyzedNews.length}件)
                 </h5>
                 <div className="space-y-3">
-                  {analyzedNews.slice(0, 5).map((news, idx) => (
-                    <a
-                      key={idx}
-                      href={news.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block p-3 border rounded-lg hover:bg-accent transition-colors group"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-2">
-                            {news.title || news.snippet}
-                          </p>
-                          <div className="flex items-center gap-2 mt-2">
-                            <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                              {news.source}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {news.date}
-                            </span>
-                          </div>
-                        </div>
-                        <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
-                      </div>
-                    </a>
-                  ))}
+                  {analyzedNews.slice(0, 5).map(renderNewsCard)}
                 </div>
               </div>
             )}
@@ -216,32 +228,7 @@ export function NewsSection({
             <p className="text-sm text-muted-foreground mb-4">
               最新ニュースを取得済みです。「関連ニュースをAI分析」ボタンで材料整理を開始できます。
             </p>
-            {newsData.slice(0, 3).map((news, idx) => (
-              <a
-                key={idx}
-                href={news.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block p-3 border rounded-lg hover:bg-accent transition-colors group"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm group-hover:text-primary transition-colors line-clamp-2">
-                      {news.snippet}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                        {news.source}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {news.date}
-                      </span>
-                    </div>
-                  </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0 mt-1" />
-                </div>
-              </a>
-            ))}
+            {newsData.slice(0, 3).map(renderNewsCard)}
           </div>
         ) : (
           <div className="text-center py-8">

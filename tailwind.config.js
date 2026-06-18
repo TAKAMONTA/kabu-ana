@@ -48,6 +48,11 @@ module.exports = {
           4: "hsl(var(--chart-4))",
           5: "hsl(var(--chart-5))",
         },
+        premium: {
+          DEFAULT: "hsl(var(--premium))",
+          foreground: "hsl(var(--premium-foreground))",
+          muted: "hsl(var(--premium-muted))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

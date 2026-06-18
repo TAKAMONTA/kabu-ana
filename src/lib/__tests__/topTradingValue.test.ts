@@ -173,6 +173,24 @@ describe("buildStableTopTradingItems", () => {
     expect(result.items[0].reason).toContain("受注・提携");
   });
 
+  it("keeps publisher labels separate from evidence titles", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "三菱UFJ、日銀利上げ観測で銀行株に買い",
+        snippet: "金利上昇の恩恵が金融株の材料として意識されています。",
+        source: "日本経済新聞",
+        date: RECENT_DATE,
+        link: "https://example.com/mufg-rate",
+      },
+    ]);
+
+    expect(result.items[0]).toMatchObject({
+      code: "8306",
+      evidence: "三菱UFJ、日銀利上げ観測で銀行株に買い",
+      sources: ["日本経済新聞"],
+    });
+  });
+
   it("surfaces less obvious stocks when they are directly named in current news", () => {
     const result = buildStableTopTradingItems([
       {
@@ -374,5 +392,38 @@ describe("buildStableTopTradingItems", () => {
     expect(codes).toContain("6997");
     expect(codes.filter(code => ["4973", "5576"].includes(code))).toHaveLength(1);
     expect(codes.filter(code => ["6323", "1928"].includes(code))).toHaveLength(1);
+  });
+
+  it("derives varied attention scores from relative news signal strength", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "三井E&S、港湾クレーン大型受注でストップ高",
+        snippet: "大型受注と出来高増加が材料です。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/mitsui-es-stop-high",
+      },
+      {
+        title: "三井E&S、追加の大型受注観測で続伸",
+        snippet: "港湾インフラ投資への期待が続きます。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/mitsui-es-order",
+      },
+      {
+        title: "任天堂、新製品発表で関心",
+        snippet: "ゲーム関連の新製品材料です。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/nintendo-product",
+      },
+    ]);
+
+    const confidences = result.items.map(item => item.confidence);
+
+    expect(result.items[0].code).toBe("7003");
+    expect(new Set(confidences).size).toBeGreaterThan(1);
+    expect(result.items[0].confidence).toBeGreaterThan(result.items[1].confidence);
+    expect(Math.max(...confidences)).toBeLessThanOrEqual(0.94);
   });
 });

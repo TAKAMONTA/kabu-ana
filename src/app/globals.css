@@ -27,9 +27,12 @@
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-  }
+	    --chart-5: 27 87% 67%;
+	    --premium: 222.2 84% 4.9%;
+	    --premium-foreground: 210 40% 98%;
+	    --premium-muted: 214 32% 82%;
+	    --radius: 0.5rem;
+	  }
 
   .dark {
     --background: 222.2 84% 4.9%;
@@ -55,8 +58,11 @@
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
+	    --chart-5: 340 75% 55%;
+	    --premium: 222.2 84% 4.9%;
+	    --premium-foreground: 210 40% 98%;
+	    --premium-muted: 215 20.2% 65.1%;
+	  }
 }
 
 @layer base {
@@ -110,7 +116,7 @@
       );
   }
 
-  /* Brand gradient text — used on the AI Market Analyzer wordmark */
+	  /* Brand gradient text used on the kabuana wordmark */
   .brand-gradient {
     background: linear-gradient(
       90deg,

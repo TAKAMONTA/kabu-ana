@@ -3,15 +3,34 @@ import "./globals.css";
 import { VercelAnalytics } from "@/components/VercelAnalytics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { APP_DESCRIPTION, APP_NAME, APP_URL } from "@/lib/constants";
 
 export const metadata: Metadata = {
-  title: "AI Market Analyzer - 株式分析アプリ",
-  description: "AIを活用して株式情報の整理と分析補助を行うアプリケーション",
+  metadataBase: new URL(APP_URL),
+  applicationName: APP_NAME,
+  title: {
+    default: `${APP_NAME} - 株式分析アプリ`,
+    template: `%s | ${APP_NAME}`,
+  },
+  description: APP_DESCRIPTION,
   manifest: "/manifest.json",
+  openGraph: {
+    title: `${APP_NAME} - 株式分析アプリ`,
+    description: APP_DESCRIPTION,
+    url: APP_URL,
+    siteName: APP_NAME,
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: `${APP_NAME} - 株式分析アプリ`,
+    description: APP_DESCRIPTION,
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Kabuana",
+    title: APP_NAME,
   },
   icons: {
     icon: "/icon-192x192.png",
@@ -38,7 +57,7 @@ export default function RootLayout({
         <meta name="theme-color" content="#3b82f6" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Kabuana" />
+        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
         {/* ServiceWorkerは一時的に無効化
             理由: Next.jsの動的ビルド構造と互換性の問題、株式分析アプリは常に最新データが必要なため

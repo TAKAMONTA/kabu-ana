@@ -10,6 +10,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import { normalizeDisplayText } from "@/lib/displayText";
 import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
@@ -64,6 +65,7 @@ export function StockSidePanel({
   };
 
   const currencySymbol = getCurrencySymbol();
+  const companyName = normalizeDisplayText(companyInfo.name);
 
   // stockDataがnullの場合はローディング表示
   if (!stockData) {
@@ -77,7 +79,7 @@ export function StockSidePanel({
                   {companyInfo.symbol}
                 </h2>
                 <h1 className="text-2xl font-bold text-foreground line-clamp-2">
-                  {companyInfo.name}
+                  {companyName}
                 </h1>
               </div>
               <Separator className="my-3" />
@@ -111,7 +113,7 @@ export function StockSidePanel({
                 {companyInfo.symbol}
               </h2>
               <h1 className="text-2xl font-bold text-foreground line-clamp-2">
-                {companyInfo.name}
+                {companyName}
               </h1>
             </div>
 

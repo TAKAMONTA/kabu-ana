@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
+import { normalizeDisplayText } from "@/lib/displayText";
 import { Newspaper, Radio, Search } from "lucide-react";
 
 interface FrontPageMarketGridProps {
@@ -26,7 +27,7 @@ export function FrontPageMarketGrid({
       value: isLoading
         ? "確認中"
         : topIdea
-          ? `${topIdea.name} ${topIdea.code}`
+          ? `${normalizeDisplayText(topIdea.name)} ${topIdea.code}`
           : "待機中",
       sub: topIdea?.signalLabel || "ニュース銘柄を抽出",
     },

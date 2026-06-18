@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { APP_NAME } from "@/lib/constants";
 
 export default function TermsOfUsePage() {
   return (
@@ -16,7 +17,8 @@ export default function TermsOfUsePage() {
           <section>
             <h2 className="text-xl font-semibold mb-3">1. はじめに</h2>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              本利用規約（以下「本規約」）は、AI Market Analyzer（以下「本アプリ」）の利用に関する条件を定めるものです。
+              本利用規約（以下「本規約」）は、{APP_NAME}
+              （以下「本アプリ」）の利用に関する条件を定めるものです。
               本アプリを利用することにより、ユーザーは本規約に同意したものとみなされます。
             </p>
           </section>
@@ -173,7 +175,7 @@ export default function TermsOfUsePage() {
               <div className="bg-muted p-4 rounded-lg">
                 <h3 className="text-lg font-medium mb-2">連絡先情報</h3>
                 <p className="text-sm text-muted-foreground">
-                  アプリ名: AI Market Analyzer<br />
+                  アプリ名: {APP_NAME}<br />
                   連絡先: admin@takaapps.com<br />
                   対応時間: 平日 9:00-18:00（JST）
                 </p>

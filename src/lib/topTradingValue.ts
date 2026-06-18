@@ -4,6 +4,7 @@ import {
   normalizeStockText,
   type JpxStock,
 } from "./jpx/stockMaster";
+import { normalizeDisplayText } from "./displayText";
 
 export interface MarketNewsItem {
   title?: string;
@@ -47,6 +48,9 @@ interface BuildStableTopTradingOptions {
 }
 
 const DEFAULT_MAX_NEWS_AGE_DAYS = 7;
+const MIN_ATTENTION_CONFIDENCE = 0.62;
+const MAX_ATTENTION_CONFIDENCE = 0.94;
+const FLAT_ATTENTION_CONFIDENCE = 0.72;
 
 function blankMarketFields() {
   return {
@@ -66,8 +70,21 @@ function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
+function isGenericNewsSource(source: string): boolean {
+  const normalized = source.trim().toLowerCase();
+  return [
+    "google news",
+    "google検索",
+    "market news",
+    "news",
+    "ニュース",
+  ].includes(normalized);
+}
+
 function sourceLabel(item: MarketNewsItem): string {
-  return item.title || item.source || "ニュース";
+  const source = item.source?.trim();
+  if (source && !isGenericNewsSource(source)) return source;
+  return item.title || source || "ニュース";
 }
 
 function normalizeNewsTitleForIdentity(title: string): string {
@@ -141,9 +158,20 @@ function evidenceText(item: MarketNewsItem): string {
 }
 
 function compactEvidence(value: string, maxLength = 64): string {
-  const compacted = value.replace(/\s+/g, " ").trim();
+  const compacted = normalizeDisplayText(value);
   if (compacted.length <= maxLength) return compacted;
   return `${compacted.slice(0, maxLength)}...`;
+}
+
+function attentionConfidence(score: number, minScore: number, maxScore: number): number {
+  if (maxScore <= minScore) return FLAT_ATTENTION_CONFIDENCE;
+
+  const relativeScore = (score - minScore) / (maxScore - minScore);
+  const confidence =
+    MIN_ATTENTION_CONFIDENCE +
+    relativeScore * (MAX_ATTENTION_CONFIDENCE - MIN_ATTENTION_CONFIDENCE);
+
+  return Number(confidence.toFixed(2));
 }
 
 function newsTime(date: string | undefined): number | null {
@@ -319,15 +347,22 @@ export function buildStableTopTradingItems(
     .sort((a, b) => b.score - a.score);
 
   const selectedScored = selectDiverseScoredStocks(visibleScored, 5);
+  const selectedScores = selectedScored.map(entry => entry.score);
+  const minSelectedScore = Math.min(...selectedScores);
+  const maxSelectedScore = Math.max(...selectedScores);
 
   const matchedItems: TradingValueItem[] = selectedScored.map((entry, index) => {
-    const confidence = Math.min(0.95, 0.55 + entry.score / 28);
+    const confidence = attentionConfidence(
+      entry.score,
+      minSelectedScore,
+      maxSelectedScore
+    );
     const evidence = entry.evidences[0] || entry.sources[0] || "ニュース";
 
     return {
       rank: index + 1,
       code: entry.stock.code,
-      name: entry.stock.name,
+      name: normalizeDisplayText(entry.stock.name),
       reason: `${entry.signalLabel}: ${compactEvidence(evidence)}を確認。`,
       confidence,
       sources: entry.sources,

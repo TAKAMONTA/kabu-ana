@@ -55,6 +55,13 @@ export function SubscriptionStatus() {
     }
   };
 
+  const getPlanButtonClass = (plan: "monthly" | "yearly") =>
+    `flex-1 rounded-md border p-3 text-left text-sm transition-colors ${
+      selectedPlan === plan
+        ? "border-primary bg-primary/20 text-premium-foreground shadow-sm shadow-primary/20"
+        : "border-primary/20 bg-premium text-premium-muted hover:border-primary/40 hover:bg-primary/10 hover:text-premium-foreground"
+    }`;
+
   const handleDeleteAccount = async () => {
     setShowDeleteConfirm(true);
   };
@@ -265,15 +272,15 @@ export function SubscriptionStatus() {
     return (
       <>
         <DeleteConfirmDialog />
-        <Card className="border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950">
+        <Card className="border-primary/30 bg-premium text-premium-foreground">
           <CardHeader>
-            <CardTitle className="text-orange-800 dark:text-orange-200">
+            <CardTitle className="text-premium-foreground">
               有効期限切れ
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <p className="text-sm text-orange-700 dark:text-orange-300">
+              <p className="text-sm text-premium-muted">
                 プレミアム機能の有効期限が切れています
               </p>
               {subscription?.expiryDate && (
@@ -290,7 +297,11 @@ export function SubscriptionStatus() {
                     variant={selectedPlan === "monthly" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedPlan("monthly")}
-                    className="flex-1"
+                    className={
+                      selectedPlan === "monthly"
+                        ? "flex-1 border-primary bg-primary text-primary-foreground"
+                        : "flex-1 border-primary/30 bg-premium text-premium-muted hover:bg-primary/10"
+                    }
                   >
                     月額プランを更新
                   </Button>
@@ -298,7 +309,11 @@ export function SubscriptionStatus() {
                     variant={selectedPlan === "yearly" ? "default" : "outline"}
                     size="sm"
                     onClick={() => setSelectedPlan("yearly")}
-                    className="flex-1"
+                    className={
+                      selectedPlan === "yearly"
+                        ? "flex-1 border-primary bg-primary text-primary-foreground"
+                        : "flex-1 border-primary/30 bg-premium text-premium-muted hover:bg-primary/10"
+                    }
                   >
                     年額プランを更新
                   </Button>
@@ -308,7 +323,7 @@ export function SubscriptionStatus() {
                   size="sm"
                   onClick={handlePurchase}
                   disabled={currentlyPurchasing}
-                  className="w-full"
+                  className="w-full shadow-md shadow-primary/20"
                 >
                   {currentlyPurchasing ? "処理中..." : "再購入する"}
                 </Button>
@@ -318,7 +333,7 @@ export function SubscriptionStatus() {
                     size="sm"
                     onClick={restorePurchases}
                     disabled={currentlyPurchasing}
-                    className="w-full"
+                    className="w-full text-premium-muted hover:bg-primary/10 hover:text-premium-foreground"
                   >
                     購入を復元
                   </Button>
@@ -341,27 +356,28 @@ export function SubscriptionStatus() {
   return (
     <>
       <DeleteConfirmDialog />
-      <Card>
+      <Card className="border-primary/30 bg-premium text-premium-foreground shadow-md shadow-primary/10">
         <CardHeader>
-          <CardTitle>プレミアム機能</CardTitle>
+          <CardTitle className="text-premium-foreground">
+            プレミアム機能
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-premium-muted">
               プレミアム機能をご利用いただくには、購入が必要です
             </p>
 
             {/* 機能一覧 */}
-            <ul className="text-xs text-muted-foreground space-y-1">
-              <li>✨ 無制限のAI株式分析</li>
-              <li>✨ 詳細な財務評価レポート</li>
-              <li>✨ リアルタイムニュース分析</li>
-              <li>✨ 広告なしの快適な利用体験</li>
+            <ul className="list-disc space-y-1 pl-4 text-xs text-premium-muted">
+              <li>無制限のAI株式分析</li>
+              <li>詳細な財務評価レポート</li>
+              <li>リアルタイムニュース分析</li>
+              <li>広告なしの快適な利用体験</li>
             </ul>
 
-            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-950 dark:border-blue-800">
-              <p className="text-xs text-blue-700 dark:text-blue-200">
-                💡
+            <div className="rounded-md border border-primary/25 bg-primary/10 p-3">
+              <p className="text-xs text-premium-foreground">
                 無料プランではAI機能を1日5回までご利用いただけます。プレミアムプランで無制限に！
               </p>
             </div>
@@ -372,37 +388,29 @@ export function SubscriptionStatus() {
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("monthly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${
-                    selectedPlan === "monthly"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-background hover:bg-muted"
-                  }`}
+                  className={getPlanButtonClass("monthly")}
                 >
                   <div className="font-semibold text-xs">
                     プレミアム月額プラン
                   </div>
                   <div className="mt-1 text-lg font-bold">¥700</div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-[10px] text-premium-muted">
                     1ヶ月ごとに自動更新
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedPlan("yearly")}
-                  className={`flex-1 rounded-md border p-3 text-sm transition-colors text-left ${
-                    selectedPlan === "yearly"
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-background hover:bg-muted"
-                  }`}
+                  className={getPlanButtonClass("yearly")}
                 >
                   <div className="font-semibold text-xs">
                     プレミアム年額プラン
                   </div>
                   <div className="mt-1 text-lg font-bold">¥7,000</div>
-                  <div className="text-[10px] text-muted-foreground">
+                  <div className="text-[10px] text-premium-muted">
                     1年ごとに自動更新
                   </div>
-                  <div className="mt-1 text-[10px] font-semibold text-green-600 dark:text-green-400">
+                  <div className="mt-1 text-[10px] font-semibold text-primary">
                     約¥583/月（17%お得）
                   </div>
                 </button>
@@ -414,7 +422,7 @@ export function SubscriptionStatus() {
                   size="sm"
                   onClick={handlePurchase}
                   disabled={currentlyPurchasing}
-                  className="w-full py-6 text-base font-bold shadow-md"
+                  className="w-full py-6 text-base font-bold shadow-md shadow-primary/25"
                 >
                   {currentlyPurchasing
                     ? "処理中..."
@@ -426,7 +434,7 @@ export function SubscriptionStatus() {
                     size="sm"
                     onClick={restorePurchases}
                     disabled={currentlyPurchasing}
-                    className="w-full mt-2 text-xs text-muted-foreground"
+                    className="mt-2 w-full text-xs text-premium-muted hover:bg-primary/10 hover:text-premium-foreground"
                   >
                     購入を復元
                   </Button>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -24,6 +23,7 @@ import { AskSection } from "@/components/AskSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
+import { SponsoredAds } from "@/components/SponsoredAds";
 import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LivePulseStrip } from "@/components/LivePulseStrip";
@@ -31,6 +31,7 @@ import { MarketFrontPage } from "@/components/frontpage/MarketFrontPage";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { isNative } from "@/lib/utils/platformDetect";
 import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
+import { APP_NAME } from "@/lib/constants";
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -418,10 +419,10 @@ export default function HomePage() {
               <div className="relative">
                 <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
               </div>
-              <div className="leading-tight">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  <span className="brand-gradient">AI Market Analyzer</span>
-                </h1>
+	              <div className="leading-tight">
+	                <h1 className="text-2xl font-bold tracking-tight">
+	                  <span className="brand-gradient">{APP_NAME}</span>
+	                </h1>
                 <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">
                   AIで株式分析と市場シグナルを 30 秒で
                 </p>
@@ -648,74 +649,8 @@ export default function HomePage() {
           </div>
         )}
 
-        {/* フッター広告セクション（フリーユーザーのみ表示） */}
-        {showSponsoredAds && (
-          <aside
-            aria-label="スポンサー広告"
-            className="mt-12 bg-gradient-to-r from-orange-50 to-orange-100 rounded-lg border-2 border-orange-300 p-6 dark:from-orange-950 dark:to-orange-900 dark:border-orange-800"
-          >
-            <div className="text-center">
-              <p className="text-sm text-orange-600 font-semibold mb-3 dark:text-orange-300">
-                スポンサー
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 広告1 */}
-                <div>
-                  <a
-                    href="https://px.a8.net/svt/ejp?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                    rel="nofollow sponsored noopener"
-                    target="_blank"
-                  >
-                    <Image
-                      width={250}
-                      height={250}
-                      alt="スポンサー広告 1"
-                      src="https://www24.a8.net/svt/bgt?aid=251002871313&wid=001&eno=01&mid=s00000008903001083000&mc=1"
-                      style={{ border: "0" }}
-                      unoptimized
-                    />
-                  </a>
-                  <Image
-                    width={1}
-                    height={1}
-                    src="https://www17.a8.net/0.gif?a8mat=45FV1Z+56CP4I+1WP2+6G4HD"
-                    alt=""
-                    aria-hidden="true"
-                    style={{ border: "0" }}
-                    unoptimized
-                  />
-                </div>
-
-                {/* 広告2 */}
-                <div>
-                  <a
-                    href="https://px.a8.net/svt/ejp?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                    rel="nofollow sponsored noopener"
-                    target="_blank"
-                  >
-                    <Image
-                      width={300}
-                      height={250}
-                      alt="スポンサー広告 2"
-                      src="https://www25.a8.net/svt/bgt?aid=251029056683&wid=001&eno=01&mid=s00000016652002006000&mc=1"
-                      style={{ border: "0" }}
-                      unoptimized
-                    />
-                  </a>
-                  <Image
-                    width={1}
-                    height={1}
-                    src="https://www10.a8.net/0.gif?a8mat=45GF9C+BAN2YA+3KHK+BXYE9"
-                    alt=""
-                    aria-hidden="true"
-                    style={{ border: "0" }}
-                    unoptimized
-                  />
-                </div>
-              </div>
-            </div>
-          </aside>
-        )}
+	        {/* フッター広告セクション（フリーユーザーのみ表示） */}
+	        {showSponsoredAds && <SponsoredAds />}
       </main>
 
       {/* フッター */}
@@ -736,10 +671,10 @@ export default function HomePage() {
               >
                 プライバシーポリシー
               </Link>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              © 2026 AI Market Analyzer. All rights reserved.
-            </p>
+	            </div>
+	            <p className="text-[10px] text-muted-foreground">
+	              © 2026 {APP_NAME}. All rights reserved.
+	            </p>
           </div>
         </div>
       </footer>

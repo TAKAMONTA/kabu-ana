@@ -1,4 +1,5 @@
 import axios from "axios";
+import { APP_NAME, APP_URL } from "../constants";
 import { STRUCTURED_JSON_SENTINEL } from "./analysisStream";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -241,8 +242,8 @@ export class OpenRouterClient {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://kabu-ana.com",
-            "X-Title": "AI Market Analyzer",
+            "HTTP-Referer": APP_URL,
+            "X-Title": APP_NAME,
           },
           timeout: 30000,
         }
@@ -372,8 +373,8 @@ export class OpenRouterClient {
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://kabu-ana.com",
-            "X-Title": "AI Market Analyzer",
+            "HTTP-Referer": APP_URL,
+            "X-Title": APP_NAME,
           },
           timeout: 30000,
         }
@@ -469,8 +470,8 @@ ${newsText}
           headers: {
             Authorization: `Bearer ${this.apiKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://kabu-ana.com",
-            "X-Title": "AI Market Analyzer",
+            "HTTP-Referer": APP_URL,
+            "X-Title": APP_NAME,
           },
           timeout: 30000,
         }
@@ -531,8 +532,8 @@ ${newsText}
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://kabu-ana.com",
-        "X-Title": "AI Market Analyzer",
+        "HTTP-Referer": APP_URL,
+        "X-Title": APP_NAME,
       },
       body: JSON.stringify({
         model: "anthropic/claude-sonnet-4-5",

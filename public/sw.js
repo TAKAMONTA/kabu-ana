@@ -1,4 +1,4 @@
-// Service Worker for AI Market Analyzer PWA
+// Service Worker for kabuana PWA
 const CACHE_NAME = 'kabuana-v1.0.0';
 const urlsToCache = [
   '/',
