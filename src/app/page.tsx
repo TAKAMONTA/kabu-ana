@@ -475,6 +475,7 @@ export default function HomePage() {
             stockIdeasSlot={stockIdeasSection}
             sampleSlot={sampleStockSlot}
             topIdea={tradingRanking[0]}
+            stockIdeas={tradingRanking}
             isStockIdeasLoading={isRankingLoading}
             warning={rankingWarning}
             remainingUses={remainingUses}

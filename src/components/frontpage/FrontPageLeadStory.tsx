@@ -10,6 +10,7 @@ interface FrontPageLeadStoryProps {
   idea?: TradingValueItem;
   isLoading: boolean;
   warning?: string | null;
+  showAttentionScore?: boolean;
   onSelectIdea: (item: TradingValueItem) => void;
 }
 
@@ -28,6 +29,7 @@ export function FrontPageLeadStory({
   idea,
   isLoading,
   warning,
+  showAttentionScore = true,
   onSelectIdea,
 }: FrontPageLeadStoryProps) {
   const ideaName = idea ? normalizeDisplayText(idea.name) : "";
@@ -98,7 +100,9 @@ export function FrontPageLeadStory({
             idea.confidence
           )}`}
         >
-          {formatAttentionScore(idea.confidence)}
+          {showAttentionScore
+            ? formatAttentionScore(idea.confidence)
+            : "注目"}
         </span>
       </div>
     </article>

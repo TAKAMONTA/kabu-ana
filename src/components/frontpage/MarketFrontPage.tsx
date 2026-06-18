@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
+import { shouldShowAttentionScore } from "@/lib/attentionScore";
 import { APP_NAME } from "@/lib/constants";
 import { FrontPageLeadStory } from "./FrontPageLeadStory";
 import { FrontPageMarketGrid } from "./FrontPageMarketGrid";
@@ -12,6 +13,7 @@ interface MarketFrontPageProps {
   stockIdeasSlot: ReactNode;
   sampleSlot?: ReactNode;
   topIdea?: TradingValueItem;
+  stockIdeas?: TradingValueItem[];
   isStockIdeasLoading: boolean;
   warning?: string | null;
   remainingUses: number;
@@ -36,6 +38,7 @@ export function MarketFrontPage({
   stockIdeasSlot,
   sampleSlot,
   topIdea,
+  stockIdeas = [],
   isStockIdeasLoading,
   warning,
   remainingUses,
@@ -44,6 +47,9 @@ export function MarketFrontPage({
   onSelectIdea,
 }: MarketFrontPageProps) {
   const marketDate = formatMarketDate();
+  const showAttentionScore = shouldShowAttentionScore(
+    stockIdeas.map(item => item.confidence)
+  );
 
   return (
     <div className="space-y-6">
@@ -66,6 +72,7 @@ export function MarketFrontPage({
               idea={topIdea}
               isLoading={isStockIdeasLoading}
               warning={warning}
+              showAttentionScore={showAttentionScore}
               onSelectIdea={onSelectIdea}
             />
 
