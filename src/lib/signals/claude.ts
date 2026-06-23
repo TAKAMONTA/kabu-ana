@@ -35,9 +35,17 @@ const morningBriefStockParsed = morningBriefStockRaw.transform(
   }
 );
 
+/** 長すぎる出力で検証エラーにならないよう、上限を超えたら切り詰める。 */
+const clampText = (max: number) =>
+  z
+    .string()
+    .transform(value =>
+      value.length > max ? value.slice(0, max).trimEnd() : value
+    );
+
 export const claudeMorningBriefSchema = z.object({
-  headline_jp: z.string().max(15),
-  summary_jp: z.string().max(120),
+  headline_jp: clampText(15),
+  summary_jp: clampText(120),
   key_drivers: z
     .array(z.object({ factor: z.string(), impact: z.string() }))
     .default([]),
