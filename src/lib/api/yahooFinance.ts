@@ -136,8 +136,42 @@ export class YahooFinanceClient implements MarketDataClient {
     }
   }
 
-  async getFinancialData(_symbol: string): Promise<FinancialData | null> {
-    return null;
+  async getFinancialData(symbol: string): Promise<FinancialData | null> {
+    try {
+      const ys = toYahooSymbol(symbol);
+      const summary = await yahooFinance.quoteSummary(ys, {
+        modules: [
+          "incomeStatementHistory",
+          "balanceSheetHistory",
+          "defaultKeyStatistics",
+        ],
+      });
+      const income =
+        summary?.incomeStatementHistory?.incomeStatementHistory?.[0];
+      if (!income) return null;
+      const balance =
+        summary?.balanceSheetHistory?.balanceSheetStatements?.[0];
+      const eps = summary?.defaultKeyStatistics?.trailingEps;
+      const year = income.endDate
+        ? new Date(income.endDate as Date).getFullYear()
+        : "";
+      return {
+        revenue: toStr(income.totalRevenue),
+        netIncome: toStr(income.netIncome),
+        operatingIncome: toStr(income.operatingIncome),
+        totalAssets: toStr(balance?.totalAssets),
+        totalLiabilities: toStr(balance?.totalLiab),
+        cash: toStr(balance?.cash),
+        eps: toStr(eps),
+        period: `${year} (FY)`,
+      };
+    } catch (error) {
+      console.error(
+        "Yahoo 財務取得エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
   }
 }
 

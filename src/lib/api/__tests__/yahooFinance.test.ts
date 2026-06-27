@@ -102,4 +102,59 @@ describe("YahooFinanceClient", () => {
     const client = new YahooFinanceClient();
     expect(await client.getChartData("7203", "1M")).toEqual([]);
   });
+
+  it("maps quoteSummary into FinancialData", async () => {
+    vi.mocked(yahooFinance.quoteSummary).mockResolvedValue({
+      incomeStatementHistory: {
+        incomeStatementHistory: [
+          {
+            endDate: new Date("2026-03-31T00:00:00Z"),
+            totalRevenue: 45_000_000_000_000,
+            netIncome: 4_000_000_000_000,
+            operatingIncome: 5_000_000_000_000,
+          },
+        ],
+      },
+      balanceSheetHistory: {
+        balanceSheetStatements: [
+          {
+            totalAssets: 90_000_000_000_000,
+            totalLiab: 50_000_000_000_000,
+            cash: 10_000_000_000_000,
+          },
+        ],
+      },
+      defaultKeyStatistics: { trailingEps: 285 },
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const fin = await client.getFinancialData("7203");
+
+    expect(vi.mocked(yahooFinance.quoteSummary)).toHaveBeenCalledWith(
+      "7203.T",
+      expect.objectContaining({
+        modules: expect.arrayContaining([
+          "incomeStatementHistory",
+          "balanceSheetHistory",
+          "defaultKeyStatistics",
+        ]),
+      })
+    );
+    expect(fin).toMatchObject({
+      revenue: "45000000000000",
+      netIncome: "4000000000000",
+      operatingIncome: "5000000000000",
+      totalAssets: "90000000000000",
+      totalLiabilities: "50000000000000",
+      cash: "10000000000000",
+      eps: "285",
+    });
+    expect(fin?.period).toContain("2026");
+  });
+
+  it("returns null when income statement is missing", async () => {
+    vi.mocked(yahooFinance.quoteSummary).mockResolvedValue({} as never);
+    const client = new YahooFinanceClient();
+    expect(await client.getFinancialData("7203")).toBeNull();
+  });
 });
