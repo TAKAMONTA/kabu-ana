@@ -31,9 +31,10 @@ export class TwelveDataClient implements MarketDataClient {
 
   private async get(path: string): Promise<any> {
     const sep = path.includes("?") ? "&" : "?";
-    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`);
+    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`).catch(() => null);
+    if (!res) return null;
     const body = await res.json().catch(() => ({}));
-    if (body && (body.status === "error" || body.code >= 400)) return null;
+    if (body && (body.status === "error" || Number(body.code) >= 400)) return null;
     return body;
   }
 
