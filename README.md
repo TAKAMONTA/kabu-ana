@@ -1,6 +1,6 @@
 # 🚀 AI Market Analyzer (kabu-ana)
 
-株式分析をAIで支援するNext.jsアプリケーションです。SERPAPIとOpenRouterを統合し、株価データ、ニュース、財務情報を参考情報として整理します。
+株式分析をAIで支援するNext.jsアプリケーションです。J-Quants（日本株）、Twelve Data（米国株）、OpenRouterを統合し、株価データ、ニュース、財務情報を参考情報として整理します。
 
 ## ✨ 主な機能
 
@@ -17,7 +17,7 @@
 - **スタイリング**: Tailwind CSS, Radix UI
 - **バックエンド**: NestJS (準備中)
 - **認証**: Firebase Authentication
-- **データ取得**: SERPAPI (Google Finance)
+- **データ取得**: J-Quants（日本株）, Twelve Data（米国株）
 - **AI分析**: OpenRouter (Claude 3.5 Sonnet)
 - **デプロイ**: Vercel
 
@@ -41,8 +41,13 @@ npm install
 `.env.local`ファイルを作成し、以下の環境変数を設定してください：
 
 ```env
-# SERPAPI Configuration
-SERPAPI_API_KEY=your_serpapi_key_here
+# Market Data Configuration
+JQUANTS_EMAIL=your_jquants_email_here
+JQUANTS_PASSWORD=your_jquants_password_here
+TWELVE_DATA_API_KEY=your_twelve_data_key_here
+# Legacy SerpAPI is disabled unless explicitly enabled.
+# ENABLE_LEGACY_SERPAPI=true
+# SERPAPI_API_KEY=your_serpapi_key_here
 
 # OpenRouter Configuration
 OPENROUTER_API_KEY=your_openrouter_key_here
@@ -66,10 +71,13 @@ npm run dev
 
 ## 📋 必要なAPIキー
 
-### SERPAPI
-1. [SERPAPI](https://serpapi.com/)でアカウントを作成
-2. APIキーを取得
-3. `.env.local`に設定
+### J-Quants / Twelve Data
+1. [J-Quants](https://jpx-jquants.com/)でアカウントを作成し、メールアドレスとパスワードを取得
+2. [Twelve Data](https://twelvedata.com/)でAPIキーを取得
+3. `.env.local`に `JQUANTS_EMAIL`, `JQUANTS_PASSWORD`, `TWELVE_DATA_API_KEY` を設定
+
+### SerpAPI（レガシー）
+通常は使用しません。検証目的で旧SerpAPI経路を使う場合のみ、`ENABLE_LEGACY_SERPAPI=true` と `SERPAPI_API_KEY` を設定してください。
 
 ### OpenRouter
 1. [OpenRouter](https://openrouter.ai/)でアカウントを作成
@@ -95,7 +103,9 @@ npm run dev
 
 Vercelダッシュボードで以下の環境変数を設定してください：
 
-- `SERPAPI_API_KEY`
+- `JQUANTS_EMAIL`
+- `JQUANTS_PASSWORD`
+- `TWELVE_DATA_API_KEY`
 - `OPENROUTER_API_KEY`
 - `NEXT_PUBLIC_FIREBASE_API_KEY`
 - `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`

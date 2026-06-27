@@ -33,11 +33,56 @@ function successfulSearchPayload() {
       symbol: "7203",
       market: "TYO",
     },
+    stockData: {
+      symbol: "7203",
+      price: 3000,
+      change: 25,
+      changePercent: 0.84,
+      volume: 1000000,
+      marketCap: "N/A",
+      pe: 0,
+      eps: 0,
+      dividend: 0,
+      high52: 3500,
+      low52: 2500,
+    },
     edinetCode: "E02144",
     accountingStandard: "USGAAP",
     ratios: { roe: 0.101, operatingMargin: 0.096 },
     financialHistory: [{ fiscalYear: 2026, revenue: 50684952000000 }],
+    metadata: { dataSource: "jpx_local" },
   };
+}
+
+function successfulAppleSearchPayload() {
+  return {
+    companyInfo: {
+      name: "Apple Inc",
+      symbol: "AAPL",
+      market: "NMS",
+    },
+    stockData: {
+      symbol: "AAPL",
+      price: 220,
+      change: 1.5,
+      changePercent: 0.69,
+      volume: 50000000,
+      marketCap: "N/A",
+      pe: 0,
+      eps: 0,
+      dividend: 0,
+      high52: 260,
+      low52: 160,
+    },
+    metadata: { dataSource: "market_fast" },
+  };
+}
+
+function searchPayloadForQuery(init) {
+  const query = JSON.parse(init.body).query;
+  return query === "AAPL"
+    ? successfulAppleSearchPayload()
+    : successfulSearchPayload();
 }
 
 describe("production smoke check", () => {
@@ -45,8 +90,7 @@ describe("production smoke check", () => {
     const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {
         expect(init.method).toBe("POST");
-        expect(JSON.parse(init.body)).toEqual({ query: "7203" });
-        return jsonResponse(successfulSearchPayload());
+        return jsonResponse(searchPayloadForQuery(init));
       }
       if (String(url).endsWith("/api/signals/claude-brief")) {
         return jsonResponse(successfulBriefPayload());
@@ -66,14 +110,18 @@ describe("production smoke check", () => {
     expect(result.failed).toEqual([]);
     expect(result.passed.map((check) => check.name)).toEqual([
       "search-edinet-7203",
+      "market-data-route-7203",
+      "market-data-route-aapl",
       "morning-brief",
     ]);
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(fetchImpl).toHaveBeenCalledTimes(4);
   });
 
   it("fails when Toyota search does not include EDINET enrichment", async () => {
-    const fetchImpl = vi.fn(async (url) => {
+    const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {
+        const query = JSON.parse(init.body).query;
+        if (query === "AAPL") return jsonResponse(successfulAppleSearchPayload());
         return jsonResponse({
           companyInfo: { name: "トヨタ自動車", symbol: "7203", market: "TYO" },
         });
@@ -89,18 +137,24 @@ describe("production smoke check", () => {
     });
 
     expect(result.ok).toBe(false);
-    expect(result.failed).toEqual([
-      expect.objectContaining({
-        name: "search-edinet-7203",
-        message: expect.stringContaining("edinetCode"),
-      }),
-    ]);
+    expect(result.failed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "search-edinet-7203",
+          message: expect.stringContaining("edinetCode"),
+        }),
+        expect.objectContaining({
+          name: "market-data-route-7203",
+          message: expect.stringContaining("stockData.price"),
+        }),
+      ])
+    );
   });
 
   it("fails when the morning brief is an error payload or has no usable content", async () => {
-    const fetchImpl = vi.fn(async (url) => {
+    const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {
-        return jsonResponse(successfulSearchPayload());
+        return jsonResponse(searchPayloadForQuery(init));
       }
       return jsonResponse({
         error: "朝ブリーフ生成に必要な市場シグナルが未取得です",
@@ -124,9 +178,9 @@ describe("production smoke check", () => {
   });
 
   it("fails when the morning brief cache is older than the accepted age", async () => {
-    const fetchImpl = vi.fn(async (url) => {
+    const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {
-        return jsonResponse(successfulSearchPayload());
+        return jsonResponse(searchPayloadForQuery(init));
       }
       return jsonResponse(successfulBriefPayload());
     });

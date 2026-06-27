@@ -11,7 +11,11 @@ import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { normalizeDisplayText } from "@/lib/displayText";
-import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
+import {
+  formatNumber,
+  formatPercentage,
+  formatMarketCap,
+} from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
   name: string;
@@ -97,9 +101,13 @@ export function StockSidePanel({
 
   // 52週レンジが有効な場合のみプログレスバーを表示
   const show52WeekRange =
-    stockData.high52 > 0 && stockData.low52 > 0 && stockData.high52 > stockData.low52;
+    stockData.high52 > 0 &&
+    stockData.low52 > 0 &&
+    stockData.high52 > stockData.low52;
   const range52WeekPercent = show52WeekRange
-    ? ((stockData.price - stockData.low52) / (stockData.high52 - stockData.low52)) * 100
+    ? ((stockData.price - stockData.low52) /
+        (stockData.high52 - stockData.low52)) *
+      100
     : 0;
 
   return (
@@ -145,8 +153,8 @@ export function StockSidePanel({
                   >
                     {isUp ? "+" : ""}
                     {currencySymbol}
-                    {stockData.change.toFixed(2)} ({
-                    stockData.changePercent.toFixed(2)}%)
+                    {stockData.change.toFixed(2)} (
+                    {stockData.changePercent.toFixed(2)}%)
                   </span>
                 </div>
               </div>
@@ -163,7 +171,9 @@ export function StockSidePanel({
         <CardContent className="space-y-3">
           <StatsCard
             label="時価総額"
-            value={formatMarketCap(stockData.marketCap)}
+            value={formatMarketCap(stockData.marketCap, {
+              currency: currencySymbol,
+            })}
             highlight
           />
           <StatsCard
@@ -180,7 +190,13 @@ export function StockSidePanel({
           <StatsCard
             label="配当利回り"
             value={formatPercentage(stockData.dividend)}
-            trend={stockData.dividend >= 2 ? "up" : stockData.dividend > 0 ? "neutral" : undefined}
+            trend={
+              stockData.dividend >= 2
+                ? "up"
+                : stockData.dividend > 0
+                  ? "neutral"
+                  : undefined
+            }
           />
           <StatsCard
             label="出来高"
@@ -193,7 +209,6 @@ export function StockSidePanel({
           />
         </CardContent>
       </Card>
-
 
       {/* 財務データ */}
       {financialData && (
@@ -208,33 +223,44 @@ export function StockSidePanel({
           </CardHeader>
           <CardContent className="space-y-2">
             {financialData.revenue && (
-              <StatsCard 
-                label="売上高" 
-                value={formatNumber(financialData.revenue, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="売上高"
+                value={formatNumber(financialData.revenue, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.netIncome && (
-              <StatsCard 
-                label="純利益" 
-                value={formatNumber(financialData.netIncome, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="純利益"
+                value={formatNumber(financialData.netIncome, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.cash && (
               <StatsCard
                 label="現金・短期投資"
-                value={formatNumber(financialData.cash, { currency: currencySymbol, compact: true })}
+                value={formatNumber(financialData.cash, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.eps && (
               <StatsCard
                 label="EPS"
-                value={formatNumber(financialData.eps, { currency: currencySymbol, decimals: 2 })}
+                value={formatNumber(financialData.eps, {
+                  currency: currencySymbol,
+                  decimals: 2,
+                })}
               />
             )}
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

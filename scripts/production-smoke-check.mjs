@@ -82,7 +82,9 @@ function validateToyotaEdinetSearch(payload) {
 
   if (payload?.error) errors.push(`error=${payload.error}`);
   if (companyInfo.symbol !== "7203") {
-    errors.push(`companyInfo.symbol expected 7203 but got ${companyInfo.symbol}`);
+    errors.push(
+      `companyInfo.symbol expected 7203 but got ${companyInfo.symbol}`
+    );
   }
   if (!hasText(payload?.edinetCode)) errors.push("edinetCode is missing");
   if (!hasText(payload?.accountingStandard)) {
@@ -100,6 +102,59 @@ function validateToyotaEdinetSearch(payload) {
   }
 }
 
+function validateMarketDataRoute(payload, { symbol, expectedMarket }) {
+  const errors = [];
+  const expectedMarkets = Array.isArray(expectedMarket)
+    ? expectedMarket
+    : [expectedMarket];
+  const companyInfo = isRecord(payload?.companyInfo) ? payload.companyInfo : {};
+  const stockData = isRecord(payload?.stockData) ? payload.stockData : {};
+  const metadata = isRecord(payload?.metadata) ? payload.metadata : {};
+
+  const price = Number(stockData.price);
+  const changePercent = Number(stockData.changePercent);
+  const high52 = Number(stockData.high52);
+  const low52 = Number(stockData.low52);
+  const dataSource = String(metadata.dataSource ?? "");
+
+  if (payload?.error) errors.push(`error=${payload.error}`);
+  if (companyInfo.symbol !== symbol) {
+    errors.push(
+      `companyInfo.symbol expected ${symbol} but got ${companyInfo.symbol}`
+    );
+  }
+  if (!expectedMarkets.includes(companyInfo.market)) {
+    errors.push(
+      `companyInfo.market expected one of ${expectedMarkets.join(", ")} but got ${companyInfo.market}`
+    );
+  }
+  if (!Number.isFinite(price) || price <= 0)
+    errors.push("stockData.price is not positive");
+  if (!Number.isFinite(changePercent) || Math.abs(changePercent) > 50) {
+    errors.push(
+      `stockData.changePercent is implausible: ${stockData.changePercent}`
+    );
+  }
+  if (!Number.isFinite(high52) || high52 <= 0)
+    errors.push("stockData.high52 is missing");
+  if (!Number.isFinite(low52) || low52 <= 0)
+    errors.push("stockData.low52 is missing");
+  if (Number.isFinite(high52) && Number.isFinite(low52) && high52 <= low52) {
+    errors.push(`52w range is invalid: low=${low52}, high=${high52}`);
+  }
+  if (/serp/i.test(dataSource)) {
+    errors.push(
+      `metadata.dataSource still points to legacy serp path: ${dataSource}`
+    );
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Market data route unhealthy for ${symbol}: ${errors.join("; ")}`
+    );
+  }
+}
+
 function validateMorningBrief(payload, { now, briefMaxAgeHours }) {
   const brief = payload?.data?.brief;
   const generatedAt = payload?.data?.generatedAt ?? payload?.lastSuccessfulAt;
@@ -109,7 +164,8 @@ function validateMorningBrief(payload, { now, briefMaxAgeHours }) {
   if (!isRecord(brief)) errors.push("brief is missing");
 
   if (isRecord(brief)) {
-    if (!hasText(brief.headline_jp)) errors.push("brief.headline_jp is missing");
+    if (!hasText(brief.headline_jp))
+      errors.push("brief.headline_jp is missing");
     if (!hasText(brief.summary_jp)) errors.push("brief.summary_jp is missing");
     if (!Array.isArray(brief.key_drivers) || brief.key_drivers.length === 0) {
       errors.push("brief.key_drivers is empty");
@@ -172,6 +228,36 @@ export function createProductionSmokeChecks(options = {}) {
           body: JSON.stringify({ query: "7203" }),
         });
         validateToyotaEdinetSearch(payload);
+      },
+    },
+    {
+      name: "market-data-route-7203",
+      label: "Toyota market data uses current router-quality fields",
+      async run() {
+        const payload = await requestJson("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "7203" }),
+        });
+        validateMarketDataRoute(payload, {
+          symbol: "7203",
+          expectedMarket: "TYO",
+        });
+      },
+    },
+    {
+      name: "market-data-route-aapl",
+      label: "Apple market data uses current router-quality fields",
+      async run() {
+        const payload = await requestJson("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "AAPL" }),
+        });
+        validateMarketDataRoute(payload, {
+          symbol: "AAPL",
+          expectedMarket: ["NASDAQ", "NMS", "NasdaqGS", "US"],
+        });
       },
     },
     {
@@ -295,8 +381,11 @@ async function main() {
   process.exitCode = result.ok ? 0 : 1;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch((error) => {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  main().catch(error => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
   });

@@ -97,6 +97,17 @@ describe("SerpApiClient", () => {
     expect(get).toHaveBeenCalledTimes(1);
   });
 
+  it("normalizes changePercent as a percent value without multiplying upstream percentages twice", async () => {
+    const get = vi.mocked(axios.get);
+    get.mockResolvedValue(googleFinanceResponse);
+
+    const client = new SerpApiClient("serp-key");
+    const stockData = await client.getStockData("7203");
+
+    expect(stockData?.changePercent).toBeCloseTo((10 / 2990) * 100, 5);
+    expect(stockData?.changePercent).toBeLessThan(1);
+  });
+
   it("returns a fast partial search result when detailed Google Finance data is slow", async () => {
     const get = vi.mocked(axios.get);
     get.mockImplementation((_url, config: any) => {

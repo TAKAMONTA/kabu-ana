@@ -4,7 +4,7 @@ import {
   StockData,
   ChartDataPoint,
   FinancialData,
-} from "@/lib/api/serpapi";
+} from "@/lib/api/marketDataTypes";
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 

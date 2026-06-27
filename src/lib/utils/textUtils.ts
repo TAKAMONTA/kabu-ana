@@ -35,18 +35,21 @@ export function normalizeQuery(query: string): string {
 /**
  * 数値を読みやすい形式にフォーマットする
  */
-export function formatNumber(value: number | string | null | undefined, options?: {
-  currency?: string;
-  decimals?: number;
-  compact?: boolean;
-}): string {
+export function formatNumber(
+  value: number | string | null | undefined,
+  options?: {
+    currency?: string;
+    decimals?: number;
+    compact?: boolean;
+  }
+): string {
   if (value === null || value === undefined || value === "") return "N/A";
-  
+
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return "N/A";
-  
+
   const { currency = "", decimals = 2, compact = true } = options || {};
-  
+
   if (compact && Math.abs(num) >= 1e12) {
     return `${currency}${(num / 1e12).toFixed(1)}T`;
   } else if (compact && Math.abs(num) >= 1e9) {
@@ -56,9 +59,9 @@ export function formatNumber(value: number | string | null | undefined, options?
   } else if (compact && Math.abs(num) >= 1e3) {
     return `${currency}${(num / 1e3).toFixed(1)}K`;
   } else {
-    return `${currency}${num.toLocaleString('ja-JP', { 
+    return `${currency}${num.toLocaleString("ja-JP", {
       minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals 
+      maximumFractionDigits: decimals,
     })}`;
   }
 }
@@ -66,31 +69,85 @@ export function formatNumber(value: number | string | null | undefined, options?
 /**
  * パーセンテージをフォーマットする
  */
-export function formatPercentage(value: number | string | null | undefined): string {
+export function formatPercentage(
+  value: number | string | null | undefined
+): string {
   if (value === null || value === undefined || value === "") return "N/A";
-  
+
   const num = typeof value === "string" ? parseFloat(value) : value;
   if (isNaN(num)) return "N/A";
-  
+
   return `${num.toFixed(2)}%`;
 }
 
 /**
  * 時価総額をフォーマットする
  */
-export function formatMarketCap(value: number | string | null | undefined): string {
+export function formatMarketCap(
+  value: number | string | null | undefined,
+  options?: { currency?: string }
+): string {
   if (value === null || value === undefined || value === "") return "N/A";
-  
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return "N/A";
-  
-  if (Math.abs(num) >= 1e12) {
-    return `¥${(num / 1e12).toFixed(1)}T`;
-  } else if (Math.abs(num) >= 1e9) {
-    return `¥${(num / 1e9).toFixed(1)}B`;
-  } else if (Math.abs(num) >= 1e6) {
-    return `¥${(num / 1e6).toFixed(1)}M`;
-  } else {
-    return `¥${num.toLocaleString('ja-JP')}`;
+
+  const { currency = "¥" } = options || {};
+
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "N/A";
+    return formatMarketCapNumber(value, currency);
   }
+
+  const normalized = toHalfWidth(String(value)).trim();
+  if (!normalized || /^N\/A$/i.test(normalized)) return "N/A";
+
+  const detectedCurrency = normalized.match(/^[¥$]/)?.[0] || currency;
+  const withoutCurrency = normalized
+    .replace(/^[¥$]/, "")
+    .replace(/円/g, "")
+    .trim();
+
+  // 日本語単位（兆・億・万）はそのまま桁を保って表示する
+  const jpMatch = withoutCurrency.match(/^([+-]?[\d,.]+)\s*(兆|億|万)$/);
+  if (jpMatch) {
+    const amount = parseFloat(jpMatch[1].replace(/,/g, ""));
+    if (!Number.isFinite(amount)) return "N/A";
+    return `${detectedCurrency}${trimDecimal(amount)}${jpMatch[2]}`;
+  }
+
+  // 英語単位（T/B/M/K）
+  const enMatch = withoutCurrency.match(/^([+-]?[\d,.]+)\s*([TtBbMmKk])$/);
+  if (enMatch) {
+    const amount = parseFloat(enMatch[1].replace(/,/g, ""));
+    if (!Number.isFinite(amount)) return "N/A";
+    return `${detectedCurrency}${trimDecimal(amount)}${enMatch[2].toUpperCase()}`;
+  }
+
+  // 単位なしの素の数値
+  if (/^[+-]?[\d,.]+$/.test(withoutCurrency)) {
+    const num = parseFloat(withoutCurrency.replace(/,/g, ""));
+    if (!Number.isFinite(num)) return "N/A";
+    return formatMarketCapNumber(num, detectedCurrency);
+  }
+
+  // 解釈できない値は嘘の金額を出さない
+  return "N/A";
+}
+
+function trimDecimal(value: number): string {
+  return Number(value.toFixed(2)).toString();
+}
+
+function formatMarketCapNumber(value: number, currency: string): string {
+  const abs = Math.abs(value);
+  if (currency === "¥") {
+    if (abs >= 1e12) return `${currency}${trimDecimal(value / 1e12)}兆`;
+    if (abs >= 1e8) return `${currency}${trimDecimal(value / 1e8)}億`;
+    if (abs >= 1e4) return `${currency}${trimDecimal(value / 1e4)}万`;
+    return `${currency}${value.toLocaleString("ja-JP")}`;
+  }
+
+  if (abs >= 1e12) return `${currency}${trimDecimal(value / 1e12)}T`;
+  if (abs >= 1e9) return `${currency}${trimDecimal(value / 1e9)}B`;
+  if (abs >= 1e6) return `${currency}${trimDecimal(value / 1e6)}M`;
+  if (abs >= 1e3) return `${currency}${trimDecimal(value / 1e3)}K`;
+  return `${currency}${value.toLocaleString("ja-JP")}`;
 }
