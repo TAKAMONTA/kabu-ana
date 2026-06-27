@@ -1,5 +1,6 @@
 import axios from "axios";
 import { normalizeQuery, toHalfWidth } from "@/lib/utils/textUtils";
+import type { MarketDataClient } from "./marketDataTypes";
 
 const SERPAPI_BASE_URL = "https://serpapi.com/search";
 
@@ -61,7 +62,7 @@ export interface FastSearchResult {
   financialData: FinancialData | null;
 }
 
-export class SerpApiClient {
+export class SerpApiClient implements MarketDataClient {
   private apiKey: string;
 
   constructor(apiKey: string) {
