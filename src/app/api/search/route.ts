@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
-import { FMPClient } from "@/lib/api/fmp";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import {
   findStocksMentionedInText,
@@ -94,13 +93,7 @@ async function searchHandler(request: NextRequest) {
 
     const { query, chartPeriod } = validationResult.data;
 
-    const fmpApiKey = process.env.FMP_API_KEY;
-
     const marketApi = createMarketDataClient();
-    const fmpApi =
-      fmpApiKey && fmpApiKey !== "your_fmp_api_key_here"
-        ? new FMPClient(fmpApiKey)
-        : null;
 
     // データ取得の結果を格納する変数
     let companyInfo: {
@@ -352,142 +345,6 @@ async function searchHandler(request: NextRequest) {
         }
       } catch (error) {
         console.error("MarketData フォールバックエラー:", error);
-      }
-    }
-
-    // SERPAPIで必要最低限が取れない場合だけFMPを使う。低優先データは短い制限時間で補完する。
-    if (fmpApi && (!companyInfo || !stockData)) {
-      try {
-        const searchResults =
-          (await measureSearchStep(timings, "fmp.comprehensive_search", () =>
-            optionalWithTimeout(
-              fmpApi.comprehensiveSearch(query),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "fmp.comprehensiveSearch"
-            )
-          )) || [];
-
-        if (searchResults && searchResults.length > 0) {
-          const company = searchResults[0];
-
-          const [profile, quote] = await Promise.all([
-            optionalWithTimeout(
-              fmpApi.getCompanyProfile(company.symbol),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "fmp.getCompanyProfile"
-            ),
-            optionalWithTimeout(
-              fmpApi.getQuote(company.symbol),
-              SEARCH_OPTIONAL_TIMEOUT_MS,
-              "fmp.getQuote"
-            ),
-          ]);
-
-          if (profile) {
-            dataSource = "fmp";
-            companyInfo = {
-              name: profile.companyName,
-              symbol: profile.symbol,
-              market: profile.exchangeShortName,
-              price: profile.price,
-              change: profile.changes,
-              changePercent: (profile.changes / profile.price) * 100,
-              description: profile.description,
-              website: profile.website,
-              employees: profile.fullTimeEmployees,
-              founded: profile.ipoDate,
-              headquarters: `${profile.city}, ${profile.country}`,
-            };
-          } else if (!companyInfo) {
-            dataSource = "fmp";
-            companyInfo = {
-              name: company.companyName || company.name || company.symbol,
-              symbol: company.symbol,
-              market: company.exchangeShortName || company.exchange || "",
-            };
-          }
-
-          if (quote) {
-            stockData = {
-              symbol: quote.symbol,
-              price: quote.price,
-              change: quote.change,
-              changePercent: quote.changesPercentage,
-              volume: quote.volume,
-              marketCap: quote.marketCap.toString(),
-              pe: quote.pe,
-              eps: quote.eps,
-              dividend: 0, // FMPでは別途取得が必要
-              high52: quote.yearHigh,
-              low52: quote.yearLow,
-            };
-          } else if (profile) {
-            stockData = {
-              symbol: profile.symbol,
-              price: profile.price || 0,
-              change: profile.changes || 0,
-              changePercent:
-                profile.price > 0 ? (profile.changes / profile.price) * 100 : 0,
-              volume: profile.volAvg || 0,
-              marketCap: profile.mktCap ? profile.mktCap.toString() : "N/A",
-              pe: 0,
-              eps: 0,
-              dividend: profile.lastDiv || 0,
-              high52: 0,
-              low52: 0,
-            };
-          }
-
-          const [financialStatements, keyMetrics, freeNews] = await Promise.all(
-            [
-              optionalWithTimeout(
-                fmpApi.getFinancialStatements(company.symbol, 1),
-                SEARCH_OPTIONAL_TIMEOUT_MS,
-                "fmp.getFinancialStatements"
-              ),
-              optionalWithTimeout(
-                fmpApi.getKeyMetrics(company.symbol, 1),
-                SEARCH_OPTIONAL_TIMEOUT_MS,
-                "fmp.getKeyMetrics"
-              ),
-              optionalWithTimeout(
-                new FreeNewsClient().getComprehensiveNews(
-                  company.name || company.companyName || company.symbol,
-                  company.symbol,
-                  5
-                ),
-                NEWS_OPTIONAL_TIMEOUT_MS,
-                "freeNews.getComprehensiveNews"
-              ),
-            ]
-          );
-
-          if (financialStatements && financialStatements.length > 0) {
-            const latest = financialStatements[0];
-            financialData = {
-              revenue: latest.revenue?.toString(),
-              netIncome: latest.netIncome?.toString(),
-              operatingIncome: latest.operatingIncome?.toString(),
-              totalAssets: undefined,
-              cash: undefined,
-              eps: latest.eps?.toString(),
-              period: `${latest.calendarYear} (${latest.period})`,
-            };
-          }
-
-          if (keyMetrics && keyMetrics.length > 0) {
-            const metrics = keyMetrics[0];
-            if (stockData) {
-              stockData.dividend = metrics.dividendYield || 0;
-            }
-          }
-
-          if (freeNews && freeNews.length > 0) {
-            newsData = freeNews;
-          }
-        }
-      } catch (error) {
-        console.error("FMP API エラー:", error);
       }
     }
 

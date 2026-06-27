@@ -36,7 +36,6 @@ const nextConfig = {
     serverComponentsExternalPackages: [
       "@firebase/auth",
       "@firebase/firestore",
-      "yahoo-finance2",
     ],
   },
   // 静的エクスポート時にfirebase-adminをwebpackの外部モジュールとして扱う

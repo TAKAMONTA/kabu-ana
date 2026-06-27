@@ -22,7 +22,7 @@ export type NewsItem = {
   link: string;
 };
 
-/** SerpApiClient と YahooFinanceClient が共通で満たすメソッド面 */
+/** MarketDataClient が満たすメソッド面 */
 export interface MarketDataClient {
   getFastSearchResult(
     query: string,
