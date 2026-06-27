@@ -112,10 +112,28 @@ export class YahooFinanceClient implements MarketDataClient {
   }
 
   async getChartData(
-    _symbol: string,
-    _window: string = "1M"
+    symbol: string,
+    window: string = "1M"
   ): Promise<ChartDataPoint[]> {
-    return [];
+    try {
+      const ys = toYahooSymbol(symbol);
+      const { period1, interval } = windowToRange(window);
+      const result = await yahooFinance.chart(ys, { period1, interval });
+      const quotes = result?.quotes ?? [];
+      return quotes
+        .filter(p => p && p.date)
+        .map(p => ({
+          date: new Date(p.date as Date).toISOString().slice(0, 10),
+          price: p.close ?? 0,
+          volume: p.volume ?? 0,
+        }));
+    } catch (error) {
+      console.error(
+        "Yahoo チャート取得エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return [];
+    }
   }
 
   async getFinancialData(_symbol: string): Promise<FinancialData | null> {

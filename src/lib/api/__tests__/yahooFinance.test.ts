@@ -76,4 +76,30 @@ describe("YahooFinanceClient", () => {
     const client = new YahooFinanceClient();
     expect(await client.getStockData("ZZZZ")).toBeNull();
   });
+
+  it("maps Yahoo chart quotes into ChartDataPoint[] and passes interval/period", async () => {
+    vi.mocked(yahooFinance.chart).mockResolvedValue({
+      quotes: [
+        { date: new Date("2026-05-28T00:00:00Z"), close: 3000, volume: 1000 },
+        { date: new Date("2026-05-29T00:00:00Z"), close: 3010, volume: 1200 },
+      ],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const chart = await client.getChartData("7203", "1M");
+
+    const call = vi.mocked(yahooFinance.chart).mock.calls[0];
+    expect(call[0]).toBe("7203.T");
+    expect((call[1] as { interval: string }).interval).toBe("1d");
+    expect(chart).toEqual([
+      { date: "2026-05-28", price: 3000, volume: 1000 },
+      { date: "2026-05-29", price: 3010, volume: 1200 },
+    ]);
+  });
+
+  it("returns [] on chart error", async () => {
+    vi.mocked(yahooFinance.chart).mockRejectedValue(new Error("boom"));
+    const client = new YahooFinanceClient();
+    expect(await client.getChartData("7203", "1M")).toEqual([]);
+  });
 });
