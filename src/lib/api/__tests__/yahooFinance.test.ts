@@ -256,4 +256,47 @@ describe("YahooFinanceClient", () => {
     const client = new YahooFinanceClient();
     expect(await client.getCompanyNews("7203", 5)).toEqual([]);
   });
+
+  it("composes a FastSearchResult from quote + chart + financials + news", async () => {
+    vi.mocked(yahooFinance.quote).mockResolvedValue({
+      symbol: "7203.T",
+      longName: "Toyota Motor Corporation",
+      fullExchangeName: "Tokyo",
+      regularMarketPrice: 3000,
+      regularMarketChange: 10,
+      regularMarketChangePercent: 0.33,
+      regularMarketVolume: 1000,
+    } as never);
+    vi.mocked(yahooFinance.chart).mockResolvedValue({
+      quotes: [
+        { date: new Date("2026-05-28T00:00:00Z"), close: 3000, volume: 1000 },
+      ],
+    } as never);
+    vi.mocked(yahooFinance.quoteSummary).mockResolvedValue({} as never);
+    vi.mocked(yahooFinance.search).mockResolvedValue({
+      quotes: [],
+      news: [],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const result = await client.getFastSearchResult("7203", "1M");
+
+    expect(result?.companyInfo.symbol).toBe("7203.T");
+    expect(result?.stockData.price).toBe(3000);
+    expect(result?.chartData).toHaveLength(1);
+    expect(result?.financialData).toBeNull();
+  });
+
+  it("returns null when company or stock data is unavailable", async () => {
+    vi.mocked(yahooFinance.quote).mockResolvedValue(undefined as never);
+    vi.mocked(yahooFinance.chart).mockResolvedValue({ quotes: [] } as never);
+    vi.mocked(yahooFinance.quoteSummary).mockResolvedValue({} as never);
+    vi.mocked(yahooFinance.search).mockResolvedValue({
+      quotes: [],
+      news: [],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    expect(await client.getFastSearchResult("ZZZZ", "1M")).toBeNull();
+  });
 });

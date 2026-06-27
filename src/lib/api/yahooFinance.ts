@@ -53,10 +53,32 @@ export class YahooFinanceClient implements MarketDataClient {
   }
 
   async getFastSearchResult(
-    _query: string,
-    _window: string = "1M"
+    query: string,
+    window: string = "1M"
   ): Promise<FastSearchResult | null> {
-    return null;
+    const [companyInfo, stockData, chartData, financialData, newsData] =
+      await Promise.all([
+        this.searchCompany(query),
+        this.getStockData(query),
+        this.getChartData(query, window),
+        this.getFinancialData(query),
+        this.getCompanyNews(query, 5),
+      ]);
+
+    if (!companyInfo || !stockData) return null;
+
+    return {
+      companyInfo: {
+        ...companyInfo,
+        price: stockData.price || companyInfo.price,
+        change: stockData.change || companyInfo.change,
+        changePercent: stockData.changePercent || companyInfo.changePercent,
+      },
+      stockData,
+      newsData,
+      chartData,
+      financialData,
+    };
   }
 
   async searchCompany(query: string): Promise<CompanyInfo | null> {
