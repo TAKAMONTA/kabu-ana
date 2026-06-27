@@ -199,4 +199,61 @@ describe("YahooFinanceClient", () => {
 
     expect(info).toEqual({ name: "Apple Inc.", symbol: "AAPL", market: "NMS" });
   });
+
+  it("maps Yahoo search news into NewsItem[] (getCompanyNews)", async () => {
+    vi.mocked(yahooFinance.search).mockResolvedValue({
+      quotes: [],
+      news: [
+        {
+          title: "トヨタ、国内販売が好調",
+          publisher: "Nikkei",
+          providerPublishTime: new Date("2026-05-28T00:00:00Z"),
+          link: "https://example.com/a",
+        },
+      ],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const news = await client.getCompanyNews("7203", 5);
+
+    expect(vi.mocked(yahooFinance.search)).toHaveBeenCalledWith(
+      "7203.T",
+      expect.objectContaining({ newsCount: 5 })
+    );
+    expect(news).toHaveLength(1);
+    expect(news[0]).toMatchObject({
+      title: "トヨタ、国内販売が好調",
+      source: "Nikkei",
+      link: "https://example.com/a",
+    });
+  });
+
+  it("getCompanyNewsFromGoogle searches by company name", async () => {
+    vi.mocked(yahooFinance.search).mockResolvedValue({
+      quotes: [],
+      news: [
+        {
+          title: "Toyota update",
+          publisher: "Reuters",
+          providerPublishTime: new Date("2026-05-28T00:00:00Z"),
+          link: "https://example.com/b",
+        },
+      ],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const news = await client.getCompanyNewsFromGoogle("7203", "トヨタ自動車", 3);
+
+    expect(vi.mocked(yahooFinance.search)).toHaveBeenCalledWith(
+      "トヨタ自動車",
+      expect.objectContaining({ newsCount: 3 })
+    );
+    expect(news[0].source).toBe("Reuters");
+  });
+
+  it("returns [] on news error", async () => {
+    vi.mocked(yahooFinance.search).mockRejectedValue(new Error("boom"));
+    const client = new YahooFinanceClient();
+    expect(await client.getCompanyNews("7203", 5)).toEqual([]);
+  });
 });

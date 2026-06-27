@@ -148,19 +148,46 @@ export class YahooFinanceClient implements MarketDataClient {
     }
   }
 
-  async getCompanyNews(
-    _symbol: string,
-    _limit: number = 10
+  private async searchNews(
+    queryForNews: string,
+    limit: number
   ): Promise<NewsItem[]> {
-    return [];
+    try {
+      const res = await yahooFinance.search(queryForNews, { newsCount: limit });
+      const news = (res?.news ?? []) as Array<{
+        title?: string;
+        publisher?: string;
+        providerPublishTime?: Date | number;
+        link?: string;
+      }>;
+      return news.slice(0, limit).map(n => ({
+        title: n.title ?? "",
+        snippet: n.title ?? "",
+        source: n.publisher ?? "Yahoo Finance",
+        date: n.providerPublishTime
+          ? new Date(n.providerPublishTime).toLocaleDateString("ja-JP")
+          : "不明",
+        link: n.link ?? "",
+      }));
+    } catch (error) {
+      console.error(
+        "Yahoo ニュース取得エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return [];
+    }
+  }
+
+  async getCompanyNews(symbol: string, limit: number = 10): Promise<NewsItem[]> {
+    return this.searchNews(toYahooSymbol(symbol), limit);
   }
 
   async getCompanyNewsFromGoogle(
     _symbol: string,
-    _companyName: string,
-    _limit: number = 10
+    companyName: string,
+    limit: number = 10
   ): Promise<NewsItem[]> {
-    return [];
+    return this.searchNews(companyName, limit);
   }
 
   async getChartData(
