@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { FMPClient } from "@/lib/api/fmp";
-import { SerpApiClient } from "@/lib/api/serpapi";
+import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 async function searchSuggestionsHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
@@ -17,7 +18,6 @@ async function searchSuggestionsHandler(request: NextRequest) {
     }
 
     const fmpApiKey = process.env.FMP_API_KEY;
-    const serpApiKey = process.env.SERPAPI_API_KEY;
 
     let suggestions: any[] = [];
 
@@ -28,24 +28,26 @@ async function searchSuggestionsHandler(request: NextRequest) {
         const fmpResults = await fmpApi.comprehensiveSearch(query);
         suggestions = fmpResults.slice(0, 5);
       } catch (error) {
-        console.error("FMP検索候補エラー:", error instanceof Error ? error.message : error);
+        console.error(
+          "FMP検索候補エラー:",
+          error instanceof Error ? error.message : error
+        );
       }
     }
 
-    // SERPAPIをフォールバックとして使用
-    if (
-      suggestions.length === 0 &&
-      serpApiKey &&
-      serpApiKey !== "your_serpapi_key_here"
-    ) {
+    // 市場データクライアント（既定 Yahoo）をフォールバックとして使用
+    if (suggestions.length === 0) {
       try {
-        const serpApi = new SerpApiClient(serpApiKey);
-        const serpResult = await serpApi.searchCompany(query);
-        if (serpResult) {
-          suggestions = [serpResult];
+        const marketApi = createMarketDataClient();
+        const result = await marketApi.searchCompany(query);
+        if (result) {
+          suggestions = [result];
         }
       } catch (error) {
-        console.error("SERPAPI検索候補エラー:", error instanceof Error ? error.message : error);
+        console.error(
+          "市場データ検索候補エラー:",
+          error instanceof Error ? error.message : error
+        );
       }
     }
 

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { normalizeQuery, toHalfWidth } from "@/lib/utils/textUtils";
+import type { MarketDataClient } from "./marketDataTypes";
 
 const SERPAPI_BASE_URL = "https://serpapi.com/search";
 
@@ -61,7 +62,7 @@ export interface FastSearchResult {
   financialData: FinancialData | null;
 }
 
-export class SerpApiClient {
+export class SerpApiClient implements MarketDataClient {
   private apiKey: string;
 
   constructor(apiKey: string) {
@@ -134,7 +135,10 @@ export class SerpApiClient {
     return request;
   }
 
-  private buildCompanyInfo(data: any, fallbackQuery: string): CompanyInfo | null {
+  private buildCompanyInfo(
+    data: any,
+    fallbackQuery: string
+  ): CompanyInfo | null {
     if (!data?.summary) return null;
 
     const about = data.knowledge_graph?.about?.[0];
@@ -168,11 +172,7 @@ export class SerpApiClient {
       return "";
     };
 
-    const avgVolumeStr = getStatValue(
-      "平均出来高",
-      "Avg Volume",
-      "平均取引高"
-    );
+    const avgVolumeStr = getStatValue("平均出来高", "Avg Volume", "平均取引高");
     let volume = 0;
     if (avgVolumeStr) {
       const match = avgVolumeStr.match(/([\d,.]+)([MK万億百千]?)/);
@@ -206,11 +206,7 @@ export class SerpApiClient {
       "株価純資産倍率",
       "PBR"
     );
-    const dividendStr = getStatValue(
-      "配当利回り",
-      "Dividend yield",
-      "配当"
-    );
+    const dividendStr = getStatValue("配当利回り", "Dividend yield", "配当");
 
     return {
       symbol: data.summary.stock || symbol,
@@ -371,8 +367,10 @@ export class SerpApiClient {
     if (!companyInfo) return null;
 
     const stockData =
-      this.buildStockData(detailedData || chartWindowData, companyInfo.symbol) ||
-      this.buildStockData(primaryData, companyInfo.symbol);
+      this.buildStockData(
+        detailedData || chartWindowData,
+        companyInfo.symbol
+      ) || this.buildStockData(primaryData, companyInfo.symbol);
     if (!stockData) return null;
 
     return {
@@ -380,7 +378,9 @@ export class SerpApiClient {
       stockData,
       newsData: detailedData ? this.buildNewsData(detailedData, 5) : [],
       chartData: this.buildChartData(chartWindowData || detailedData),
-      financialData: detailedData ? this.buildFinancialData(detailedData) : null,
+      financialData: detailedData
+        ? this.buildFinancialData(detailedData)
+        : null,
     };
   }
 

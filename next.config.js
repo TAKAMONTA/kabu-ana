@@ -33,7 +33,11 @@ const nextConfig = {
       }),
   // 実験的機能の設定
   experimental: {
-    serverComponentsExternalPackages: ["@firebase/auth", "@firebase/firestore"],
+    serverComponentsExternalPackages: [
+      "@firebase/auth",
+      "@firebase/firestore",
+      "yahoo-finance2",
+    ],
   },
   // 静的エクスポート時にfirebase-adminをwebpackの外部モジュールとして扱う
   webpack: (config, { isServer }) => {
@@ -51,12 +55,7 @@ const nextConfig = {
   // 画像最適化の設定
   images: {
     unoptimized: true,
-    domains: [
-      "www24.a8.net",
-      "www17.a8.net",
-      "www25.a8.net",
-      "www10.a8.net",
-    ],
+    domains: ["www24.a8.net", "www17.a8.net", "www25.a8.net", "www10.a8.net"],
   },
   // 本番環境での最適化
   // output: "standalone", // Vercelデプロイエラーのため一時的に無効化
