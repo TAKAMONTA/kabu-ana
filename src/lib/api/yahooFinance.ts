@@ -59,12 +59,64 @@ export class YahooFinanceClient implements MarketDataClient {
     return null;
   }
 
-  async searchCompany(_query: string): Promise<CompanyInfo | null> {
-    return null;
+  async searchCompany(query: string): Promise<CompanyInfo | null> {
+    try {
+      const ys = toYahooSymbol(query);
+      const q = await yahooFinance.quote(ys);
+      if (!q) return null;
+
+      // 日本株は JPX マスタの日本語社名を優先（Yahoo は英語社名のことが多い）
+      const jpCode = ys.endsWith(".T") ? ys.replace(".T", "") : "";
+      const jpName = jpCode ? JPX_STOCK_BY_CODE.get(jpCode)?.name : undefined;
+
+      return {
+        name: jpName ?? q.longName ?? q.shortName ?? query,
+        symbol: q.symbol ?? ys,
+        market: q.fullExchangeName ?? q.exchange ?? "",
+        price: q.regularMarketPrice ?? 0,
+        change: q.regularMarketChange ?? 0,
+        changePercent: q.regularMarketChangePercent ?? 0,
+        description: "",
+        website: "",
+        employees: "",
+        founded: "",
+        headquarters: "",
+      };
+    } catch (error) {
+      console.error(
+        "Yahoo 企業検索エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
   }
 
-  async searchCompanyByGoogle(_query: string): Promise<CompanyInfo | null> {
-    return null;
+  async searchCompanyByGoogle(query: string): Promise<CompanyInfo | null> {
+    try {
+      const res = await yahooFinance.search(query);
+      const hit = (res?.quotes ?? []).find(
+        (item: { isYahooFinance?: boolean }) => item?.isYahooFinance
+      ) as
+        | {
+            symbol?: string;
+            longname?: string;
+            shortname?: string;
+            exchange?: string;
+          }
+        | undefined;
+      if (!hit?.symbol) return null;
+      return {
+        name: hit.longname ?? hit.shortname ?? query,
+        symbol: hit.symbol,
+        market: hit.exchange ?? "",
+      };
+    } catch (error) {
+      console.error(
+        "Yahoo 名称検索エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
   }
 
   async getStockData(symbol: string): Promise<StockData | null> {
@@ -175,6 +227,3 @@ export class YahooFinanceClient implements MarketDataClient {
   }
 }
 
-// JPX_STOCK_BY_CODE と toStr は後続タスクで使用するため参照を維持
-void JPX_STOCK_BY_CODE;
-void toStr;

@@ -157,4 +157,46 @@ describe("YahooFinanceClient", () => {
     const client = new YahooFinanceClient();
     expect(await client.getFinancialData("7203")).toBeNull();
   });
+
+  it("builds CompanyInfo from a quote, enriching JP names from JPX master", async () => {
+    vi.mocked(yahooFinance.quote).mockResolvedValue({
+      symbol: "7203.T",
+      longName: "Toyota Motor Corporation",
+      shortName: "TOYOTA",
+      fullExchangeName: "Tokyo",
+      regularMarketPrice: 3000,
+      regularMarketChange: 10,
+      regularMarketChangePercent: 0.33,
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const info = await client.searchCompany("7203");
+
+    expect(info).toMatchObject({
+      symbol: "7203.T",
+      market: "Tokyo",
+      price: 3000,
+    });
+    // JPX master の日本語社名で上書きされる（7203 = トヨタ自動車）
+    expect(info?.name).toContain("トヨタ");
+  });
+
+  it("resolves a company via Yahoo search (searchCompanyByGoogle)", async () => {
+    vi.mocked(yahooFinance.search).mockResolvedValue({
+      quotes: [
+        {
+          isYahooFinance: true,
+          symbol: "AAPL",
+          shortname: "Apple Inc.",
+          exchange: "NMS",
+        },
+      ],
+      news: [],
+    } as never);
+
+    const client = new YahooFinanceClient();
+    const info = await client.searchCompanyByGoogle("apple");
+
+    expect(info).toEqual({ name: "Apple Inc.", symbol: "AAPL", market: "NMS" });
+  });
 });
