@@ -2,7 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
-import { formatAttentionScore, getAttentionBadgeTone } from "@/lib/attentionScore";
+import {
+  formatAttentionScore,
+  getAttentionBadgeTone,
+} from "@/lib/attentionScore";
 import { normalizeDisplayText } from "@/lib/displayText";
 import { BarChart3, ExternalLink } from "lucide-react";
 
@@ -100,9 +103,7 @@ export function FrontPageLeadStory({
             idea.confidence
           )}`}
         >
-          {showAttentionScore
-            ? formatAttentionScore(idea.confidence)
-            : "注目"}
+          {showAttentionScore ? formatAttentionScore(idea.confidence) : "注目"}
         </span>
       </div>
     </article>

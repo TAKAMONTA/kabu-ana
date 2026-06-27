@@ -419,10 +419,10 @@ export default function HomePage() {
               <div className="relative">
                 <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
               </div>
-	              <div className="leading-tight">
-	                <h1 className="text-2xl font-bold tracking-tight">
-	                  <span className="brand-gradient">{APP_NAME}</span>
-	                </h1>
+              <div className="leading-tight">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  <span className="brand-gradient">{APP_NAME}</span>
+                </h1>
                 <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">
                   AIで株式分析と市場シグナルを 30 秒で
                 </p>
@@ -650,8 +650,8 @@ export default function HomePage() {
           </div>
         )}
 
-	        {/* フッター広告セクション（フリーユーザーのみ表示） */}
-	        {showSponsoredAds && <SponsoredAds />}
+        {/* フッター広告セクション（フリーユーザーのみ表示） */}
+        {showSponsoredAds && <SponsoredAds />}
       </main>
 
       {/* フッター */}
@@ -672,10 +672,10 @@ export default function HomePage() {
               >
                 プライバシーポリシー
               </Link>
-	            </div>
-	            <p className="text-[10px] text-muted-foreground">
-	              © 2026 {APP_NAME}. All rights reserved.
-	            </p>
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              © 2026 {APP_NAME}. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
