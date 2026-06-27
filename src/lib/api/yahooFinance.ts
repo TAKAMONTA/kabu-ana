@@ -67,8 +67,33 @@ export class YahooFinanceClient implements MarketDataClient {
     return null;
   }
 
-  async getStockData(_symbol: string): Promise<StockData | null> {
-    return null;
+  async getStockData(symbol: string): Promise<StockData | null> {
+    try {
+      const ys = toYahooSymbol(symbol);
+      const q = await yahooFinance.quote(ys);
+      if (!q) return null;
+      return {
+        symbol: q.symbol ?? ys,
+        price: q.regularMarketPrice ?? 0,
+        change: q.regularMarketChange ?? 0,
+        changePercent: q.regularMarketChangePercent ?? 0,
+        volume: q.regularMarketVolume ?? 0,
+        marketCap: q.marketCap !== undefined ? String(q.marketCap) : "N/A",
+        pe: q.trailingPE ?? 0,
+        eps: q.epsTrailingTwelveMonths ?? 0,
+        dividend: q.trailingAnnualDividendYield
+          ? q.trailingAnnualDividendYield * 100
+          : 0,
+        high52: q.fiftyTwoWeekHigh ?? 0,
+        low52: q.fiftyTwoWeekLow ?? 0,
+      };
+    } catch (error) {
+      console.error(
+        "Yahoo 株価取得エラー:",
+        error instanceof Error ? error.message : error
+      );
+      return null;
+    }
   }
 
   async getCompanyNews(
