@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SerpApiClient } from "@/lib/api/serpapi";
+import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FMPClient } from "@/lib/api/fmp";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import {
@@ -94,27 +94,9 @@ async function searchHandler(request: NextRequest) {
 
     const { query, chartPeriod } = validationResult.data;
 
-    const serpApiKey = process.env.SERPAPI_API_KEY;
     const fmpApiKey = process.env.FMP_API_KEY;
 
-    // 少なくとも一つのAPIキーが必要
-    if (
-      (!serpApiKey || serpApiKey === "your_serpapi_key_here") &&
-      (!fmpApiKey || fmpApiKey === "your_fmp_api_key_here")
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "APIキーが設定されていません。SERPAPI_API_KEYまたはFMP_API_KEYのいずれかを設定してください。",
-        },
-        { status: 400 }
-      );
-    }
-
-    const serpApi =
-      serpApiKey && serpApiKey !== "your_serpapi_key_here"
-        ? new SerpApiClient(serpApiKey)
-        : null;
+    const marketApi = createMarketDataClient();
     const fmpApi =
       fmpApiKey && fmpApiKey !== "your_fmp_api_key_here"
         ? new FMPClient(fmpApiKey)
@@ -181,7 +163,7 @@ async function searchHandler(request: NextRequest) {
     const shouldSkipSerpFast =
       Boolean(localJpxStock) || isLikelyPlainUsTicker(query);
 
-    if (localJpxStock && serpApi) {
+    if (localJpxStock) {
       companyInfo = {
         name: localJpxStock.name,
         symbol: localJpxStock.code,
@@ -212,27 +194,27 @@ async function searchHandler(request: NextRequest) {
       ] = await measureSearchStep(timings, "jpx.serp_enrichment", () =>
         Promise.all([
           optionalWithTimeout(
-            serpApi.getStockData(localJpxStock.code),
+            marketApi.getStockData(localJpxStock.code),
             SEARCH_OPTIONAL_TIMEOUT_MS,
             "serp.getStockData.localJpx"
           ),
           optionalWithTimeout(
-            serpApi.getCompanyNews(localJpxStock.code, 5),
+            marketApi.getCompanyNews(localJpxStock.code, 5),
             NEWS_OPTIONAL_TIMEOUT_MS,
             "serp.getCompanyNews.localJpx"
           ),
           optionalWithTimeout(
-            serpApi.getChartData(localJpxStock.code, chartPeriod),
+            marketApi.getChartData(localJpxStock.code, chartPeriod),
             SEARCH_OPTIONAL_TIMEOUT_MS,
             "serp.getChartData.localJpx"
           ),
           optionalWithTimeout(
-            serpApi.getFinancialData(localJpxStock.code),
+            marketApi.getFinancialData(localJpxStock.code),
             SEARCH_OPTIONAL_TIMEOUT_MS,
             "serp.getFinancialData.localJpx"
           ),
           optionalWithTimeout(
-            serpApi.getCompanyNewsFromGoogle(
+            marketApi.getCompanyNewsFromGoogle(
               localJpxStock.code,
               localJpxStock.name,
               5
@@ -264,12 +246,12 @@ async function searchHandler(request: NextRequest) {
     }
 
     // 最初にGoogle Finance系の高速結果を取りに行く。体感速度を優先し、詳細データは後段で補う。
-    if (serpApi && !shouldSkipSerpFast) {
+    if (!shouldSkipSerpFast) {
       try {
         const fastResult = await measureSearchStep(
           timings,
           "serp.fast_search",
-          () => serpApi.getFastSearchResult(query, chartPeriod)
+          () => marketApi.getFastSearchResult(query, chartPeriod)
         );
 
         if (fastResult) {
@@ -281,12 +263,12 @@ async function searchHandler(request: NextRequest) {
           financialData = fastResult.financialData;
         }
       } catch (error) {
-        console.error("SERPAPI 高速検索エラー:", error);
+        console.error("MarketData 高速検索エラー:", error);
       }
     }
 
     // 高速検索で見つからなかった場合だけ、従来のSERPAPIフォールバックを短い待ち時間で実行する。
-    if (serpApi && (!companyInfo || !stockData)) {
+    if (!companyInfo || !stockData) {
       try {
         const serpCompanyInfo = await measureSearchStep(
           timings,
@@ -294,12 +276,12 @@ async function searchHandler(request: NextRequest) {
           async () => {
             const [financeLookup, googleLookup] = await Promise.all([
               optionalWithTimeout(
-                serpApi.searchCompany(query),
+                marketApi.searchCompany(query),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
                 "serp.searchCompany"
               ),
               optionalWithTimeout(
-                serpApi.searchCompanyByGoogle(query),
+                marketApi.searchCompanyByGoogle(query),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
                 "serp.searchCompanyByGoogle"
               ),
@@ -317,28 +299,28 @@ async function searchHandler(request: NextRequest) {
               stockData
                 ? Promise.resolve(stockData)
                 : optionalWithTimeout(
-                    serpApi.getStockData(serpCompanyInfo.symbol),
+                    marketApi.getStockData(serpCompanyInfo.symbol),
                     SEARCH_OPTIONAL_TIMEOUT_MS,
                     "serp.getStockData"
                   ),
               newsData.length > 0
                 ? Promise.resolve(newsData)
                 : optionalWithTimeout(
-                    serpApi.getCompanyNews(serpCompanyInfo.symbol, 5),
+                    marketApi.getCompanyNews(serpCompanyInfo.symbol, 5),
                     NEWS_OPTIONAL_TIMEOUT_MS,
                     "serp.getCompanyNews"
                   ),
               chartData.length > 0
                 ? Promise.resolve(chartData)
                 : optionalWithTimeout(
-                    serpApi.getChartData(serpCompanyInfo.symbol, chartPeriod),
+                    marketApi.getChartData(serpCompanyInfo.symbol, chartPeriod),
                     SEARCH_OPTIONAL_TIMEOUT_MS,
                     "serp.getChartData"
                   ),
               financialData
                 ? Promise.resolve(financialData)
                 : optionalWithTimeout(
-                    serpApi.getFinancialData(serpCompanyInfo.symbol),
+                    marketApi.getFinancialData(serpCompanyInfo.symbol),
                     SEARCH_OPTIONAL_TIMEOUT_MS,
                     "serp.getFinancialData"
                   ),
@@ -355,7 +337,7 @@ async function searchHandler(request: NextRequest) {
 
           if (newsData.length === 0) {
             const googleNews = await optionalWithTimeout(
-              serpApi.getCompanyNewsFromGoogle(
+              marketApi.getCompanyNewsFromGoogle(
                 serpCompanyInfo.symbol,
                 serpCompanyInfo.name,
                 5
@@ -369,7 +351,7 @@ async function searchHandler(request: NextRequest) {
           }
         }
       } catch (error) {
-        console.error("SERPAPI フォールバックエラー:", error);
+        console.error("MarketData フォールバックエラー:", error);
       }
     }
 

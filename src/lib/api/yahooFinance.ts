@@ -1,4 +1,6 @@
-import yahooFinance from "yahoo-finance2";
+import _yahooFinance from "yahoo-finance2";
+// ESM 配布の型定義は quote/autoc のみ。他メソッド型欠落のためキャスト
+const yahooFinance = _yahooFinance as any; // eslint-disable-line
 import { JPX_STOCK_BY_CODE } from "@/lib/jpx/stockMaster";
 import type {
   CompanyInfo,
@@ -48,8 +50,9 @@ function toStr(value: unknown): string | undefined {
 
 export class YahooFinanceClient implements MarketDataClient {
   constructor() {
-    (yahooFinance as unknown as { suppressNotices?: (k: string[]) => void })
-      .suppressNotices?.(["yahooSurvey"]);
+    (
+      yahooFinance as unknown as { suppressNotices?: (k: string[]) => void }
+    ).suppressNotices?.(["yahooSurvey"]);
   }
 
   async getFastSearchResult(
@@ -200,7 +203,10 @@ export class YahooFinanceClient implements MarketDataClient {
     }
   }
 
-  async getCompanyNews(symbol: string, limit: number = 10): Promise<NewsItem[]> {
+  async getCompanyNews(
+    symbol: string,
+    limit: number = 10
+  ): Promise<NewsItem[]> {
     return this.searchNews(toYahooSymbol(symbol), limit);
   }
 
@@ -222,8 +228,8 @@ export class YahooFinanceClient implements MarketDataClient {
       const result = await yahooFinance.chart(ys, { period1, interval });
       const quotes = result?.quotes ?? [];
       return quotes
-        .filter(p => p && p.date)
-        .map(p => ({
+        .filter((p: any) => p && p.date)
+        .map((p: any) => ({
           date: new Date(p.date as Date).toISOString().slice(0, 10),
           price: p.close ?? 0,
           volume: p.volume ?? 0,
@@ -250,8 +256,7 @@ export class YahooFinanceClient implements MarketDataClient {
       const income =
         summary?.incomeStatementHistory?.incomeStatementHistory?.[0];
       if (!income) return null;
-      const balance =
-        summary?.balanceSheetHistory?.balanceSheetStatements?.[0];
+      const balance = summary?.balanceSheetHistory?.balanceSheetStatements?.[0];
       const eps = summary?.defaultKeyStatistics?.trailingEps;
       const year = income.endDate
         ? new Date(income.endDate as Date).getFullYear()
@@ -275,4 +280,3 @@ export class YahooFinanceClient implements MarketDataClient {
     }
   }
 }
-

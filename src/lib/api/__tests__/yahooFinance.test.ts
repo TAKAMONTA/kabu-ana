@@ -242,7 +242,11 @@ describe("YahooFinanceClient", () => {
     } as never);
 
     const client = new YahooFinanceClient();
-    const news = await client.getCompanyNewsFromGoogle("7203", "トヨタ自動車", 3);
+    const news = await client.getCompanyNewsFromGoogle(
+      "7203",
+      "トヨタ自動車",
+      3
+    );
 
     expect(vi.mocked(yahooFinance.search)).toHaveBeenCalledWith(
       "トヨタ自動車",

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
-import { SerpApiClient } from "@/lib/api/serpapi";
+import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
 
@@ -11,7 +11,8 @@ export interface NewsAnalysisResult {
   keyPoints: string[];
   recommendations: string[];
 }
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 async function newsAnalysisHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
@@ -28,7 +29,6 @@ async function newsAnalysisHandler(request: NextRequest) {
       );
     }
 
-    const serpApiKey = process.env.SERPAPI_API_KEY;
     const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
     if (
@@ -54,25 +54,20 @@ async function newsAnalysisHandler(request: NextRequest) {
       10
     );
 
-    // 2. SERPAPIをフォールバックとして使用
-    if (
-      (!newsData || newsData.length === 0) &&
-      serpApiKey &&
-      serpApiKey !== "your_serpapi_key_here"
-    ) {
-      const serpApi = new SerpApiClient(serpApiKey);
-      const serpNews = await serpApi.getCompanyNews(symbol, 10);
-      if (serpNews && serpNews.length > 0) {
-        newsData = serpNews;
+    // 2. 市場データクライアント（既定 Yahoo）をフォールバックとして使用
+    if (!newsData || newsData.length === 0) {
+      const marketApi = createMarketDataClient();
+      const marketNews = await marketApi.getCompanyNews(symbol, 10);
+      if (marketNews && marketNews.length > 0) {
+        newsData = marketNews;
       } else {
-        // Google検索からもニュースを取得
-        const googleNews = await serpApi.getCompanyNewsFromGoogle(
+        const altNews = await marketApi.getCompanyNewsFromGoogle(
           symbol,
           companyName,
           10
         );
-        if (googleNews && googleNews.length > 0) {
-          newsData = googleNews;
+        if (altNews && altNews.length > 0) {
+          newsData = altNews;
         }
       }
     }
