@@ -3,10 +3,8 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { formatSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-import {
-  grantBundledAiSearchCredits,
-  withDailyLimit,
-} from "@/lib/utils/dailyUsageLimiter";
+import { withDailyLimit, getClientIP } from "@/lib/utils/dailyUsageLimiter";
+import { createAiBundleToken } from "@/lib/utils/aiBundleToken";
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -153,10 +151,18 @@ async function analyzeHandler(request: NextRequest) {
       return NextResponse.json({ error: message }, { status });
     }
 
+    const clientIp = getClientIP(request);
+    const bundleTokens = {
+      financial: createAiBundleToken(clientIp, companyInfo.symbol, "financial"),
+      news: createAiBundleToken(clientIp, companyInfo.symbol, "news"),
+    };
+
     const stream = new ReadableStream({
       async start(controller) {
         const enqueue = (chunk: string) =>
           controller.enqueue(new TextEncoder().encode(chunk));
+
+        enqueue(formatSSE("bundle", JSON.stringify(bundleTokens)));
 
         let fullText = firstChunk;
         enqueue(formatSSE("narrative", firstChunk));
@@ -172,8 +178,6 @@ async function analyzeHandler(request: NextRequest) {
             const analysisResult = openRouter.parseAnalysisResult(json);
             enqueue(formatSSE("result", JSON.stringify(analysisResult)));
           }
-
-          grantBundledAiSearchCredits(request, 2);
 
           console.info("Analyze API timings", {
             symbol: companyInfo.symbol,

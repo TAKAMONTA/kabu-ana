@@ -85,6 +85,7 @@ export default function HomePage() {
     error: analysisError,
     analysisResult,
     streamingText,
+    bundleTokens,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
     retry: retryAnalysis,
@@ -271,6 +272,7 @@ export default function HomePage() {
     if (!searchResult) return;
     if (isAnalyzing) return;
     if (!analysisResult) return;
+    if (!bundleTokens?.financial || !bundleTokens?.news) return;
 
     const symbol = searchResult.companyInfo.symbol;
     if (autoExtraAnalyzedSymbolRef.current === symbol) return;
@@ -292,18 +294,18 @@ export default function HomePage() {
         financialData: searchResult.financialData,
         edinetExtras,
       },
-      { bundledAiSearch: true }
+      { bundleToken: bundleTokens.financial }
     );
     void analyzeNews(
       searchResult.companyInfo.symbol,
       searchResult.companyInfo.name,
-      { bundledAiSearch: true }
+      { bundleToken: bundleTokens.news }
     );
   }, [
     searchResult,
     isAnalyzing,
     analysisResult,
-    streamingText,
+    bundleTokens,
     evaluateFinancials,
     analyzeNews,
   ]);

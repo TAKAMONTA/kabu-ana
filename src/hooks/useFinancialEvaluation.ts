@@ -47,15 +47,15 @@ export function useFinancialEvaluation() {
           accountingStandard?: string | null;
         };
       },
-      options?: { bundledAiSearch?: boolean }
+      options?: { bundleToken?: string }
     ) => {
       lastArgsRef.current = args;
       setIsLoading(true);
       setError(null);
       try {
         const headers = await getAuthHeaders();
-        if (options?.bundledAiSearch) {
-          headers["X-Bundled-AI-Search"] = "true";
+        if (options?.bundleToken) {
+          headers["X-AI-Bundle-Token"] = options.bundleToken;
         }
         const requestOptions = {
           url: getApiUrl("/api/financial-evaluation"),

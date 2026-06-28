@@ -28,15 +28,15 @@ export function useNewsAnalysis() {
     async (
       symbol: string,
       companyName: string,
-      options?: { bundledAiSearch?: boolean }
+      options?: { bundleToken?: string }
     ) => {
       lastArgsRef.current = { symbol, companyName };
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
       try {
         const headers = await getAuthHeaders();
-        if (options?.bundledAiSearch) {
-          headers["X-Bundled-AI-Search"] = "true";
+        if (options?.bundleToken) {
+          headers["X-AI-Bundle-Token"] = options.bundleToken;
         }
         const requestOptions = {
           url: getApiUrl("/api/news-analysis"),

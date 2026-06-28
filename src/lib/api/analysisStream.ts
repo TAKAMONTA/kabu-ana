@@ -1,7 +1,7 @@
 export const STRUCTURED_JSON_SENTINEL = "===STRUCTURED_JSON===";
 
 export function formatSSE(
-  event: "narrative" | "result" | "error",
+  event: "narrative" | "result" | "error" | "bundle",
   data: string
 ): string {
   // JSON-encode the payload so arbitrary content (newlines, quotes, backslashes)

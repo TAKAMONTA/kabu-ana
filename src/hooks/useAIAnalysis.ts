@@ -19,6 +19,10 @@ export function useAIAnalysis() {
     null
   );
   const [streamingText, setStreamingText] = useState("");
+  const [bundleTokens, setBundleTokens] = useState<{
+    financial: string;
+    news: string;
+  } | null>(null);
   const lastArgsRef = useRef<{
     companyInfo: any;
     stockData: any;
@@ -59,6 +63,7 @@ export function useAIAnalysis() {
       };
       setStreamingText("");
       setAnalysisResult(null);
+      setBundleTokens(null);
       setError(null);
       setIsAnalyzing(true);
 
@@ -99,6 +104,13 @@ export function useAIAnalysis() {
                 setAnalysisResult(JSON.parse(ev.data));
               } catch {
                 // ignore parse errors on result
+              }
+            } else if (ev.event === "bundle") {
+              try {
+                if (!mountedRef.current) return;
+                setBundleTokens(JSON.parse(ev.data));
+              } catch {
+                // ignore parse errors on bundle tokens
               }
             } else if (ev.event === "error") {
               if (!mountedRef.current) return;
@@ -158,6 +170,13 @@ export function useAIAnalysis() {
                 } catch {
                   // ignore parse errors on result
                 }
+              } else if (ev.event === "bundle") {
+                try {
+                  if (!mountedRef.current) return;
+                  setBundleTokens(JSON.parse(ev.data));
+                } catch {
+                  // ignore parse errors on bundle tokens
+                }
               } else if (ev.event === "error") {
                 if (!mountedRef.current) return;
                 setError(ev.data);
@@ -191,6 +210,7 @@ export function useAIAnalysis() {
   const clearAnalysis = useCallback(() => {
     setAnalysisResult(null);
     setStreamingText("");
+    setBundleTokens(null);
     setError(null);
   }, []);
 
@@ -199,6 +219,7 @@ export function useAIAnalysis() {
     error,
     analysisResult,
     streamingText,
+    bundleTokens,
     analyzeStock,
     clearAnalysis,
     retry,

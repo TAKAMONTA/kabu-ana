@@ -5,12 +5,11 @@ const FREE_DAILY_LIMIT = 5;
 
 // メモリベースの日次利用回数管理
 const dailyUsageCounts = new Map<string, { count: number; date: string }>();
-const bundledAiSearchCredits = new Map<string, { count: number; date: string }>();
 
 /**
  * クライアントIPを取得
  */
-function getClientIP(request: NextRequest): string {
+export function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
   const realIP = request.headers.get("x-real-ip");
 
@@ -86,34 +85,6 @@ export function incrementDailyUsage(request: NextRequest): void {
   }
 }
 
-export function grantBundledAiSearchCredits(
-  request: NextRequest,
-  count: number
-): void {
-  const clientIP = getClientIP(request);
-  const today = getTodayString();
-  const currentData = bundledAiSearchCredits.get(clientIP);
-
-  if (!currentData || currentData.date !== today) {
-    bundledAiSearchCredits.set(clientIP, { count, date: today });
-  } else {
-    currentData.count += count;
-  }
-}
-
-function consumeBundledAiSearchCredit(request: NextRequest): boolean {
-  const clientIP = getClientIP(request);
-  const today = getTodayString();
-  const currentData = bundledAiSearchCredits.get(clientIP);
-
-  if (!currentData || currentData.date !== today || currentData.count <= 0) {
-    return false;
-  }
-
-  currentData.count -= 1;
-  return true;
-}
-
 /**
  * Firebase IDトークンからプレミアムステータスを確認するヘルパー
  * トークンが無い場合はfalseを返す
@@ -179,13 +150,6 @@ export async function checkPremiumStatus(
  * AI機能のAPIルートに適用する日次利用制限ミドルウェア
  * プレミアムユーザーは無制限、無料ユーザーは1日5回まで
  */
-export function isBundledAiSearchRequest(request: NextRequest): boolean {
-  return (
-    request.headers.get("x-bundled-ai-search") === "true" &&
-    consumeBundledAiSearchCredit(request)
-  );
-}
-
 export function withDailyLimit(
   handler: (request: NextRequest) => Promise<Response>,
   options?: { skip?: (request: NextRequest) => boolean }
