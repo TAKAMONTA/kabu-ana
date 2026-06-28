@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+  Suspense,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -119,6 +126,7 @@ export default function HomePage() {
     isPremium,
     isNativeApp,
   });
+  const autoAnalyzedSymbolRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsNativeApp(isNative());
@@ -133,6 +141,7 @@ export default function HomePage() {
     clearSuggestions();
     clearAiAnalysis();
     clearNewsAnalysis();
+    autoAnalyzedSymbolRef.current = null;
 
     await searchCompany(queryToUse, chartPeriod);
   }, [
@@ -167,6 +176,7 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      autoAnalyzedSymbolRef.current = null;
       await searchCompany(symbol, chartPeriod);
     },
     [
@@ -208,7 +218,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleAsk = useCallback(
+  const runAiAnalysis = useCallback(
     async (question: string) => {
       if (!searchResult) return;
       if (!canUseFeature) return;
@@ -231,6 +241,20 @@ export default function HomePage() {
     },
     [searchResult, analyzeStock, canUseFeature, incrementUsage]
   );
+
+  useEffect(() => {
+    if (!searchResult) return;
+    if (isAnalyzing) return;
+    if (!canUseFeature) return;
+
+    const symbol = searchResult.companyInfo.symbol;
+    if (autoAnalyzedSymbolRef.current === symbol) return;
+
+    autoAnalyzedSymbolRef.current = symbol;
+    void runAiAnalysis(
+      "この会社の業績・リスク・株価材料を、初心者向けに短く文章で分析してください。"
+    );
+  }, [searchResult, isAnalyzing, canUseFeature, runAiAnalysis]);
 
   const getCurrencySymbol = useMemo(() => {
     if (!searchResult) return "$";
@@ -310,6 +334,7 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      autoAnalyzedSymbolRef.current = null;
       await searchCompany(query, chartPeriod);
     },
     [
@@ -608,7 +633,6 @@ export default function HomePage() {
 
                 {/* AIに質問するセクション（会話型UI） */}
                 <AskSection
-                  onAsk={handleAsk}
                   isAnalyzing={isAnalyzing}
                   streamingText={streamingText}
                   analysisResult={analysisResult}
