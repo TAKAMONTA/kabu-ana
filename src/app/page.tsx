@@ -21,6 +21,7 @@ import { SearchSection } from "@/components/SearchSection";
 import { TopTradingValueSection } from "@/components/TopTradingValueSection";
 import { AskSection } from "@/components/AskSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
+import { FreePerformanceSummary } from "@/components/FreePerformanceSummary";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SponsoredAds } from "@/components/SponsoredAds";
@@ -596,6 +597,14 @@ export default function HomePage() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* 無料で見られる業績サマリー */}
+                <FreePerformanceSummary
+                  financialData={searchResult.financialData}
+                  ratios={searchResult.ratios}
+                  financialHistory={searchResult.financialHistory}
+                  currencySymbol={getCurrencySymbol}
+                />
 
                 {/* AIに質問するセクション（会話型UI） */}
                 <AskSection
