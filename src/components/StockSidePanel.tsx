@@ -118,7 +118,7 @@ export function StockPriceHeaderCard({
               <span className="text-sm text-muted-foreground">現在値</span>
               <span className="text-3xl font-bold text-foreground">
                 {currencySymbol}
-                {stockData.price.toLocaleString(undefined, {
+                {stockData.price.toLocaleString("ja-JP", {
                   maximumFractionDigits: 2,
                 })}
               </span>
