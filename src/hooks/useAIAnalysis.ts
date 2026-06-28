@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
-import { parseSSE } from "@/lib/api/analysisStream";
+import { parseSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -107,7 +107,7 @@ export function useAIAnalysis() {
             }
           }
           if (!mountedRef.current) return;
-          setStreamingText(narrative);
+          setStreamingText(splitNarrativeAndJson(narrative).narrative);
         } else {
           const res = await fetch(getApiUrl("/api/analyze"), {
             method: "POST",
@@ -165,7 +165,7 @@ export function useAIAnalysis() {
               }
             }
             if (!mountedRef.current) return;
-            setStreamingText(narrative);
+            setStreamingText(splitNarrativeAndJson(narrative).narrative);
           }
         }
       } catch (err) {

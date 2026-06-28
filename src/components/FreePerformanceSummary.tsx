@@ -19,6 +19,7 @@ interface FreePerformanceSummaryProps {
   ratios?: SearchResultRatios | null;
   financialHistory?: FinancialHistoryItem[] | null;
   currencySymbol: string;
+  hidePerformanceComment?: boolean;
 }
 
 function formatCurrency(
@@ -118,6 +119,7 @@ export function FreePerformanceSummary({
   ratios,
   financialHistory,
   currencySymbol,
+  hidePerformanceComment = false,
 }: FreePerformanceSummaryProps) {
   const sorted = getSortedHistory(financialHistory);
   const latest = sorted[0] ?? null;
@@ -169,18 +171,20 @@ export function FreePerformanceSummary({
           無料で見られる業績サマリー
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          まずは売上・利益・収益性を確認してから、必要に応じてAIに質問できます。
+          売上・利益・収益性の数値サマリーです。
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
-          <p className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-            業績コメント
-          </p>
-          <p className="text-sm leading-relaxed text-foreground">
-            {performanceComment}
-          </p>
-        </div>
+        {!hidePerformanceComment && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <p className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+              業績コメント
+            </p>
+            <p className="text-sm leading-relaxed text-foreground">
+              {performanceComment}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {metrics.map(item => (

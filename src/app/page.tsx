@@ -629,6 +629,11 @@ export default function HomePage() {
                   ratios={searchResult.ratios}
                   financialHistory={searchResult.financialHistory}
                   currencySymbol={getCurrencySymbol}
+                  hidePerformanceComment={
+                    isAnalyzing ||
+                    Boolean(analysisResult) ||
+                    Boolean(streamingText.trim())
+                  }
                 />
 
                 {/* AIに質問するセクション（会話型UI） */}
