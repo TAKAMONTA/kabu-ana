@@ -47,6 +47,72 @@ function ratioToPercent(value: number | null | undefined) {
   return value == null ? null : value * 100;
 }
 
+function describeTrend(value: number | null) {
+  if (value == null) return null;
+  if (value >= 10) return "大きく伸びています";
+  if (value >= 3) return "堅調に伸びています";
+  if (value > -3) return "おおむね横ばいです";
+  if (value > -10) return "やや弱含みです";
+  return "大きく落ち込んでいます";
+}
+
+function describeProfitability(roe?: number, operatingMargin?: number) {
+  const roePercent = ratioToPercent(roe);
+  const marginPercent = ratioToPercent(operatingMargin);
+
+  if (roePercent == null && marginPercent == null) {
+    return "収益性を判断する指標はまだ十分に取得できていません。";
+  }
+
+  const comments = [];
+  if (roePercent != null) {
+    comments.push(
+      roePercent >= 10
+        ? "ROEは高めで、資本効率は良好です"
+        : roePercent >= 5
+          ? "ROEは標準的な水準です"
+          : "ROEは低めで、資本効率には改善余地があります"
+    );
+  }
+  if (marginPercent != null) {
+    comments.push(
+      marginPercent >= 10
+        ? "営業利益率も高く、本業の収益力は強めです"
+        : marginPercent >= 3
+          ? "営業利益率は一定の収益力を示しています"
+          : "営業利益率は低めで、利益率の改善が確認ポイントです"
+    );
+  }
+
+  return `${comments.join("。")}。`;
+}
+
+function buildPerformanceComment({
+  revenueGrowth,
+  netIncomeGrowth,
+  ratios,
+  latestFiscalYear,
+}: {
+  revenueGrowth: number | null;
+  netIncomeGrowth: number | null;
+  ratios?: SearchResultRatios | null;
+  latestFiscalYear?: number;
+}) {
+  const revenueTrend = describeTrend(revenueGrowth);
+  const profitTrend = describeTrend(netIncomeGrowth);
+  const period = latestFiscalYear ? `${latestFiscalYear}年度のデータでは、` : "取得できたデータでは、";
+
+  const growthSentence =
+    revenueTrend || profitTrend
+      ? `${period}売上は${revenueTrend ?? "確認できません"}。純利益は${profitTrend ?? "確認できません"}。`
+      : `${period}売上・利益の成長率はまだ十分に取得できていません。`;
+
+  return `${growthSentence}${describeProfitability(
+    ratios?.roe,
+    ratios?.operatingMargin
+  )}`;
+}
+
 export function FreePerformanceSummary({
   financialData,
   ratios,
@@ -88,6 +154,12 @@ export function FreePerformanceSummary({
     { label: "ROE", value: formatRatio(ratios?.roe) },
     { label: "営業利益率", value: formatRatio(ratios?.operatingMargin) },
   ];
+  const performanceComment = buildPerformanceComment({
+    revenueGrowth,
+    netIncomeGrowth,
+    ratios,
+    latestFiscalYear: latest?.fiscalYear,
+  });
 
   return (
     <Card>
@@ -101,6 +173,15 @@ export function FreePerformanceSummary({
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <p className="mb-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            業績コメント
+          </p>
+          <p className="text-sm leading-relaxed text-foreground">
+            {performanceComment}
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {metrics.map(item => (
             <div key={item.label} className="rounded-lg border bg-muted/30 p-3">
