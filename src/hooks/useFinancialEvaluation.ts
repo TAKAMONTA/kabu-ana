@@ -36,27 +36,33 @@ export function useFinancialEvaluation() {
   }, []);
 
   const evaluate = useCallback(
-    async (args: {
-      symbol: string;
-      companyName: string;
-      financialData?: any;
-      edinetExtras?: {
-        ratios?: any;
-        financialHistory?: any[] | null;
-        accountingStandard?: string | null;
-      };
-    }) => {
+    async (
+      args: {
+        symbol: string;
+        companyName: string;
+        financialData?: any;
+        edinetExtras?: {
+          ratios?: any;
+          financialHistory?: any[] | null;
+          accountingStandard?: string | null;
+        };
+      },
+      options?: { bundledAiSearch?: boolean }
+    ) => {
       lastArgsRef.current = args;
       setIsLoading(true);
       setError(null);
       try {
         const headers = await getAuthHeaders();
-        const options = {
+        if (options?.bundledAiSearch) {
+          headers["X-Bundled-AI-Search"] = "true";
+        }
+        const requestOptions = {
           url: getApiUrl("/api/financial-evaluation"),
           headers,
           data: args,
         };
-        const response = await CapacitorHttp.post(options);
+        const response = await CapacitorHttp.post(requestOptions);
         const data = response.data;
         if (response.status !== 200)
           throw new Error(data.error || "財務評価に失敗しました");

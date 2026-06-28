@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
-import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import {
+  isBundledAiSearchRequest,
+  withDailyLimit,
+} from "@/lib/utils/dailyUsageLimiter";
 
 export interface NewsAnalysisResult {
   impact: "positive" | "negative" | "neutral";
@@ -99,4 +102,6 @@ async function newsAnalysisHandler(request: NextRequest) {
   }
 }
 
-export const POST = withDailyLimit(newsAnalysisHandler);
+export const POST = withDailyLimit(newsAnalysisHandler, {
+  skip: isBundledAiSearchRequest,
+});

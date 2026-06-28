@@ -3,7 +3,10 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { formatSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import {
+  grantBundledAiSearchCredits,
+  withDailyLimit,
+} from "@/lib/utils/dailyUsageLimiter";
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -169,6 +172,8 @@ async function analyzeHandler(request: NextRequest) {
             const analysisResult = openRouter.parseAnalysisResult(json);
             enqueue(formatSSE("result", JSON.stringify(analysisResult)));
           }
+
+          grantBundledAiSearchCredits(request, 2);
 
           console.info("Analyze API timings", {
             symbol: companyInfo.symbol,

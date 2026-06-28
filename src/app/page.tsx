@@ -18,7 +18,10 @@ import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
-import { StockSidePanel } from "@/components/StockSidePanel";
+import {
+  StockPriceHeaderCard,
+  StockSidePanel,
+} from "@/components/StockSidePanel";
 import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
 import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useTopTradingValue } from "@/hooks/useTopTradingValue";
@@ -113,6 +116,7 @@ export default function HomePage() {
     error: financialError,
     result: financialEval,
     evaluate: evaluateFinancials,
+    clear: clearFinancialEval,
     retry: retryFinancialEval,
   } = useFinancialEvaluation();
   const {
@@ -127,6 +131,7 @@ export default function HomePage() {
     isNativeApp,
   });
   const autoAnalyzedSymbolRef = useRef<string | null>(null);
+  const autoExtraAnalyzedSymbolRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsNativeApp(isNative());
@@ -141,7 +146,9 @@ export default function HomePage() {
     clearSuggestions();
     clearAiAnalysis();
     clearNewsAnalysis();
+    clearFinancialEval();
     autoAnalyzedSymbolRef.current = null;
+    autoExtraAnalyzedSymbolRef.current = null;
 
     await searchCompany(queryToUse, chartPeriod);
   }, [
@@ -151,6 +158,7 @@ export default function HomePage() {
     clearSuggestions,
     clearAiAnalysis,
     clearNewsAnalysis,
+    clearFinancialEval,
   ]);
 
   const handleInputChange = useCallback(
@@ -176,7 +184,9 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      clearFinancialEval();
       autoAnalyzedSymbolRef.current = null;
+      autoExtraAnalyzedSymbolRef.current = null;
       await searchCompany(symbol, chartPeriod);
     },
     [
@@ -185,6 +195,7 @@ export default function HomePage() {
       clearSuggestions,
       clearAiAnalysis,
       clearNewsAnalysis,
+      clearFinancialEval,
     ]
   );
 
@@ -256,6 +267,47 @@ export default function HomePage() {
     );
   }, [searchResult, isAnalyzing, canUseFeature, runAiAnalysis]);
 
+  useEffect(() => {
+    if (!searchResult) return;
+    if (isAnalyzing) return;
+    if (!analysisResult) return;
+
+    const symbol = searchResult.companyInfo.symbol;
+    if (autoExtraAnalyzedSymbolRef.current === symbol) return;
+    autoExtraAnalyzedSymbolRef.current = symbol;
+
+    const edinetExtras =
+      searchResult.ratios != null || searchResult.financialHistory != null
+        ? {
+            ratios: searchResult.ratios ?? undefined,
+            financialHistory: searchResult.financialHistory ?? undefined,
+            accountingStandard: searchResult.accountingStandard ?? undefined,
+          }
+        : undefined;
+
+    void evaluateFinancials(
+      {
+        symbol: searchResult.companyInfo.symbol,
+        companyName: searchResult.companyInfo.name,
+        financialData: searchResult.financialData,
+        edinetExtras,
+      },
+      { bundledAiSearch: true }
+    );
+    void analyzeNews(
+      searchResult.companyInfo.symbol,
+      searchResult.companyInfo.name,
+      { bundledAiSearch: true }
+    );
+  }, [
+    searchResult,
+    isAnalyzing,
+    analysisResult,
+    streamingText,
+    evaluateFinancials,
+    analyzeNews,
+  ]);
+
   const getCurrencySymbol = useMemo(() => {
     if (!searchResult) return "$";
     return searchResult.companyInfo.market === "TYO" ? "¥" : "$";
@@ -270,27 +322,6 @@ export default function HomePage() {
     },
     [searchResult, searchCompany]
   );
-
-  const handleNewsAnalysis = useCallback(async () => {
-    if (!searchResult) return;
-    if (!canUseFeature) return;
-    incrementUsage();
-    await analyzeNews(
-      searchResult.companyInfo.symbol,
-      searchResult.companyInfo.name
-    );
-  }, [searchResult, analyzeNews, canUseFeature, incrementUsage]);
-
-  const handleFinancialEvaluation = useCallback(async () => {
-    if (!searchResult) return;
-    if (!canUseFeature) return;
-    incrementUsage();
-    await evaluateFinancials({
-      symbol: searchResult.companyInfo.symbol,
-      companyName: searchResult.companyInfo.name,
-      financialData: searchResult.financialData,
-    });
-  }, [searchResult, evaluateFinancials, canUseFeature, incrementUsage]);
 
   const getScoreLabel = useCallback((score: number) => {
     switch (score) {
@@ -334,7 +365,9 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      clearFinancialEval();
       autoAnalyzedSymbolRef.current = null;
+      autoExtraAnalyzedSymbolRef.current = null;
       await searchCompany(query, chartPeriod);
     },
     [
@@ -343,6 +376,7 @@ export default function HomePage() {
       clearSuggestions,
       clearAiAnalysis,
       clearNewsAnalysis,
+      clearFinancialEval,
     ]
   );
 
@@ -511,6 +545,14 @@ export default function HomePage() {
           />
         ) : (
           <>
+            <div className="mb-6">
+              <StockPriceHeaderCard
+                companyInfo={searchResult.companyInfo}
+                stockData={searchResult.stockData}
+                currency={getCurrencySymbol}
+              />
+            </div>
+
             {/* 無料プラン案内 */}
             <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
               <div className="flex items-center justify-between">
@@ -537,7 +579,7 @@ export default function HomePage() {
         )}
 
         {/* エラー表示 */}
-        {(error || analysisError || newsError) && (
+        {(error || analysisError || newsError || financialError) && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3 text-destructive">
@@ -545,7 +587,7 @@ export default function HomePage() {
                 <div className="flex-1">
                   <p className="font-semibold">エラーが発生しました</p>
                   <p className="text-sm mt-1">
-                    {error || analysisError || newsError}
+                    {error || analysisError || newsError || financialError}
                   </p>
                   <div className="flex gap-2 mt-3">
                     {analysisError && (
@@ -562,6 +604,14 @@ export default function HomePage() {
                         className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
                       >
                         ニュース分析を再試行
+                      </button>
+                    )}
+                    {financialError && (
+                      <button
+                        onClick={retryFinancialEval}
+                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                      >
+                        財務評価を再試行
                       </button>
                     )}
                   </div>
@@ -652,13 +702,8 @@ export default function HomePage() {
                 <FinancialEvaluationSection
                   financialEval={financialEval}
                   isFinancialLoading={isFinancialLoading}
-                  onEvaluate={handleFinancialEvaluation}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
-                  canUseFeature={canUseFeature}
-                  remainingUses={remainingUses}
-                  dailyLimit={dailyLimit}
-                  isPremium={isPremium}
                 />
 
                 {/* ニュースセクション */}
@@ -667,11 +712,6 @@ export default function HomePage() {
                   analyzedNews={analyzedNews}
                   newsData={searchResult.newsData}
                   isNewsAnalyzing={isNewsAnalyzing}
-                  onAnalyze={handleNewsAnalysis}
-                  canUseFeature={canUseFeature}
-                  remainingUses={remainingUses}
-                  dailyLimit={dailyLimit}
-                  isPremium={isPremium}
                 />
               </div>
             </div>
@@ -683,6 +723,7 @@ export default function HomePage() {
                 stockData={searchResult.stockData}
                 financialData={searchResult.financialData}
                 currency={getCurrencySymbol}
+                showPriceHeader={false}
               />
             </div>
           </div>

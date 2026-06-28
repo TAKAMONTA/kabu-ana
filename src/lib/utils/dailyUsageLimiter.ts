@@ -5,6 +5,7 @@ const FREE_DAILY_LIMIT = 5;
 
 // メモリベースの日次利用回数管理
 const dailyUsageCounts = new Map<string, { count: number; date: string }>();
+const bundledAiSearchCredits = new Map<string, { count: number; date: string }>();
 
 /**
  * クライアントIPを取得
@@ -85,6 +86,34 @@ export function incrementDailyUsage(request: NextRequest): void {
   }
 }
 
+export function grantBundledAiSearchCredits(
+  request: NextRequest,
+  count: number
+): void {
+  const clientIP = getClientIP(request);
+  const today = getTodayString();
+  const currentData = bundledAiSearchCredits.get(clientIP);
+
+  if (!currentData || currentData.date !== today) {
+    bundledAiSearchCredits.set(clientIP, { count, date: today });
+  } else {
+    currentData.count += count;
+  }
+}
+
+function consumeBundledAiSearchCredit(request: NextRequest): boolean {
+  const clientIP = getClientIP(request);
+  const today = getTodayString();
+  const currentData = bundledAiSearchCredits.get(clientIP);
+
+  if (!currentData || currentData.date !== today || currentData.count <= 0) {
+    return false;
+  }
+
+  currentData.count -= 1;
+  return true;
+}
+
 /**
  * Firebase IDトークンからプレミアムステータスを確認するヘルパー
  * トークンが無い場合はfalseを返す
@@ -150,14 +179,23 @@ export async function checkPremiumStatus(
  * AI機能のAPIルートに適用する日次利用制限ミドルウェア
  * プレミアムユーザーは無制限、無料ユーザーは1日5回まで
  */
+export function isBundledAiSearchRequest(request: NextRequest): boolean {
+  return (
+    request.headers.get("x-bundled-ai-search") === "true" &&
+    consumeBundledAiSearchCredit(request)
+  );
+}
+
 export function withDailyLimit(
-  handler: (request: NextRequest) => Promise<Response>
+  handler: (request: NextRequest) => Promise<Response>,
+  options?: { skip?: (request: NextRequest) => boolean }
 ) {
   return async (request: NextRequest): Promise<Response> => {
     // プレミアムユーザーかチェック
     const isPremium = await checkPremiumStatus(request);
+    const skipDailyLimit = options?.skip?.(request) ?? false;
 
-    if (!isPremium) {
+    if (!isPremium && !skipDailyLimit) {
       // 無料ユーザーの日次利用制限チェック
       const limitResult = checkDailyLimit(request);
 
@@ -187,7 +225,9 @@ export function withDailyLimit(
 
     // 成功した場合のみカウントをインクリメント
     if (!isPremium && response.ok) {
-      incrementDailyUsage(request);
+      if (!skipDailyLimit) {
+        incrementDailyUsage(request);
+      }
       const limitResult = checkDailyLimit(request);
       response.headers.set("X-Daily-Remaining", limitResult.remaining.toString());
       response.headers.set("X-Daily-Limit", FREE_DAILY_LIMIT.toString());

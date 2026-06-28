@@ -1,8 +1,7 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, TrendingUp, ExternalLink, Lock } from "lucide-react";
+import { Brain, TrendingUp, ExternalLink } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { normalizeDisplayText } from "@/lib/displayText";
 
@@ -19,11 +18,6 @@ interface NewsSectionProps {
   analyzedNews: NewsItem[] | null;
   newsData: NewsItem[] | null;
   isNewsAnalyzing: boolean;
-  onAnalyze: () => void;
-  canUseFeature?: boolean;
-  remainingUses?: number;
-  dailyLimit?: number;
-  isPremium?: boolean;
 }
 
 export function NewsSection({
@@ -31,11 +25,6 @@ export function NewsSection({
   analyzedNews,
   newsData,
   isNewsAnalyzing,
-  onAnalyze,
-  canUseFeature = true,
-  remainingUses = 5,
-  dailyLimit = 5,
-  isPremium = false,
 }: NewsSectionProps) {
   const renderNewsCard = (news: NewsItem, idx: number) => {
     const title = normalizeDisplayText(news.title || news.snippet);
@@ -72,38 +61,6 @@ export function NewsSection({
       </a>
     );
   };
-
-  const AnalyzeButton = () => {
-    if (!canUseFeature) {
-      return (
-        <Button disabled size="sm" className="opacity-50">
-          <Lock className="h-4 w-4 mr-2" />
-          上限到達
-        </Button>
-      );
-    }
-    return (
-      <Button
-        onClick={onAnalyze}
-        disabled={isNewsAnalyzing}
-        size="sm"
-        className="bg-blue-600 hover:bg-blue-700 text-white"
-      >
-        {isNewsAnalyzing ? (
-          <>
-            <Brain className="h-4 w-4 mr-2 animate-spin" />
-            分析中...
-          </>
-        ) : (
-          <>
-            <Brain className="h-4 w-4 mr-2" />
-            関連ニュースをAI分析
-          </>
-        )}
-      </Button>
-    );
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -112,21 +69,12 @@ export function NewsSection({
             <Brain className="h-5 w-5" />
             関連ニュース分析
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {/* 残り回数バッジ（プレミアムでない場合） */}
-            {!isPremium && (
-              <span
-                className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                  canUseFeature
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-                }`}
-              >
-                残り{remainingUses}/{dailyLimit}
-              </span>
-            )}
-            <AnalyzeButton />
-          </div>
+          {isNewsAnalyzing && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Brain className="h-4 w-4 animate-spin" />
+              AIが自動分析中...
+            </span>
+          )}
         </div>
       </CardHeader>
       <CardContent>
@@ -226,15 +174,23 @@ export function NewsSection({
         ) : newsData && newsData.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-4">
-              最新ニュースを取得済みです。「関連ニュースをAI分析」ボタンで材料整理を開始できます。
+              総合AI分析の完了後、関連ニュースの材料整理を自動表示します。
             </p>
             {newsData.slice(0, 3).map(renderNewsCard)}
           </div>
         ) : (
           <div className="text-center py-8">
-            <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <Brain
+              className={`h-12 w-12 mx-auto mb-3 ${
+                isNewsAnalyzing
+                  ? "animate-spin text-primary"
+                  : "text-muted-foreground"
+              }`}
+            />
             <p className="text-sm text-muted-foreground mb-4">
-              企業を検索してから、関連ニュースの分析を実行してください
+              {isNewsAnalyzing
+                ? "関連ニュースをAIが自動分析しています。"
+                : "総合AI分析の完了後、関連ニュース分析を自動表示します。"}
             </p>
           </div>
         )}
