@@ -24,6 +24,7 @@ interface AskSectionProps {
   currencySymbol?: string;
 }
 
+const COMMENT_PREVIEW_LENGTH = 260;
 const TOP_FACTORS = 3;
 
 function getMainAnalysisText(
@@ -33,6 +34,34 @@ function getMainAnalysisText(
   const narrative = splitNarrativeAndJson(streamingText).narrative;
   if (narrative) return narrative;
   return analysisResult?.investmentAdvice || "";
+}
+
+function splitSentences(text: string): string[] {
+  return (
+    text
+      .replace(/\s+/g, " ")
+      .match(/[^。.!?！？]+[。.!?！？]?/g)
+      ?.map(sentence => sentence.trim())
+      .filter(Boolean) ?? []
+  );
+}
+
+function getConclusion(text: string): string {
+  const firstSentence = splitSentences(text)[0];
+  if (!firstSentence) return "AIが業績・材料・リスクを整理しています。";
+  if (firstSentence.length <= 120) return firstSentence;
+  return `${firstSentence.slice(0, 120)}…`;
+}
+
+function getCommentBody(text: string): string {
+  const sentences = splitSentences(text);
+  if (sentences.length <= 1) return text.trim();
+  return sentences.slice(1).join(" ").trim();
+}
+
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trim()}…`;
 }
 
 function riskLabel(level: AnalysisResult["riskLevel"]) {
@@ -48,6 +77,77 @@ function riskLabel(level: AnalysisResult["riskLevel"]) {
   }
 }
 
+function riskClassName(level: AnalysisResult["riskLevel"]) {
+  switch (level) {
+    case "low":
+      return "border-green-200 bg-green-50 text-green-800 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200";
+    case "medium":
+      return "border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-900 dark:bg-yellow-950/40 dark:text-yellow-200";
+    case "high":
+      return "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
+    default:
+      return "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200";
+  }
+}
+
+function buildPointCards(analysisResult: AnalysisResult | null) {
+  const keyFactors = analysisResult?.keyFactors ?? [];
+  const recommendations = analysisResult?.recommendations ?? [];
+  const swot = analysisResult?.swot;
+
+  return [
+    {
+      label: "良い点",
+      value:
+        swot?.strengths?.[0] ||
+        keyFactors[0] ||
+        "業績や材料の強みをAIが整理します。",
+      className:
+        "border-emerald-200 bg-emerald-50/80 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100",
+    },
+    {
+      label: "注意点",
+      value:
+        swot?.threats?.[0] ||
+        swot?.weaknesses?.[0] ||
+        keyFactors[1] ||
+        "株価や事業に影響しそうなリスクを確認します。",
+      className:
+        "border-amber-200 bg-amber-50/80 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100",
+    },
+    {
+      label: "次に見る点",
+      value:
+        recommendations[0] ||
+        swot?.opportunities?.[0] ||
+        keyFactors[2] ||
+        "決算、ニュース、株価材料を続けて確認します。",
+      className:
+        "border-sky-200 bg-sky-50/80 text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100",
+    },
+  ];
+}
+
+function LoadingDots() {
+  return (
+    <>
+      <span className="inline-block animate-bounce">.</span>
+      <span
+        className="inline-block animate-bounce"
+        style={{ animationDelay: "0.15s" }}
+      >
+        .
+      </span>
+      <span
+        className="inline-block animate-bounce"
+        style={{ animationDelay: "0.3s" }}
+      >
+        .
+      </span>
+    </>
+  );
+}
+
 export function AskSection({
   isAnalyzing,
   streamingText,
@@ -59,41 +159,53 @@ export function AskSection({
   currencySymbol = "¥",
 }: AskSectionProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [showFullComment, setShowFullComment] = useState(false);
+
   const mainText = getMainAnalysisText(streamingText, analysisResult);
   const hasResponse =
     analysisResult || isAnalyzing || Boolean(mainText.trim());
+  const conclusion = getConclusion(mainText);
+  const commentBody = getCommentBody(mainText) || mainText;
+  const shouldCollapseComment = commentBody.length > COMMENT_PREVIEW_LENGTH;
+  const visibleComment = showFullComment
+    ? commentBody
+    : truncateText(commentBody, COMMENT_PREVIEW_LENGTH);
+  const pointCards = buildPointCards(analysisResult);
   const keyFactors = analysisResult?.keyFactors ?? [];
-  const previewFactors = keyFactors.slice(0, TOP_FACTORS);
   const hasMoreDetails = Boolean(
     analysisResult &&
-      (keyFactors.length > TOP_FACTORS ||
+      (keyFactors.length > 0 ||
         (analysisResult.recommendations?.length ?? 0) > 0 ||
         analysisResult.swot ||
         analysisResult.targetPrice ||
-        analysisResult.stopLoss)
+        analysisResult.stopLoss ||
+        analysisResult.aiReflection)
   );
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Brain className="h-5 w-5" />
-          AI自動分析（参考情報）
-        </CardTitle>
-        <CardDescription>
-          検索後にAI分析を自動表示します。無料ユーザーは1日{dailyLimit}
-          回まで利用できます。
-        </CardDescription>
+    <Card className="border-primary/20 bg-gradient-to-br from-background via-background to-primary/5 shadow-sm">
+      <CardHeader className="space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-1">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Brain className="h-5 w-5 text-primary" />
+              無料AI分析レポート
+            </CardTitle>
+            <CardDescription>
+              検索だけで、業績・材料・リスクをAIが自動整理します。
+            </CardDescription>
+          </div>
+          {!isPremium && canUseFeature && (
+            <span className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+              本日あと {remainingUses} 回
+            </span>
+          )}
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {!isPremium && canUseFeature && (
-          <p className="text-xs text-muted-foreground">
-            自動AI分析の残り {remainingUses}/{dailyLimit} 回
-          </p>
-        )}
 
+      <CardContent className="space-y-4">
         {!canUseFeature && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
+          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900">
             <Lock className="h-4 w-4 shrink-0" />
             <span>
               本日の無料AI分析上限に達しました。プレミアムプランで無制限にご利用いただけます。
@@ -102,90 +214,85 @@ export function AskSection({
         )}
 
         {hasResponse && (
-          <div className="space-y-4 border-t pt-4">
+          <div className="space-y-4">
+            <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                結論
+              </p>
+              <p className="text-base font-semibold leading-relaxed text-foreground md:text-lg">
+                {mainText ? conclusion : "AIが分析レポートを作成しています"}
+                {isAnalyzing && !mainText && <LoadingDots />}
+                {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
+              </p>
+            </div>
+
             {(mainText || isAnalyzing) && (
-              <div className="rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-sm text-slate-800 leading-relaxed dark:text-slate-200 whitespace-pre-wrap">
-                  {mainText}
-                  {isAnalyzing && !mainText && (
-                    <>
-                      <span className="inline-block animate-bounce">.</span>
+              <div className="rounded-xl border border-slate-200 bg-card p-4 dark:border-slate-800">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">AIコメント</p>
+                  {analysisResult?.riskLevel && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className="inline-block animate-bounce"
-                        style={{ animationDelay: "0.15s" }}
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${riskClassName(
+                          analysisResult.riskLevel
+                        )}`}
                       >
-                        .
+                        {riskLabel(analysisResult.riskLevel)}
                       </span>
-                      <span
-                        className="inline-block animate-bounce"
-                        style={{ animationDelay: "0.3s" }}
-                      >
-                        .
-                      </span>
-                    </>
+                      {analysisResult.confidence != null && (
+                        <span className="text-xs text-muted-foreground">
+                          信頼度 {analysisResult.confidence}%
+                        </span>
+                      )}
+                    </div>
                   )}
-                  {isAnalyzing && mainText && (
-                    <span className="animate-pulse">▋</span>
-                  )}
+                </div>
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                  {mainText ? visibleComment : "分析文を生成しています"}
+                  {isAnalyzing && !mainText && <LoadingDots />}
+                  {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
                 </p>
+                {shouldCollapseComment && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 h-auto px-0 text-primary hover:bg-transparent hover:text-primary/80"
+                    onClick={() => setShowFullComment(prev => !prev)}
+                  >
+                    {showFullComment ? "短く表示" : "全文を読む"}
+                  </Button>
+                )}
               </div>
             )}
 
             {analysisResult && (
               <>
+                <div>
+                  <h4 className="mb-3 text-sm font-semibold">見るべきポイント</h4>
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    {pointCards.map(point => (
+                      <div
+                        key={point.label}
+                        className={`rounded-xl border p-3 ${point.className}`}
+                      >
+                        <p className="mb-2 text-xs font-bold">{point.label}</p>
+                        <p className="text-sm leading-relaxed">{point.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
                   本分析は情報提供を目的とした参考情報であり、投資助言・売買推奨ではありません。最終的な判断はご自身で行ってください。
                 </div>
-
-                {analysisResult.riskLevel && (
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span
-                      className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                        analysisResult.riskLevel === "low"
-                          ? "bg-green-200 text-green-900 dark:bg-green-900 dark:text-green-200"
-                          : analysisResult.riskLevel === "medium"
-                            ? "bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-200"
-                            : "bg-red-200 text-red-900 dark:bg-red-900 dark:text-red-200"
-                      }`}
-                    >
-                      {riskLabel(analysisResult.riskLevel)}
-                    </span>
-                    {analysisResult.confidence != null && (
-                      <span className="text-xs text-muted-foreground">
-                        信頼度: {analysisResult.confidence}%
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {previewFactors.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold mb-2">重要な要因</h4>
-                    <ul className="space-y-1.5">
-                      {previewFactors.map((factor, i) => (
-                        <li
-                          key={i}
-                          className="text-sm text-muted-foreground pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-primary"
-                        >
-                          {factor}
-                        </li>
-                      ))}
-                    </ul>
-                    {keyFactors.length > TOP_FACTORS && !showDetails && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        他 {keyFactors.length - TOP_FACTORS}{" "}
-                        件は「詳しく見る」から確認できます
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {hasMoreDetails && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full"
+                    className="w-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
                     onClick={() => setShowDetails(prev => !prev)}
                   >
                     {showDetails ? (
@@ -196,7 +303,7 @@ export function AskSection({
                     ) : (
                       <>
                         <ChevronDown className="mr-2 h-4 w-4" />
-                        詳しく見る（推定レンジ・SWOT・確認ポイント）
+                        詳しく見る（根拠・リスク・SWOT）
                       </>
                     )}
                   </Button>
@@ -204,16 +311,16 @@ export function AskSection({
 
                 {showDetails && analysisResult && (
                   <div className="space-y-4 border-t pt-4">
-                    {keyFactors.length > TOP_FACTORS && (
+                    {keyFactors.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-semibold mb-2">
-                          重要な要因（すべて）
+                        <h4 className="mb-2 text-sm font-semibold">
+                          根拠・重要な要因
                         </h4>
                         <ul className="space-y-1.5">
                           {keyFactors.map((factor, i) => (
                             <li
                               key={i}
-                              className="text-sm text-muted-foreground pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-primary"
+                              className="relative pl-4 text-sm text-muted-foreground before:absolute before:left-0 before:text-primary before:content-['•']"
                             >
                               {factor}
                             </li>
@@ -224,14 +331,14 @@ export function AskSection({
 
                     {analysisResult.recommendations?.length > 0 && (
                       <div>
-                        <h4 className="text-sm font-semibold mb-2">
-                          確認ポイント
+                        <h4 className="mb-2 text-sm font-semibold">
+                          次に確認すること
                         </h4>
                         <ul className="space-y-1.5">
                           {analysisResult.recommendations.map((rec, i) => (
                             <li
                               key={i}
-                              className="text-sm text-muted-foreground pl-4 relative before:content-['→'] before:absolute before:left-0 before:text-primary"
+                              className="relative pl-5 text-sm text-muted-foreground before:absolute before:left-0 before:text-primary before:content-['→']"
                             >
                               {rec}
                             </li>
@@ -242,7 +349,7 @@ export function AskSection({
 
                     {analysisResult.targetPrice && (
                       <div>
-                        <h4 className="text-sm font-bold mb-1">
+                        <h4 className="mb-2 text-sm font-bold">
                           参考レンジ（売買推奨ではありません）
                         </h4>
                         <div className="grid grid-cols-3 gap-2">
@@ -262,9 +369,9 @@ export function AskSection({
                           ].map(t => (
                             <div
                               key={t.label}
-                              className="text-center p-3 border rounded-lg bg-gradient-to-br from-green-50 to-green-100 border-green-300 dark:from-green-950 dark:to-green-900 dark:border-green-800"
+                              className="rounded-lg border border-green-300 bg-gradient-to-br from-green-50 to-green-100 p-3 text-center dark:border-green-800 dark:from-green-950 dark:to-green-900"
                             >
-                              <p className="text-xs font-bold text-green-700 mb-1 dark:text-green-300">
+                              <p className="mb-1 text-xs font-bold text-green-700 dark:text-green-300">
                                 {t.label}
                               </p>
                               <p className="text-base font-bold text-green-900 dark:text-green-200">
@@ -279,7 +386,7 @@ export function AskSection({
 
                     {analysisResult.stopLoss && (
                       <div>
-                        <h4 className="text-sm font-bold mb-1">
+                        <h4 className="mb-2 text-sm font-bold">
                           下振れリスク目安（参考）
                         </h4>
                         <div className="grid grid-cols-3 gap-2">
@@ -299,9 +406,9 @@ export function AskSection({
                           ].map(t => (
                             <div
                               key={t.label}
-                              className="text-center p-3 border rounded-lg bg-gradient-to-br from-red-50 to-red-100 border-red-300 dark:from-red-950 dark:to-red-900 dark:border-red-800"
+                              className="rounded-lg border border-red-300 bg-gradient-to-br from-red-50 to-red-100 p-3 text-center dark:border-red-800 dark:from-red-950 dark:to-red-900"
                             >
-                              <p className="text-xs font-bold text-red-700 mb-1 dark:text-red-300">
+                              <p className="mb-1 text-xs font-bold text-red-700 dark:text-red-300">
                                 {t.label}
                               </p>
                               <p className="text-base font-bold text-red-900 dark:text-red-200">
@@ -316,7 +423,7 @@ export function AskSection({
 
                     {analysisResult.swot && (
                       <div>
-                        <h4 className="text-sm font-bold mb-3">SWOT分析</h4>
+                        <h4 className="mb-3 text-sm font-bold">SWOT分析</h4>
                         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                           {[
                             {
@@ -361,6 +468,15 @@ export function AskSection({
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {analysisResult.aiReflection && (
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
+                        <h4 className="mb-2 text-sm font-semibold">AIの見立て</h4>
+                        <p className="text-sm leading-relaxed text-muted-foreground">
+                          {analysisResult.aiReflection}
+                        </p>
                       </div>
                     )}
                   </div>
