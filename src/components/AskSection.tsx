@@ -105,9 +105,6 @@ export function AskSection({
           <div className="space-y-4 border-t pt-4">
             {(mainText || isAnalyzing) && (
               <div className="rounded-md border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900">
-                <p className="text-xs font-semibold text-slate-500 mb-2 dark:text-slate-400">
-                  AIの分析文
-                </p>
                 <p className="text-sm text-slate-800 leading-relaxed dark:text-slate-200 whitespace-pre-wrap">
                   {mainText}
                   {isAnalyzing && !mainText && (

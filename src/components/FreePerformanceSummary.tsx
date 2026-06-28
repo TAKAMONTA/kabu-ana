@@ -1,7 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, TrendingUp } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { TrendingUp } from "lucide-react";
 import type {
   FinancialHistoryItem,
   SearchResultRatios,
@@ -165,15 +165,6 @@ export function FreePerformanceSummary({
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          無料で見られる業績サマリー
-        </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          売上・利益・収益性の数値サマリーです。
-        </p>
-      </CardHeader>
       <CardContent className="space-y-4">
         {!hidePerformanceComment && (
           <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
