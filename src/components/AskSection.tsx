@@ -46,7 +46,16 @@ function splitSentences(text: string): string[] {
   );
 }
 
-function getConclusion(text: string): string {
+function getConclusion(
+  text: string,
+  analysisResult: AnalysisResult | null
+): string {
+  const conclusion = analysisResult?.analysisConclusion?.trim();
+  if (conclusion) {
+    if (conclusion.length <= 160) return conclusion;
+    return `${conclusion.slice(0, 160)}…`;
+  }
+
   const firstSentence = splitSentences(text)[0];
   if (!firstSentence) return "AIが業績・材料・リスクを整理しています。";
   if (firstSentence.length <= 120) return firstSentence;
@@ -164,7 +173,7 @@ export function AskSection({
   const mainText = getMainAnalysisText(streamingText, analysisResult);
   const hasResponse =
     analysisResult || isAnalyzing || Boolean(mainText.trim());
-  const conclusion = getConclusion(mainText);
+  const conclusion = getConclusion(mainText, analysisResult);
   const commentBody = getCommentBody(mainText) || mainText;
   const shouldCollapseComment = commentBody.length > COMMENT_PREVIEW_LENGTH;
   const visibleComment = showFullComment

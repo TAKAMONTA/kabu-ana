@@ -5,6 +5,7 @@ import { STRUCTURED_JSON_SENTINEL } from "./analysisStream";
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 export interface AnalysisResult {
+  analysisConclusion: string;
   investmentAdvice: string;
   targetPrice: {
     shortTerm: number;
@@ -120,6 +121,9 @@ export function buildAnalysisPrompt(
     ? "上記の質問に対して、企業データを参照しながら回答してください。投資助言は避け、分析・参考情報として整理してください。"
     : "以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。";
 
+  const conclusionGuide =
+    'analysisConclusion は「何をしている会社か」という会社紹介ではなく、提供データ（業績・利益率・成長率・株価材料・リスク）を踏まえた“分析の結論”を1〜2文で書いてください。次の3要素を必ず含めること: (1) 業績・収益性の見立て、(2) 株価の材料またはリスク、(3) 投資判断として次に注目すべき点。会社概要や一般論だけの文は禁止です。';
+
   const base = `
 ${instruction}
 
@@ -141,8 +145,11 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}${question
     return `${base}
 
 まず、この企業について${question ? "質問への回答を" : "状況を"}200〜400字の自然文で述べてください。その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
+
+${conclusionGuide}
 ${STRUCTURED_JSON_SENTINEL}
 {
+  "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
   "investmentAdvice": "参考情報としての総合コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
@@ -171,7 +178,10 @@ ${STRUCTURED_JSON_SENTINEL}
   return `${base}
 
 以下のJSON形式で分析結果を返してください：
+
+${conclusionGuide}
 {
+  "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
   "investmentAdvice": "参考情報としての総合コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
@@ -228,7 +238,7 @@ export class OpenRouterClient {
           messages: [
             {
               role: "system",
-              content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。回答はJSON形式で返してください。`,
+              content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。会社概要ではなく、業績・収益性・株価材料・リスクから「なぜ注目/注意すべきか」が伝わる分析結論を作ってください。回答はJSON形式で返してください。`,
             },
             {
               role: "user",
@@ -296,6 +306,7 @@ export class OpenRouterClient {
       const result = JSON.parse(jsonMatch[0]);
 
       return {
+        analysisConclusion: result.analysisConclusion || "",
         investmentAdvice: result.investmentAdvice || "",
         targetPrice: {
           shortTerm: result.targetPrice?.shortTerm || 0,
@@ -323,6 +334,7 @@ export class OpenRouterClient {
       console.error("分析結果の解析エラー:", error);
       // フォールバック
       return {
+        analysisConclusion: "",
         investmentAdvice: "分析結果の解析に失敗しました。",
         targetPrice: { shortTerm: 0, mediumTerm: 0, longTerm: 0 },
         stopLoss: { shortTerm: 0, mediumTerm: 0, longTerm: 0 },
@@ -540,7 +552,7 @@ ${newsText}
         messages: [
           {
             role: "system",
-            content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。`,
+            content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。会社概要ではなく、業績・収益性・株価材料・リスクから「なぜ注目/注意すべきか」が伝わる分析結論を作ってください。`,
           },
           {
             role: "user",

@@ -264,7 +264,7 @@ export default function HomePage() {
 
     autoAnalyzedSymbolRef.current = symbol;
     void runAiAnalysis(
-      "この会社の業績・リスク・株価材料を、初心者向けに短く文章で分析してください。"
+      "会社紹介ではなく、業績・収益性・株価材料・リスクから見た結論を初心者向けに短く分析してください。結論には、良い点、注意点、次に見るべき点を必ず含めてください。"
     );
   }, [searchResult, isAnalyzing, canUseFeature, runAiAnalysis]);
 

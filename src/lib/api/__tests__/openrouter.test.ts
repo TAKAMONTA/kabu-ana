@@ -22,6 +22,8 @@ describe("OpenRouterClient", () => {
           {
             message: {
               content: JSON.stringify({
+                analysisConclusion:
+                  "収益性は安定している一方、材料の持続性が焦点です。次は利益率と受注動向を確認したい局面です。",
                 investmentAdvice: "参考情報として中立に確認します。",
                 targetPrice: {
                   shortTerm: 100,
@@ -59,6 +61,9 @@ describe("OpenRouterClient", () => {
     );
 
     expect(result.aiReflection).toBe("長期の事業変化を見たい銘柄です。");
+    expect(result.analysisConclusion).toBe(
+      "収益性は安定している一方、材料の持続性が焦点です。次は利益率と受注動向を確認したい局面です。"
+    );
     expect(post).toHaveBeenCalledTimes(1);
     const payload = post.mock.calls[0]![1] as {
       max_tokens: number;
@@ -67,6 +72,7 @@ describe("OpenRouterClient", () => {
     expect(payload).toMatchObject({
       max_tokens: 2500,
     });
+    expect(payload.messages[1]!.content).toContain('"analysisConclusion"');
     expect(payload.messages[1]!.content).toContain('"aiReflection"');
   });
 });
