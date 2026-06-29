@@ -44,11 +44,17 @@ function getMainAnalysisText(
 }
 
 function splitSentences(text: string): string[] {
+  // 小数点（例: 48.4）を文の区切りと誤認しないよう、一時的に退避してから分割する
+  const DECIMAL_PLACEHOLDER = "\u0001";
+  const protectedText = text
+    .replace(/\s+/g, " ")
+    .replace(/(\d)\.(\d)/g, `$1${DECIMAL_PLACEHOLDER}$2`);
   return (
-    text
-      .replace(/\s+/g, " ")
+    protectedText
       .match(/[^。.!?！？]+[。.!?！？]?/g)
-      ?.map(sentence => sentence.trim())
+      ?.map(sentence =>
+        sentence.replace(new RegExp(DECIMAL_PLACEHOLDER, "g"), ".").trim()
+      )
       .filter(Boolean) ?? []
   );
 }
@@ -71,31 +77,24 @@ function getCommentBody(
 ): string {
   const conclusion = analysisResult?.analysisConclusion?.trim() || "";
   const advice = analysisResult?.investmentAdvice?.trim() || "";
-  let body = text.trim();
 
-  if (advice && (!body || sentencesOverlap(body, conclusion))) {
-    body = advice;
-  } else {
+  // ストリーミング本文を優先し、無ければ補足コメントを使う
+  let body = text.trim() || advice;
+  if (!body) return "";
+
+  // 結論は別枠で表示するため、結論と重複する文のみを取り除く。
+  // 文章の先頭を無条件に削らないことで「数字の途中から始まる」表示崩れを防ぐ。
+  if (conclusion) {
     const sentences = splitSentences(body);
-    if (sentences.length > 1) {
-      body = sentences.slice(1).join(" ").trim();
-    }
-  }
-
-  if (conclusion && body) {
-    const filtered = splitSentences(body).filter(
+    const filtered = sentences.filter(
       sentence => !sentencesOverlap(sentence, conclusion)
     );
-    if (filtered.length > 0) {
-      body = filtered.join(" ").trim();
+    if (filtered.length > 0 && filtered.length < sentences.length) {
+      body = filtered.join("").trim();
     }
   }
 
-  if (!body && advice && !sentencesOverlap(advice, conclusion)) {
-    return advice;
-  }
-
-  return body || text.trim();
+  return body;
 }
 
 function truncateText(text: string, maxLength: number): string {
