@@ -1,12 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Brain } from "lucide-react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
 
 interface FinancialEvaluationSectionProps {
   financialEval: FinancialEvaluationResult | null;
   isFinancialLoading: boolean;
+  financialError?: string | null;
+  onRetry?: () => void;
   getScoreLabel: (score: number) => string;
   getScoreColor: (score: number) => string;
 }
@@ -14,6 +17,8 @@ interface FinancialEvaluationSectionProps {
 export function FinancialEvaluationSection({
   financialEval,
   isFinancialLoading,
+  financialError,
+  onRetry,
   getScoreLabel,
   getScoreColor,
 }: FinancialEvaluationSectionProps) {
@@ -34,6 +39,23 @@ export function FinancialEvaluationSection({
         </div>
       </CardHeader>
       <CardContent>
+        {financialError && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-semibold">財務評価を取得できませんでした</p>
+            <p className="mt-1 text-destructive/80">{financialError}</p>
+            {onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={onRetry}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        )}
         {financialEval?.parseFailed ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
             <p className="font-semibold">財務評価を表示できませんでした</p>
@@ -41,6 +63,17 @@ export function FinancialEvaluationSection({
               {financialEval.analysis ||
                 "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
             </p>
+            {onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+                onClick={onRetry}
+              >
+                再試行
+              </Button>
+            )}
           </div>
         ) : financialEval ? (
           <div className="space-y-5">

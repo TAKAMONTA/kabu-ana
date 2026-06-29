@@ -8,6 +8,7 @@ interface NewsAnalysisState {
   error: string | null;
   newsData: any[] | null;
   analysis: NewsAnalysisResult | null;
+  empty: boolean;
 }
 
 export function useNewsAnalysis() {
@@ -16,6 +17,7 @@ export function useNewsAnalysis() {
     error: null,
     newsData: null,
     analysis: null,
+    empty: false,
   });
   const lastArgsRef = useRef<{ symbol: string; companyName: string } | null>(null);
   const mountedRef = useRef(true);
@@ -31,7 +33,7 @@ export function useNewsAnalysis() {
       options?: { bundleToken?: string }
     ) => {
       lastArgsRef.current = { symbol, companyName };
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
+      setState(prev => ({ ...prev, isLoading: true, error: null, empty: false }));
 
       try {
         const headers = await getAuthHeaders();
@@ -56,6 +58,7 @@ export function useNewsAnalysis() {
           error: null,
           newsData: response.data.newsData,
           analysis: response.data.analysis,
+          empty: Boolean(response.data.empty),
         });
       } catch (err) {
         if (!mountedRef.current) return;
@@ -85,6 +88,7 @@ export function useNewsAnalysis() {
       error: null,
       newsData: null,
       analysis: null,
+      empty: false,
     });
   }, []);
 

@@ -74,10 +74,11 @@ async function newsAnalysisHandler(request: NextRequest) {
     }
 
     if (!newsData || newsData.length === 0) {
-      return NextResponse.json(
-        { error: "ニュースが見つかりませんでした" },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        newsData: [],
+        analysis: null,
+        empty: true,
+      });
     }
 
     // AIによるニュース分析

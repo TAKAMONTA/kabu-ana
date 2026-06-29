@@ -25,7 +25,14 @@ interface AskSectionProps {
 }
 
 const COMMENT_PREVIEW_LENGTH = 260;
-const TOP_FACTORS = 3;
+const CONCLUSION_MAX_LENGTH = 100;
+
+function getConclusion(analysisResult: AnalysisResult | null): string | null {
+  const conclusion = analysisResult?.analysisConclusion?.trim();
+  if (!conclusion) return null;
+  if (conclusion.length <= CONCLUSION_MAX_LENGTH) return conclusion;
+  return `${conclusion.slice(0, CONCLUSION_MAX_LENGTH)}…`;
+}
 
 function getMainAnalysisText(
   streamingText: string,
@@ -44,22 +51,6 @@ function splitSentences(text: string): string[] {
       ?.map(sentence => sentence.trim())
       .filter(Boolean) ?? []
   );
-}
-
-function getConclusion(
-  text: string,
-  analysisResult: AnalysisResult | null
-): string {
-  const conclusion = analysisResult?.analysisConclusion?.trim();
-  if (conclusion) {
-    if (conclusion.length <= 160) return conclusion;
-    return `${conclusion.slice(0, 160)}…`;
-  }
-
-  const firstSentence = splitSentences(text)[0];
-  if (!firstSentence) return "AIが業績・材料・リスクを整理しています。";
-  if (firstSentence.length <= 120) return firstSentence;
-  return `${firstSentence.slice(0, 120)}…`;
 }
 
 function normalizeForCompare(text: string): string {
@@ -212,7 +203,7 @@ export function AskSection({
   const mainText = getMainAnalysisText(streamingText, analysisResult);
   const hasResponse =
     analysisResult || isAnalyzing || Boolean(mainText.trim());
-  const conclusion = getConclusion(mainText, analysisResult);
+  const conclusion = getConclusion(analysisResult);
   const commentBody = getCommentBody(mainText, analysisResult) || mainText;
   const shouldCollapseComment = commentBody.length > COMMENT_PREVIEW_LENGTH;
   const visibleComment = showFullComment
@@ -263,17 +254,6 @@ export function AskSection({
 
         {hasResponse && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
-                結論
-              </p>
-              <p className="text-base font-semibold leading-relaxed text-foreground md:text-lg">
-                {mainText ? conclusion : "AIが分析レポートを作成しています"}
-                {isAnalyzing && !mainText && <LoadingDots />}
-                {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
-              </p>
-            </div>
-
             {(mainText || isAnalyzing) && (
               <div className="rounded-xl border border-slate-200 bg-card p-4 dark:border-slate-800">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -311,6 +291,18 @@ export function AskSection({
                     {showFullComment ? "短く表示" : "全文を読む"}
                   </Button>
                 )}
+              </div>
+            )}
+
+            {(conclusion || (isAnalyzing && mainText)) && (
+              <div className="rounded-xl border border-primary/20 bg-primary/10 p-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                  結論
+                </p>
+                <p className="text-base font-semibold leading-relaxed text-foreground md:text-lg">
+                  {conclusion ?? "結論をまとめています"}
+                  {isAnalyzing && !conclusion && <LoadingDots />}
+                </p>
               </div>
             )}
 

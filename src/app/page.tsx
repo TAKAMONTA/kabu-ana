@@ -96,6 +96,7 @@ export default function HomePage() {
     error: newsError,
     newsData: analyzedNews,
     analysis: newsAnalysis,
+    empty: newsEmpty,
     analyzeNews,
     clearAnalysis: clearNewsAnalysis,
     retry: retryNewsAnalysis,
@@ -580,17 +581,15 @@ export default function HomePage() {
           </>
         )}
 
-        {/* エラー表示 */}
-        {(error || analysisError || newsError || financialError) && (
+        {/* エラー表示（検索・メインAI分析のみ） */}
+        {(error || analysisError) && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold">エラーが発生しました</p>
-                  <p className="text-sm mt-1">
-                    {error || analysisError || newsError || financialError}
-                  </p>
+                  <p className="text-sm mt-1">{error || analysisError}</p>
                   <div className="flex gap-2 mt-3">
                     {analysisError && (
                       <button
@@ -598,22 +597,6 @@ export default function HomePage() {
                         className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
                       >
                         AI分析を再試行
-                      </button>
-                    )}
-                    {newsError && (
-                      <button
-                        onClick={retryNewsAnalysis}
-                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        ニュース分析を再試行
-                      </button>
-                    )}
-                    {financialError && (
-                      <button
-                        onClick={retryFinancialEval}
-                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        財務評価を再試行
                       </button>
                     )}
                   </div>
@@ -704,6 +687,8 @@ export default function HomePage() {
                 <FinancialEvaluationSection
                   financialEval={financialEval}
                   isFinancialLoading={isFinancialLoading}
+                  financialError={financialError}
+                  onRetry={retryFinancialEval}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
                 />
@@ -714,6 +699,9 @@ export default function HomePage() {
                   analyzedNews={analyzedNews}
                   newsData={searchResult.newsData}
                   isNewsAnalyzing={isNewsAnalyzing}
+                  newsError={newsError}
+                  newsEmpty={newsEmpty}
+                  onRetryNews={retryNewsAnalysis}
                 />
               </div>
             </div>

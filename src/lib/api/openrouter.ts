@@ -145,7 +145,7 @@ export function buildAnalysisPrompt(
     : "以下の企業情報を基に、投資助言ではない参考分析を行ってください。売買判断を直接促す表現は避け、材料・リスク・確認ポイントとして整理してください。";
 
   const conclusionGuide =
-    'analysisConclusion は「何をしている会社か」という会社紹介ではなく、提供データ（業績・利益率・成長率・株価材料・リスク）を踏まえた“分析の結論”を1〜2文で書いてください。次の3要素を必ず含めること: (1) 業績・収益性の見立て、(2) 株価の材料またはリスク、(3) 投資判断として次に注目すべき点。会社概要や一般論だけの文は禁止です。';
+    'analysisConclusion は1文・40〜80字で書いてください。「何をしている会社か」という会社紹介は禁止。提供データから業績・収益性の見立てを言い切り、数値や根拠を1つ含め、株価の材料またはリスク、次に注目すべき点のいずれかを短く述べてください。';
 
   const narrativeGuide =
     "自然文（ストリーミング本文）では、analysisConclusion の繰り返し・要約は禁止です。具体的な数値（売上成長率、利益率、ROE、株価変動など）とその意味、業界背景、なぜそのリスク/材料が重要かを初心者向けに説明してください。investmentAdvice も結論の言い換えではなく、根拠と背景の補足として書いてください。";
@@ -177,7 +177,7 @@ ${narrativeGuide}
 ${conclusionGuide}
 ${STRUCTURED_JSON_SENTINEL}
 {
-  "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
+  "analysisConclusion": "1文・40〜80字の分析結論（数値を1つ含め、業績見立てと材料/リスク/注目点を短く言い切る）",
   "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
@@ -209,7 +209,7 @@ ${STRUCTURED_JSON_SENTINEL}
 
 ${conclusionGuide}
 {
-  "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
+  "analysisConclusion": "1文・40〜80字の分析結論（数値を1つ含め、業績見立てと材料/リスク/注目点を短く言い切る）",
   "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,

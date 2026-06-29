@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Brain, TrendingUp, ExternalLink } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { normalizeDisplayText } from "@/lib/displayText";
@@ -18,6 +19,9 @@ interface NewsSectionProps {
   analyzedNews: NewsItem[] | null;
   newsData: NewsItem[] | null;
   isNewsAnalyzing: boolean;
+  newsError?: string | null;
+  newsEmpty?: boolean;
+  onRetryNews?: () => void;
 }
 
 export function NewsSection({
@@ -25,6 +29,9 @@ export function NewsSection({
   analyzedNews,
   newsData,
   isNewsAnalyzing,
+  newsError,
+  newsEmpty = false,
+  onRetryNews,
 }: NewsSectionProps) {
   const renderNewsCard = (news: NewsItem, idx: number) => {
     const title = normalizeDisplayText(news.title || news.snippet);
@@ -78,6 +85,23 @@ export function NewsSection({
         </div>
       </CardHeader>
       <CardContent>
+        {newsError && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-semibold">ニュース分析を取得できませんでした</p>
+            <p className="mt-1 text-destructive/80">{newsError}</p>
+            {onRetryNews && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={onRetryNews}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        )}
         {newsAnalysis?.parseFailed ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
             <p className="font-semibold">ニュース影響分析を表示できませんでした</p>
@@ -85,6 +109,17 @@ export function NewsSection({
               {newsAnalysis.analysis ||
                 "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
             </p>
+            {onRetryNews && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+                onClick={onRetryNews}
+              >
+                再試行
+              </Button>
+            )}
           </div>
         ) : newsAnalysis ? (
           <div className="space-y-6">
@@ -178,6 +213,13 @@ export function NewsSection({
                 </div>
               </div>
             )}
+          </div>
+        ) : newsEmpty ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900">
+            <p>この銘柄に関する最新ニュースは見つかりませんでした。</p>
+            <p className="mt-1 text-xs">
+              ニュースが無いため、影響分析はスキップされます。
+            </p>
           </div>
         ) : newsData && newsData.length > 0 ? (
           <div className="space-y-3">
