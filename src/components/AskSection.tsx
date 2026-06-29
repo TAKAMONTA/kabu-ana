@@ -62,10 +62,49 @@ function getConclusion(
   return `${firstSentence.slice(0, 120)}…`;
 }
 
-function getCommentBody(text: string): string {
-  const sentences = splitSentences(text);
-  if (sentences.length <= 1) return text.trim();
-  return sentences.slice(1).join(" ").trim();
+function normalizeForCompare(text: string): string {
+  return text.replace(/\s+/g, "").toLowerCase();
+}
+
+function sentencesOverlap(a: string, b: string): boolean {
+  const normA = normalizeForCompare(a);
+  const normB = normalizeForCompare(b);
+  if (!normA || !normB) return false;
+  const probe = normA.slice(0, Math.min(24, normA.length));
+  return normB.includes(probe) || normA.includes(normB.slice(0, Math.min(24, normB.length)));
+}
+
+function getCommentBody(
+  text: string,
+  analysisResult: AnalysisResult | null
+): string {
+  const conclusion = analysisResult?.analysisConclusion?.trim() || "";
+  const advice = analysisResult?.investmentAdvice?.trim() || "";
+  let body = text.trim();
+
+  if (advice && (!body || sentencesOverlap(body, conclusion))) {
+    body = advice;
+  } else {
+    const sentences = splitSentences(body);
+    if (sentences.length > 1) {
+      body = sentences.slice(1).join(" ").trim();
+    }
+  }
+
+  if (conclusion && body) {
+    const filtered = splitSentences(body).filter(
+      sentence => !sentencesOverlap(sentence, conclusion)
+    );
+    if (filtered.length > 0) {
+      body = filtered.join(" ").trim();
+    }
+  }
+
+  if (!body && advice && !sentencesOverlap(advice, conclusion)) {
+    return advice;
+  }
+
+  return body || text.trim();
 }
 
 function truncateText(text: string, maxLength: number): string {
@@ -174,7 +213,7 @@ export function AskSection({
   const hasResponse =
     analysisResult || isAnalyzing || Boolean(mainText.trim());
   const conclusion = getConclusion(mainText, analysisResult);
-  const commentBody = getCommentBody(mainText) || mainText;
+  const commentBody = getCommentBody(mainText, analysisResult) || mainText;
   const shouldCollapseComment = commentBody.length > COMMENT_PREVIEW_LENGTH;
   const visibleComment = showFullComment
     ? commentBody
@@ -238,7 +277,7 @@ export function AskSection({
             {(mainText || isAnalyzing) && (
               <div className="rounded-xl border border-slate-200 bg-card p-4 dark:border-slate-800">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">AIコメント</p>
+                  <p className="text-sm font-semibold text-foreground">根拠と背景</p>
                   {analysisResult?.riskLevel && (
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -257,7 +296,7 @@ export function AskSection({
                   )}
                 </div>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                  {mainText ? visibleComment : "分析文を生成しています"}
+                  {mainText ? visibleComment : "根拠と背景を生成しています"}
                   {isAnalyzing && !mainText && <LoadingDots />}
                   {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
                 </p>

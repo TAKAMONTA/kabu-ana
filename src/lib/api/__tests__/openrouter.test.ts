@@ -1,6 +1,10 @@
 import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OpenRouterClient } from "../openrouter";
+import {
+  OpenRouterClient,
+  extractJsonFromContent,
+  parseJsonFromAiContent,
+} from "../openrouter";
 
 vi.mock("axios", () => ({
   default: {
@@ -74,5 +78,97 @@ describe("OpenRouterClient", () => {
     });
     expect(payload.messages[1]!.content).toContain('"analysisConclusion"');
     expect(payload.messages[1]!.content).toContain('"aiReflection"');
+  });
+
+  it("extracts JSON from fenced AI responses", () => {
+    const fenced = 'Here is the result:\n```json\n{"impact":"positive","impactScore":42}\n```';
+    expect(extractJsonFromContent(fenced)).toBe(
+      '{"impact":"positive","impactScore":42}'
+    );
+    const parsed = parseJsonFromAiContent<{ impact: string; impactScore: number }>(
+      fenced
+    );
+    expect(parsed.impact).toBe("positive");
+    expect(parsed.impactScore).toBe(42);
+  });
+
+  it("parses financial evaluation from fenced JSON", async () => {
+    const post = vi.mocked(axios.post);
+    post.mockResolvedValue({
+      data: {
+        choices: [
+          {
+            message: {
+              content: `\`\`\`json
+{
+  "bs": { "score": 4, "summary": "自己資本比率は良好" },
+  "pl": { "score": 5, "summary": "高い利益率" },
+  "cf": { "score": 4, "summary": "FCFは黒字" },
+  "overall": { "score": 4, "label": "総合評価" },
+  "analysis": "財務体質は強い",
+  "recommendations": ["次期決算を確認"]
+}
+\`\`\``,
+            },
+          },
+        ],
+      },
+    });
+
+    const client = new OpenRouterClient("openrouter-key");
+    const result = await client.analyzeFinancials("Example", "EX", {});
+
+    expect(result.parseFailed).toBeUndefined();
+    expect(result.bs.summary).toBe("自己資本比率は良好");
+    expect(result.pl.score).toBe(5);
+    expect(result.analysis).toBe("財務体質は強い");
+  });
+
+  it("parses news analysis from fenced JSON", async () => {
+    const post = vi.mocked(axios.post);
+    post.mockResolvedValue({
+      data: {
+        choices: [
+          {
+            message: {
+              content: `\`\`\`json
+{
+  "impact": "positive",
+  "impactScore": 30,
+  "analysis": "好材料が中心",
+  "keyPoints": ["新製品発表"],
+  "recommendations": ["売上への寄与を確認"]
+}
+\`\`\``,
+            },
+          },
+        ],
+      },
+    });
+
+    const client = new OpenRouterClient("openrouter-key");
+    const result = await client.analyzeNewsImpact("Example", "EX", [
+      { title: "ニュース", snippet: "概要", source: "test", date: "2026-01-01" },
+    ]);
+
+    expect(result.parseFailed).toBeUndefined();
+    expect(result.impact).toBe("positive");
+    expect(result.analysis).toBe("好材料が中心");
+    expect(result.keyPoints).toEqual(["新製品発表"]);
+  });
+
+  it("marks financial evaluation as failed when JSON is invalid", async () => {
+    const post = vi.mocked(axios.post);
+    post.mockResolvedValue({
+      data: {
+        choices: [{ message: { content: "not json at all" } }],
+      },
+    });
+
+    const client = new OpenRouterClient("openrouter-key");
+    const result = await client.analyzeFinancials("Example", "EX", {});
+
+    expect(result.parseFailed).toBe(true);
+    expect(result.analysis).toContain("読み取れませんでした");
   });
 });

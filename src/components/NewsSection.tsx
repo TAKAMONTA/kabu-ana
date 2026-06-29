@@ -78,7 +78,15 @@ export function NewsSection({
         </div>
       </CardHeader>
       <CardContent>
-        {newsAnalysis ? (
+        {newsAnalysis?.parseFailed ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-semibold">ニュース影響分析を表示できませんでした</p>
+            <p className="mt-1 text-muted-foreground">
+              {newsAnalysis.analysis ||
+                "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
+            </p>
+          </div>
+        ) : newsAnalysis ? (
           <div className="space-y-6">
             {/* ニュース影響分析結果 */}
             <div className="p-5 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-lg border-2 border-purple-300 shadow-sm dark:from-purple-950 dark:to-purple-900/50 dark:border-purple-800">

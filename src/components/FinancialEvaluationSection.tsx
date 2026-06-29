@@ -34,7 +34,15 @@ export function FinancialEvaluationSection({
         </div>
       </CardHeader>
       <CardContent>
-        {financialEval ? (
+        {financialEval?.parseFailed ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-semibold">財務評価を表示できませんでした</p>
+            <p className="mt-1 text-muted-foreground">
+              {financialEval.analysis ||
+                "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
+            </p>
+          </div>
+        ) : financialEval ? (
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[

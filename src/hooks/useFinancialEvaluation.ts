@@ -1,17 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
+import { FinancialEvaluationResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
-
-export interface FinancialEvaluationResult {
-  bs: { score: 1 | 2 | 3 | 4 | 5; summary: string };
-  pl: { score: 1 | 2 | 3 | 4 | 5; summary: string };
-  cf: { score: 1 | 2 | 3 | 4 | 5; summary: string };
-  overall: { score: 1 | 2 | 3 | 4 | 5; label: string };
-  analysis: string;
-  recommendations: string[];
-}
 
 export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);

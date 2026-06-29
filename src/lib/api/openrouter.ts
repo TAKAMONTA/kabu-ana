@@ -36,6 +36,7 @@ export interface NewsAnalysisResult {
   analysis: string;
   keyPoints: string[];
   recommendations: string[];
+  parseFailed?: boolean;
 }
 
 export interface FinancialEvaluationResult {
@@ -45,6 +46,7 @@ export interface FinancialEvaluationResult {
   overall: { score: 1 | 2 | 3 | 4 | 5; label: string };
   analysis: string;
   recommendations: string[];
+  parseFailed?: boolean;
 }
 
 export interface OpenRouterResponse {
@@ -107,6 +109,27 @@ function buildEdinetSections(edinetExtras?: EdinetExtras | null): string {
   return ratiosSection + historySection;
 }
 
+/** AI応答からJSON文字列を抽出（```json フェンスや前置き文に対応） */
+export function extractJsonFromContent(content: string): string | null {
+  if (!content?.trim()) return null;
+
+  const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenceMatch?.[1]?.trim()) {
+    return fenceMatch[1].trim();
+  }
+
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  return jsonMatch ? jsonMatch[0] : null;
+}
+
+export function parseJsonFromAiContent<T>(content: string): T {
+  const jsonStr = extractJsonFromContent(content);
+  if (!jsonStr) {
+    throw new Error("JSON形式の応答が見つかりません");
+  }
+  return JSON.parse(jsonStr) as T;
+}
+
 export function buildAnalysisPrompt(
   companyInfo: any,
   stockData: any,
@@ -123,6 +146,9 @@ export function buildAnalysisPrompt(
 
   const conclusionGuide =
     'analysisConclusion は「何をしている会社か」という会社紹介ではなく、提供データ（業績・利益率・成長率・株価材料・リスク）を踏まえた“分析の結論”を1〜2文で書いてください。次の3要素を必ず含めること: (1) 業績・収益性の見立て、(2) 株価の材料またはリスク、(3) 投資判断として次に注目すべき点。会社概要や一般論だけの文は禁止です。';
+
+  const narrativeGuide =
+    "自然文（ストリーミング本文）では、analysisConclusion の繰り返し・要約は禁止です。具体的な数値（売上成長率、利益率、ROE、株価変動など）とその意味、業界背景、なぜそのリスク/材料が重要かを初心者向けに説明してください。investmentAdvice も結論の言い換えではなく、根拠と背景の補足として書いてください。";
 
   const base = `
 ${instruction}
@@ -144,13 +170,15 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}${question
   if (streaming) {
     return `${base}
 
-まず、この企業について${question ? "質問への回答を" : "状況を"}200〜400字の自然文で述べてください。その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
+まず、この企業について${question ? "質問への回答を" : "分析の根拠と背景を"}200〜400字の自然文で述べてください。
+${narrativeGuide}
+その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
 
 ${conclusionGuide}
 ${STRUCTURED_JSON_SENTINEL}
 {
   "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
-  "investmentAdvice": "参考情報としての総合コメント",
+  "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
     "mediumTerm": 中期目標価格,
@@ -182,7 +210,7 @@ ${STRUCTURED_JSON_SENTINEL}
 ${conclusionGuide}
 {
   "analysisConclusion": "データに基づく1〜2文の分析の結論（業績の見立て・株価材料/リスク・次の注目点を含む）",
-  "investmentAdvice": "参考情報としての総合コメント",
+  "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
     "mediumTerm": 中期目標価格,
@@ -297,13 +325,18 @@ export class OpenRouterClient {
 
   parseAnalysisResult(content: string): AnalysisResult {
     try {
-      // JSON部分を抽出
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("JSON形式の分析結果が見つかりません");
-      }
-
-      const result = JSON.parse(jsonMatch[0]);
+      const result = parseJsonFromAiContent<{
+        analysisConclusion?: string;
+        investmentAdvice?: string;
+        targetPrice?: { shortTerm?: number; mediumTerm?: number; longTerm?: number };
+        stopLoss?: { shortTerm?: number; mediumTerm?: number; longTerm?: number };
+        riskLevel?: AnalysisResult["riskLevel"];
+        confidence?: number;
+        keyFactors?: string[];
+        recommendations?: string[];
+        aiReflection?: string;
+        swot?: AnalysisResult["swot"];
+      }>(content);
 
       return {
         analysisConclusion: result.analysisConclusion || "",
@@ -371,7 +404,7 @@ export class OpenRouterClient {
           messages: [
             {
               role: "system",
-              content: `あなたは企業ニュースを整理する分析アシスタントです。投資助言や売買推奨は行わず、最新ニュースの材料性、注意点、確認ポイントを中立的にまとめてください。`,
+              content: `あなたは企業ニュースを整理する分析アシスタントです。投資助言や売買推奨は行わず、最新ニュースの材料性、注意点、確認ポイントを中立的にまとめてください。必ず有効なJSONのみを返してください。`,
             },
             {
               role: "user",
@@ -393,16 +426,22 @@ export class OpenRouterClient {
       );
 
       const content = response.data.choices[0].message.content;
-      const analysisResult = JSON.parse(content);
+      const analysisResult = parseJsonFromAiContent<{
+        impact: NewsAnalysisResult["impact"];
+        impactScore: number;
+        analysis: string;
+        keyPoints: string[];
+        recommendations: string[];
+      }>(content);
 
       return {
-        impact: analysisResult.impact,
-        impactScore: analysisResult.impactScore,
-        analysis: analysisResult.analysis,
-        keyPoints: analysisResult.keyPoints,
-        recommendations: analysisResult.recommendations,
+        impact: analysisResult.impact || "neutral",
+        impactScore: analysisResult.impactScore ?? 0,
+        analysis: analysisResult.analysis || "",
+        keyPoints: analysisResult.keyPoints || [],
+        recommendations: analysisResult.recommendations || [],
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(
         "ニュース分析エラー:",
         error instanceof Error ? error.message : error
@@ -410,9 +449,11 @@ export class OpenRouterClient {
       return {
         impact: "neutral",
         impactScore: 0,
-        analysis: "ニュース分析中にエラーが発生しました。",
+        analysis:
+          "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。",
         keyPoints: [],
         recommendations: [],
+        parseFailed: true,
       };
     }
   }
@@ -490,8 +531,15 @@ ${newsText}
       );
 
       const content = response.data?.choices?.[0]?.message?.content as string;
-      const json = JSON.parse(content);
-      const toScore = (n: any) => {
+      const json = parseJsonFromAiContent<{
+        bs?: { score?: number; summary?: string };
+        pl?: { score?: number; summary?: string };
+        cf?: { score?: number; summary?: string };
+        overall?: { score?: number; label?: string };
+        analysis?: string;
+        recommendations?: string[];
+      }>(content);
+      const toScore = (n: unknown) => {
         const v = Math.max(1, Math.min(5, Number(n) || 3));
         return Math.round(v) as 1 | 2 | 3 | 4 | 5;
       };
@@ -512,12 +560,14 @@ ${newsText}
         error instanceof Error ? error.message : error
       );
       return {
-        bs: { score: 3, summary: "BSの評価を取得できませんでした。" },
-        pl: { score: 3, summary: "PLの評価を取得できませんでした。" },
-        cf: { score: 3, summary: "CFの評価を取得できませんでした。" },
+        bs: { score: 3, summary: "" },
+        pl: { score: 3, summary: "" },
+        cf: { score: 3, summary: "" },
         overall: { score: 3, label: "総合評価" },
-        analysis: "財務評価中にエラーが発生しました。",
+        analysis:
+          "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。",
         recommendations: [],
+        parseFailed: true,
       };
     }
   }
