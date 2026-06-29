@@ -20,7 +20,9 @@ export function toJQuantsCode(code: string): string {
 
 /** 入力から4桁証券コードを抽出（無ければ元文字列） */
 function extract4(code: string): string {
-  return String(code).normalize("NFKC").match(/\d{4}/)?.[0] ?? String(code).trim();
+  return (
+    String(code).normalize("NFKC").match(/\d{4}/)?.[0] ?? String(code).trim()
+  );
 }
 
 const num = (v: unknown): number => {
@@ -42,7 +44,9 @@ function jFrom(window: string = "1M"): string {
     "5Y": 5 * 365,
     MAX: 20 * 365,
   };
-  return new Date(Date.now() - (back[window] ?? 31) * day).toISOString().slice(0, 10);
+  return new Date(Date.now() - (back[window] ?? 31) * day)
+    .toISOString()
+    .slice(0, 10);
 }
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -72,7 +76,9 @@ export class JQuantsClient implements MarketDataClient {
 
   async searchCompany(query: string): Promise<CompanyInfo | null> {
     const code4 = extract4(query);
-    const rows = await this.getData(`/equities/master?code=${toJQuantsCode(code4)}`);
+    const rows = await this.getData(
+      `/equities/master?code=${toJQuantsCode(code4)}`
+    );
     const m = rows[0];
     if (!m) return null;
     const jpx = JPX_STOCK_BY_CODE.get(code4);
@@ -93,7 +99,9 @@ export class JQuantsClient implements MarketDataClient {
     const rows = await this.getData(
       `/equities/bars/daily?code=${toJQuantsCode(code4)}&from=${jFrom(window)}&to=${today()}`
     );
-    return rows.filter((r: any) => r && r.Date).sort((a: any, b: any) => (a.Date < b.Date ? -1 : 1));
+    return rows
+      .filter((r: any) => r && r.Date)
+      .sort((a: any, b: any) => (a.Date < b.Date ? -1 : 1));
   }
 
   async getStockData(symbol: string): Promise<StockData | null> {
@@ -120,7 +128,10 @@ export class JQuantsClient implements MarketDataClient {
     };
   }
 
-  async getChartData(symbol: string, window: string = "1M"): Promise<ChartDataPoint[]> {
+  async getChartData(
+    symbol: string,
+    window: string = "1M"
+  ): Promise<ChartDataPoint[]> {
     const rows = await this.bars(extract4(symbol), window);
     return rows.map((r: any) => ({
       date: r.Date,
@@ -130,7 +141,9 @@ export class JQuantsClient implements MarketDataClient {
   }
 
   async getFinancialData(symbol: string): Promise<FinancialData | null> {
-    const rows = await this.getData(`/fins/summary?code=${toJQuantsCode(extract4(symbol))}`);
+    const rows = await this.getData(
+      `/fins/summary?code=${toJQuantsCode(extract4(symbol))}`
+    );
     const s = rows[rows.length - 1];
     if (!s) return null;
     return {
@@ -150,18 +163,26 @@ export class JQuantsClient implements MarketDataClient {
     return this.freeNews.getComprehensiveNews(name, symbol, limit);
   }
 
-  async getCompanyNewsFromGoogle(_symbol: string, companyName: string, limit = 10): Promise<NewsItem[]> {
+  async getCompanyNewsFromGoogle(
+    _symbol: string,
+    companyName: string,
+    limit = 10
+  ): Promise<NewsItem[]> {
     return this.freeNews.getComprehensiveNews(companyName, undefined, limit);
   }
 
-  async getFastSearchResult(query: string, window = "1M"): Promise<FastSearchResult | null> {
-    const [companyInfo, stockData, chartData, financialData, newsData] = await Promise.all([
-      this.searchCompany(query),
-      this.getStockData(query),
-      this.getChartData(query, window),
-      this.getFinancialData(query),
-      this.getCompanyNews(query, 5),
-    ]);
+  async getFastSearchResult(
+    query: string,
+    window = "1M"
+  ): Promise<FastSearchResult | null> {
+    const [companyInfo, stockData, chartData, financialData, newsData] =
+      await Promise.all([
+        this.searchCompany(query),
+        this.getStockData(query),
+        this.getChartData(query, window),
+        this.getFinancialData(query),
+        this.getCompanyNews(query, 5),
+      ]);
     if (!companyInfo || !stockData) return null;
     return {
       companyInfo: {

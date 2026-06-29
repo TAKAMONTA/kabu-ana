@@ -33,10 +33,7 @@ const nextConfig = {
       }),
   // 実験的機能の設定
   experimental: {
-    serverComponentsExternalPackages: [
-      "@firebase/auth",
-      "@firebase/firestore",
-    ],
+    serverComponentsExternalPackages: ["@firebase/auth", "@firebase/firestore"],
   },
   // 静的エクスポート時にfirebase-adminをwebpackの外部モジュールとして扱う
   webpack: (config, { isServer }) => {

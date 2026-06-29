@@ -1,13 +1,21 @@
 import { FreeNewsClient } from "./freeNews";
 import type {
-  CompanyInfo, StockData, ChartDataPoint, FinancialData, FastSearchResult,
-  MarketDataClient, NewsItem,
+  CompanyInfo,
+  StockData,
+  ChartDataPoint,
+  FinancialData,
+  FastSearchResult,
+  MarketDataClient,
+  NewsItem,
 } from "./marketDataTypes";
 
 const BASE = "https://api.twelvedata.com";
 
 /** アプリの window 値 → Twelve Data {interval, outputsize} */
-export function tdWindow(window: string = "1M"): { interval: string; outputsize: number } {
+export function tdWindow(window: string = "1M"): {
+  interval: string;
+  outputsize: number;
+} {
   const table: Record<string, { interval: string; outputsize: number }> = {
     "1D": { interval: "5min", outputsize: 78 },
     "5D": { interval: "30min", outputsize: 65 },
@@ -31,10 +39,13 @@ export class TwelveDataClient implements MarketDataClient {
 
   private async get(path: string): Promise<any> {
     const sep = path.includes("?") ? "&" : "?";
-    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`).catch(() => null);
+    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`).catch(
+      () => null
+    );
     if (!res) return null;
     const body = await res.json().catch(() => ({}));
-    if (body && (body.status === "error" || Number(body.code) >= 400)) return null;
+    if (body && (body.status === "error" || Number(body.code) >= 400))
+      return null;
     return body;
   }
 
@@ -74,7 +85,10 @@ export class TwelveDataClient implements MarketDataClient {
     return this.searchCompany(query);
   }
 
-  async getChartData(symbol: string, window: string = "1M"): Promise<ChartDataPoint[]> {
+  async getChartData(
+    symbol: string,
+    window: string = "1M"
+  ): Promise<ChartDataPoint[]> {
     const { interval, outputsize } = tdWindow(window);
     const d = await this.get(
       `/time_series?symbol=${encodeURIComponent(symbol)}&interval=${interval}&outputsize=${outputsize}&order=ASC`
@@ -82,7 +96,11 @@ export class TwelveDataClient implements MarketDataClient {
     const values: any[] = d?.values ?? [];
     return values
       .filter(v => v && v.datetime)
-      .map(v => ({ date: v.datetime, price: num(v.close), volume: num(v.volume) }));
+      .map(v => ({
+        date: v.datetime,
+        price: num(v.close),
+        volume: num(v.volume),
+      }));
   }
 
   async getFinancialData(_symbol: string): Promise<FinancialData | null> {
@@ -93,11 +111,18 @@ export class TwelveDataClient implements MarketDataClient {
     return this.freeNews.getComprehensiveNews(symbol, symbol, limit);
   }
 
-  async getCompanyNewsFromGoogle(_symbol: string, companyName: string, limit = 10): Promise<NewsItem[]> {
+  async getCompanyNewsFromGoogle(
+    _symbol: string,
+    companyName: string,
+    limit = 10
+  ): Promise<NewsItem[]> {
     return this.freeNews.getComprehensiveNews(companyName, undefined, limit);
   }
 
-  async getFastSearchResult(query: string, window = "1M"): Promise<FastSearchResult | null> {
+  async getFastSearchResult(
+    query: string,
+    window = "1M"
+  ): Promise<FastSearchResult | null> {
     const [companyInfo, stockData, chartData, newsData] = await Promise.all([
       this.searchCompany(query),
       this.getStockData(query),
@@ -106,7 +131,12 @@ export class TwelveDataClient implements MarketDataClient {
     ]);
     if (!companyInfo || !stockData) return null;
     return {
-      companyInfo: { ...companyInfo, price: stockData.price, change: stockData.change, changePercent: stockData.changePercent },
+      companyInfo: {
+        ...companyInfo,
+        price: stockData.price,
+        change: stockData.change,
+        changePercent: stockData.changePercent,
+      },
       stockData,
       newsData,
       chartData,

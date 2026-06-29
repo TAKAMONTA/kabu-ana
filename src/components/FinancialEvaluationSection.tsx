@@ -1,65 +1,27 @@
 "use client";
 
-import { useMemo } from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Brain } from "lucide-react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
 
 interface FinancialEvaluationSectionProps {
   financialEval: FinancialEvaluationResult | null;
   isFinancialLoading: boolean;
-  onEvaluate: () => void;
+  financialError?: string | null;
+  onRetry?: () => void;
   getScoreLabel: (score: number) => string;
   getScoreColor: (score: number) => string;
-  canUseFeature?: boolean;
-  remainingUses?: number;
-  dailyLimit?: number;
-  isPremium?: boolean;
 }
 
 export function FinancialEvaluationSection({
   financialEval,
   isFinancialLoading,
-  onEvaluate,
+  financialError,
+  onRetry,
   getScoreLabel,
   getScoreColor,
-  canUseFeature = true,
-  remainingUses = 5,
-  dailyLimit = 5,
-  isPremium = false,
 }: FinancialEvaluationSectionProps) {
-  const EvaluateButton = () => {
-    if (!canUseFeature) {
-      return (
-        <Button disabled size="sm" className="opacity-50">
-          <Lock className="h-4 w-4 mr-2" />
-          上限到達
-        </Button>
-      );
-    }
-    return (
-      <Button
-        onClick={onEvaluate}
-        disabled={isFinancialLoading}
-        size="sm"
-        className="bg-blue-600 hover:bg-blue-700 text-white"
-      >
-        {isFinancialLoading ? (
-          <>
-            <Brain className="h-4 w-4 mr-2 animate-spin" />
-            分析中...
-          </>
-        ) : (
-          <>
-            <Brain className="h-4 w-4 mr-2" />
-            財務をAI評価
-          </>
-        )}
-      </Button>
-    );
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -68,25 +30,52 @@ export function FinancialEvaluationSection({
             <Brain className="h-5 w-5" />
             財務健全性評価（BS/PL/CF）
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {/* 残り回数バッジ（プレミアムでない場合） */}
-            {!isPremium && (
-              <span
-                className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                  canUseFeature
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-                }`}
-              >
-                残り{remainingUses}/{dailyLimit}
-              </span>
-            )}
-            <EvaluateButton />
-          </div>
+          {isFinancialLoading && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Brain className="h-4 w-4 animate-spin" />
+              AIが自動分析中...
+            </span>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {financialEval ? (
+        {financialError && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-semibold">財務評価を取得できませんでした</p>
+            <p className="mt-1 text-destructive/80">{financialError}</p>
+            {onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={onRetry}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        )}
+        {financialEval?.parseFailed ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-semibold">財務評価を表示できませんでした</p>
+            <p className="mt-1 text-muted-foreground">
+              {financialEval.analysis ||
+                "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
+            </p>
+            {onRetry && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+                onClick={onRetry}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        ) : financialEval ? (
           <div className="space-y-5">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
@@ -155,7 +144,9 @@ export function FinancialEvaluationSection({
           </div>
         ) : (
           <div className="text-center py-6 text-sm text-muted-foreground">
-            財務三表（BS/PL/CF）をAIが5段階で評価します。
+            {isFinancialLoading
+              ? "財務三表（BS/PL/CF）をAIが自動評価しています。"
+              : "総合AI分析の完了後、財務三表（BS/PL/CF）の評価を自動表示します。"}
           </div>
         )}
       </CardContent>

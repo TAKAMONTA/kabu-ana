@@ -153,7 +153,7 @@ async function searchHandler(request: NextRequest) {
     const requestStartedAt = Date.now();
     let dataSource = "none";
     const localJpxStock = findLocalJpxStock(query);
-    const shouldSkipSerpFast =
+    const shouldSkipFastSearch =
       Boolean(localJpxStock) || isLikelyPlainUsTicker(query);
 
     if (localJpxStock) {
@@ -179,32 +179,32 @@ async function searchHandler(request: NextRequest) {
       dataSource = "jpx_local";
 
       const [
-        serpStockData,
-        serpNews,
-        serpChartData,
-        serpFinancialData,
+        marketStockData,
+        marketNews,
+        marketChartData,
+        marketFinancialData,
         googleNews,
-      ] = await measureSearchStep(timings, "jpx.serp_enrichment", () =>
+      ] = await measureSearchStep(timings, "jpx.market_enrichment", () =>
         Promise.all([
           optionalWithTimeout(
             marketApi.getStockData(localJpxStock.code),
             SEARCH_OPTIONAL_TIMEOUT_MS,
-            "serp.getStockData.localJpx"
+            "market.getStockData.localJpx"
           ),
           optionalWithTimeout(
             marketApi.getCompanyNews(localJpxStock.code, 5),
             NEWS_OPTIONAL_TIMEOUT_MS,
-            "serp.getCompanyNews.localJpx"
+            "market.getCompanyNews.localJpx"
           ),
           optionalWithTimeout(
             marketApi.getChartData(localJpxStock.code, chartPeriod),
             SEARCH_OPTIONAL_TIMEOUT_MS,
-            "serp.getChartData.localJpx"
+            "market.getChartData.localJpx"
           ),
           optionalWithTimeout(
             marketApi.getFinancialData(localJpxStock.code),
             SEARCH_OPTIONAL_TIMEOUT_MS,
-            "serp.getFinancialData.localJpx"
+            "market.getFinancialData.localJpx"
           ),
           optionalWithTimeout(
             marketApi.getCompanyNewsFromGoogle(
@@ -213,42 +213,42 @@ async function searchHandler(request: NextRequest) {
               5
             ),
             NEWS_OPTIONAL_TIMEOUT_MS,
-            "serp.getCompanyNewsFromGoogle.localJpx"
+            "market.getCompanyNewsFromGoogle.localJpx"
           ),
         ])
       );
 
-      if (serpStockData) {
-        stockData = serpStockData;
+      if (marketStockData) {
+        stockData = marketStockData;
         companyInfo = {
           ...companyInfo,
-          price: serpStockData.price,
-          change: serpStockData.change,
-          changePercent: serpStockData.changePercent,
+          price: marketStockData.price,
+          change: marketStockData.change,
+          changePercent: marketStockData.changePercent,
         };
       }
-      if (Array.isArray(serpNews) && serpNews.length > 0) {
-        newsData = serpNews;
+      if (Array.isArray(marketNews) && marketNews.length > 0) {
+        newsData = marketNews;
       } else if (Array.isArray(googleNews) && googleNews.length > 0) {
         newsData = googleNews;
       }
-      if (Array.isArray(serpChartData) && serpChartData.length > 0) {
-        chartData = serpChartData;
+      if (Array.isArray(marketChartData) && marketChartData.length > 0) {
+        chartData = marketChartData;
       }
-      financialData = financialData || serpFinancialData;
+      financialData = financialData || marketFinancialData;
     }
 
     // 最初にGoogle Finance系の高速結果を取りに行く。体感速度を優先し、詳細データは後段で補う。
-    if (!shouldSkipSerpFast) {
+    if (!shouldSkipFastSearch) {
       try {
         const fastResult = await measureSearchStep(
           timings,
-          "serp.fast_search",
+          "market.fast_search",
           () => marketApi.getFastSearchResult(query, chartPeriod)
         );
 
         if (fastResult) {
-          dataSource = "serp_fast";
+          dataSource = "market_fast";
           companyInfo = fastResult.companyInfo;
           stockData = fastResult.stockData;
           newsData = fastResult.newsData;
@@ -260,83 +260,87 @@ async function searchHandler(request: NextRequest) {
       }
     }
 
-    // 高速検索で見つからなかった場合だけ、従来のSERPAPIフォールバックを短い待ち時間で実行する。
+    // 高速検索で見つからなかった場合だけ、市場データAPIのフォールバックを短い待ち時間で実行する。
     if (!companyInfo || !stockData) {
       try {
-        const serpCompanyInfo = await measureSearchStep(
+        const marketCompanyInfo = await measureSearchStep(
           timings,
-          "serp.company_lookup",
+          "market.company_lookup",
           async () => {
             const [financeLookup, googleLookup] = await Promise.all([
               optionalWithTimeout(
                 marketApi.searchCompany(query),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
-                "serp.searchCompany"
+                "market.searchCompany"
               ),
               optionalWithTimeout(
                 marketApi.searchCompanyByGoogle(query),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
-                "serp.searchCompanyByGoogle"
+                "market.searchCompanyByGoogle"
               ),
             ]);
             return financeLookup || googleLookup;
           }
         );
 
-        if (serpCompanyInfo) {
-          dataSource = "serp_fallback";
-          companyInfo = companyInfo || serpCompanyInfo;
+        if (marketCompanyInfo) {
+          dataSource = "market_fallback";
+          companyInfo = companyInfo || marketCompanyInfo;
 
-          const [serpStockData, serpNews, serpChartData, serpFinancialData] =
-            await Promise.all([
-              stockData
-                ? Promise.resolve(stockData)
-                : optionalWithTimeout(
-                    marketApi.getStockData(serpCompanyInfo.symbol),
-                    SEARCH_OPTIONAL_TIMEOUT_MS,
-                    "serp.getStockData"
-                  ),
-              newsData.length > 0
-                ? Promise.resolve(newsData)
-                : optionalWithTimeout(
-                    marketApi.getCompanyNews(serpCompanyInfo.symbol, 5),
-                    NEWS_OPTIONAL_TIMEOUT_MS,
-                    "serp.getCompanyNews"
-                  ),
-              chartData.length > 0
-                ? Promise.resolve(chartData)
-                : optionalWithTimeout(
-                    marketApi.getChartData(serpCompanyInfo.symbol, chartPeriod),
-                    SEARCH_OPTIONAL_TIMEOUT_MS,
-                    "serp.getChartData"
-                  ),
-              financialData
-                ? Promise.resolve(financialData)
-                : optionalWithTimeout(
-                    marketApi.getFinancialData(serpCompanyInfo.symbol),
-                    SEARCH_OPTIONAL_TIMEOUT_MS,
-                    "serp.getFinancialData"
-                  ),
-            ]);
+          const [
+            marketStockData,
+            marketNews,
+            marketChartData,
+            marketFinancialData,
+          ] = await Promise.all([
+            stockData
+              ? Promise.resolve(stockData)
+              : optionalWithTimeout(
+                  marketApi.getStockData(marketCompanyInfo.symbol),
+                  SEARCH_OPTIONAL_TIMEOUT_MS,
+                  "market.getStockData"
+                ),
+            newsData.length > 0
+              ? Promise.resolve(newsData)
+              : optionalWithTimeout(
+                  marketApi.getCompanyNews(marketCompanyInfo.symbol, 5),
+                  NEWS_OPTIONAL_TIMEOUT_MS,
+                  "market.getCompanyNews"
+                ),
+            chartData.length > 0
+              ? Promise.resolve(chartData)
+              : optionalWithTimeout(
+                  marketApi.getChartData(marketCompanyInfo.symbol, chartPeriod),
+                  SEARCH_OPTIONAL_TIMEOUT_MS,
+                  "market.getChartData"
+                ),
+            financialData
+              ? Promise.resolve(financialData)
+              : optionalWithTimeout(
+                  marketApi.getFinancialData(marketCompanyInfo.symbol),
+                  SEARCH_OPTIONAL_TIMEOUT_MS,
+                  "market.getFinancialData"
+                ),
+          ]);
 
-          stockData = stockData || serpStockData;
-          if (Array.isArray(serpNews) && serpNews.length > 0) {
-            newsData = serpNews;
+          stockData = stockData || marketStockData;
+          if (Array.isArray(marketNews) && marketNews.length > 0) {
+            newsData = marketNews;
           }
-          if (Array.isArray(serpChartData) && serpChartData.length > 0) {
-            chartData = serpChartData;
+          if (Array.isArray(marketChartData) && marketChartData.length > 0) {
+            chartData = marketChartData;
           }
-          financialData = financialData || serpFinancialData;
+          financialData = financialData || marketFinancialData;
 
           if (newsData.length === 0) {
             const googleNews = await optionalWithTimeout(
               marketApi.getCompanyNewsFromGoogle(
-                serpCompanyInfo.symbol,
-                serpCompanyInfo.name,
+                marketCompanyInfo.symbol,
+                marketCompanyInfo.name,
                 5
               ),
               NEWS_OPTIONAL_TIMEOUT_MS,
-              "serp.getCompanyNewsFromGoogle"
+              "market.getCompanyNewsFromGoogle"
             );
             if (Array.isArray(googleNews) && googleNews.length > 0) {
               newsData = googleNews;

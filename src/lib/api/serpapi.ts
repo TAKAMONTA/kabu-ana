@@ -1,65 +1,45 @@
 import axios from "axios";
 import { normalizeQuery, toHalfWidth } from "@/lib/utils/textUtils";
-import type { MarketDataClient } from "./marketDataTypes";
+import type {
+  ChartDataPoint,
+  CompanyInfo,
+  FastSearchResult,
+  FinancialData,
+  MarketDataClient,
+  StockData,
+} from "./marketDataTypes";
+
+export type {
+  ChartDataPoint,
+  CompanyInfo,
+  FastSearchResult,
+  FinancialData,
+  StockData,
+} from "./marketDataTypes";
 
 const SERPAPI_BASE_URL = "https://serpapi.com/search";
 
-export interface CompanyInfo {
-  name: string;
-  symbol: string;
-  market: string;
-  price?: number;
-  change?: number;
-  changePercent?: number;
-  description?: string;
-  website?: string;
-  employees?: string;
-  founded?: string;
-  headquarters?: string;
-}
+export function normalizeChangePercent(input: {
+  price?: unknown;
+  change?: unknown;
+  percentage?: unknown;
+}): number {
+  const price = Number(input.price);
+  const change = Number(input.change);
+  const previousClose = price - change;
+  if (
+    Number.isFinite(price) &&
+    Number.isFinite(change) &&
+    Number.isFinite(previousClose) &&
+    previousClose !== 0
+  ) {
+    return (change / previousClose) * 100;
+  }
 
-export interface StockData {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  marketCap: string;
-  pe: number;
-  eps: number;
-  dividend: number;
-  high52: number;
-  low52: number;
-}
+  const percentage = Number(input.percentage);
+  if (!Number.isFinite(percentage)) return 0;
 
-export interface ChartDataPoint {
-  date: string;
-  price: number;
-  volume: number;
-  keyEvent?: {
-    title: string;
-    link: string;
-    source: string;
-  };
-}
-
-export interface FinancialData {
-  revenue?: string;
-  netIncome?: string;
-  operatingIncome?: string;
-  totalAssets?: string;
-  totalLiabilities?: string;
-  cash?: string;
-  eps?: string;
-  period?: string;
-}
-
-export interface FastSearchResult {
-  companyInfo: CompanyInfo;
-  stockData: StockData;
-  newsData: any[];
-  chartData: ChartDataPoint[];
-  financialData: FinancialData | null;
+  return Math.abs(percentage) > 1 ? percentage : percentage * 100;
 }
 
 export class SerpApiClient implements MarketDataClient {
@@ -148,7 +128,11 @@ export class SerpApiClient implements MarketDataClient {
       market: data.summary.exchange || "",
       price: data.summary.extracted_price || 0,
       change: data.summary.price_movement?.value || 0,
-      changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+      changePercent: normalizeChangePercent({
+        price: data.summary.extracted_price,
+        change: data.summary.price_movement?.value,
+        percentage: data.summary.price_movement?.percentage,
+      }),
       description: about?.description?.snippet || "",
       website: "",
       employees: "",
@@ -212,7 +196,11 @@ export class SerpApiClient implements MarketDataClient {
       symbol: data.summary.stock || symbol,
       price: data.summary.extracted_price || 0,
       change: data.summary.price_movement?.value || 0,
-      changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+      changePercent: normalizeChangePercent({
+        price: data.summary.extracted_price,
+        change: data.summary.price_movement?.value,
+        percentage: data.summary.price_movement?.percentage,
+      }),
       volume,
       marketCap: marketCapStr || "N/A",
       pe: parseFloat(peStr.replace(/[^0-9.-]/g, "")) || 0,
@@ -398,7 +386,11 @@ export class SerpApiClient implements MarketDataClient {
           market: data.summary.exchange || "",
           price: data.summary.extracted_price || 0,
           change: data.summary.price_movement?.value || 0,
-          changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+          changePercent: normalizeChangePercent({
+            price: data.summary.extracted_price,
+            change: data.summary.price_movement?.value,
+            percentage: data.summary.price_movement?.percentage,
+          }),
           description: about?.description?.snippet || "",
           website: "",
           employees: "",
@@ -571,7 +563,11 @@ export class SerpApiClient implements MarketDataClient {
           symbol: data.summary.stock || symbol,
           price: data.summary.extracted_price || 0,
           change: data.summary.price_movement?.value || 0,
-          changePercent: (data.summary.price_movement?.percentage || 0) * 100,
+          changePercent: normalizeChangePercent({
+            price: data.summary.extracted_price,
+            change: data.summary.price_movement?.value,
+            percentage: data.summary.price_movement?.percentage,
+          }),
           volume: volume,
           marketCap: marketCapStr || "N/A",
           pe: pe,

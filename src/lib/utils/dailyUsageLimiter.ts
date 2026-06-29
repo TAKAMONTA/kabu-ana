@@ -9,7 +9,7 @@ const dailyUsageCounts = new Map<string, { count: number; date: string }>();
 /**
  * クライアントIPを取得
  */
-function getClientIP(request: NextRequest): string {
+export function getClientIP(request: NextRequest): string {
   const forwarded = request.headers.get("x-forwarded-for");
   const realIP = request.headers.get("x-real-ip");
 
@@ -151,13 +151,15 @@ export async function checkPremiumStatus(
  * プレミアムユーザーは無制限、無料ユーザーは1日5回まで
  */
 export function withDailyLimit(
-  handler: (request: NextRequest) => Promise<Response>
+  handler: (request: NextRequest) => Promise<Response>,
+  options?: { skip?: (request: NextRequest) => boolean }
 ) {
   return async (request: NextRequest): Promise<Response> => {
     // プレミアムユーザーかチェック
     const isPremium = await checkPremiumStatus(request);
+    const skipDailyLimit = options?.skip?.(request) ?? false;
 
-    if (!isPremium) {
+    if (!isPremium && !skipDailyLimit) {
       // 無料ユーザーの日次利用制限チェック
       const limitResult = checkDailyLimit(request);
 
@@ -187,7 +189,9 @@ export function withDailyLimit(
 
     // 成功した場合のみカウントをインクリメント
     if (!isPremium && response.ok) {
-      incrementDailyUsage(request);
+      if (!skipDailyLimit) {
+        incrementDailyUsage(request);
+      }
       const limitResult = checkDailyLimit(request);
       response.headers.set("X-Daily-Remaining", limitResult.remaining.toString());
       response.headers.set("X-Daily-Limit", FREE_DAILY_LIMIT.toString());

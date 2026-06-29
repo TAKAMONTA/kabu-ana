@@ -11,7 +11,11 @@ import { Separator } from "@/components/ui/separator";
 import { StatsCard } from "./StatsCard";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { normalizeDisplayText } from "@/lib/displayText";
-import { formatNumber, formatPercentage, formatMarketCap } from "@/lib/utils/textUtils";
+import {
+  formatNumber,
+  formatPercentage,
+  formatMarketCap,
+} from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
   name: string;
@@ -47,6 +51,7 @@ interface StockSidePanelProps {
   stockData: StockData | null;
   financialData?: FinancialData | null;
   currency?: string;
+  showPriceHeader?: boolean;
 }
 
 // ヘルパー関数：数値をフォーマット（後方互換性のため残す）
@@ -54,11 +59,104 @@ function formatLargeNumber(value: string | number | undefined): string {
   return formatNumber(value, { compact: true });
 }
 
+interface StockPriceHeaderCardProps {
+  companyInfo: CompanyInfo;
+  stockData: StockData | null;
+  currency?: string;
+}
+
+export function StockPriceHeaderCard({
+  companyInfo,
+  stockData,
+  currency = "$",
+}: StockPriceHeaderCardProps) {
+  const currencySymbol = companyInfo.market === "TYO" ? "¥" : currency;
+  const companyName = normalizeDisplayText(companyInfo.name);
+
+  if (!stockData) {
+    return (
+      <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
+        <CardContent className="pt-6">
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+                {companyInfo.symbol}
+              </h2>
+              <h1 className="text-2xl font-bold text-foreground line-clamp-2">
+                {companyName}
+              </h1>
+            </div>
+            <Separator className="my-3" />
+            <div className="text-center py-8 text-muted-foreground">
+              株価データを読み込み中...
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const isUp = stockData.change >= 0;
+
+  return (
+    <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
+      <CardContent className="pt-6">
+        <div className="space-y-3">
+          <div>
+            <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+              {companyInfo.symbol}
+            </h2>
+            <h1 className="text-2xl font-bold text-foreground line-clamp-2">
+              {companyName}
+            </h1>
+          </div>
+
+          <Separator className="my-3" />
+
+          <div className="space-y-2">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm text-muted-foreground">現在値</span>
+              <span className="text-3xl font-bold text-foreground">
+                {currencySymbol}
+                {stockData.price.toLocaleString("ja-JP", {
+                  maximumFractionDigits: 2,
+                })}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">前日比</span>
+              <div className="flex items-center gap-2">
+                {isUp ? (
+                  <TrendingUp className="w-4 h-4 text-green-600" />
+                ) : (
+                  <TrendingDown className="w-4 h-4 text-red-600" />
+                )}
+                <span
+                  className={`font-semibold ${
+                    isUp ? "text-green-600" : "text-red-600"
+                  }`}
+                >
+                  {isUp ? "+" : ""}
+                  {currencySymbol}
+                  {stockData.change.toFixed(2)} (
+                  {stockData.changePercent.toFixed(2)}%)
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function StockSidePanel({
   companyInfo,
   stockData,
   financialData,
   currency = "$",
+  showPriceHeader = true,
 }: StockSidePanelProps) {
   const getCurrencySymbol = () => {
     return companyInfo.market === "TYO" ? "¥" : currency;
@@ -69,6 +167,9 @@ export function StockSidePanel({
 
   // stockDataがnullの場合はローディング表示
   if (!stockData) {
+    if (!showPriceHeader) {
+      return null;
+    }
     return (
       <div className="space-y-4">
         <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -97,63 +198,25 @@ export function StockSidePanel({
 
   // 52週レンジが有効な場合のみプログレスバーを表示
   const show52WeekRange =
-    stockData.high52 > 0 && stockData.low52 > 0 && stockData.high52 > stockData.low52;
+    stockData.high52 > 0 &&
+    stockData.low52 > 0 &&
+    stockData.high52 > stockData.low52;
   const range52WeekPercent = show52WeekRange
-    ? ((stockData.price - stockData.low52) / (stockData.high52 - stockData.low52)) * 100
+    ? ((stockData.price - stockData.low52) /
+        (stockData.high52 - stockData.low52)) *
+      100
     : 0;
 
   return (
     <div className="space-y-4">
       {/* ヘッダー情報 */}
-      <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
-        <CardContent className="pt-6">
-          <div className="space-y-3">
-            <div>
-              <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
-                {companyInfo.symbol}
-              </h2>
-              <h1 className="text-2xl font-bold text-foreground line-clamp-2">
-                {companyName}
-              </h1>
-            </div>
-
-            <Separator className="my-3" />
-
-            <div className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm text-muted-foreground">現在値</span>
-                <span className="text-3xl font-bold text-foreground">
-                  {currencySymbol}
-                  {stockData.price.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">前日比</span>
-                <div className="flex items-center gap-2">
-                  {isUp ? (
-                    <TrendingUp className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-red-600" />
-                  )}
-                  <span
-                    className={`font-semibold ${
-                      isUp ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    {isUp ? "+" : ""}
-                    {currencySymbol}
-                    {stockData.change.toFixed(2)} ({
-                    stockData.changePercent.toFixed(2)}%)
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {showPriceHeader && (
+        <StockPriceHeaderCard
+          companyInfo={companyInfo}
+          stockData={stockData}
+          currency={currency}
+        />
+      )}
 
       {/* 主要指標 */}
       <Card>
@@ -163,7 +226,9 @@ export function StockSidePanel({
         <CardContent className="space-y-3">
           <StatsCard
             label="時価総額"
-            value={formatMarketCap(stockData.marketCap)}
+            value={formatMarketCap(stockData.marketCap, {
+              currency: currencySymbol,
+            })}
             highlight
           />
           <StatsCard
@@ -180,7 +245,13 @@ export function StockSidePanel({
           <StatsCard
             label="配当利回り"
             value={formatPercentage(stockData.dividend)}
-            trend={stockData.dividend >= 2 ? "up" : stockData.dividend > 0 ? "neutral" : undefined}
+            trend={
+              stockData.dividend >= 2
+                ? "up"
+                : stockData.dividend > 0
+                  ? "neutral"
+                  : undefined
+            }
           />
           <StatsCard
             label="出来高"
@@ -193,7 +264,6 @@ export function StockSidePanel({
           />
         </CardContent>
       </Card>
-
 
       {/* 財務データ */}
       {financialData && (
@@ -208,33 +278,44 @@ export function StockSidePanel({
           </CardHeader>
           <CardContent className="space-y-2">
             {financialData.revenue && (
-              <StatsCard 
-                label="売上高" 
-                value={formatNumber(financialData.revenue, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="売上高"
+                value={formatNumber(financialData.revenue, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.netIncome && (
-              <StatsCard 
-                label="純利益" 
-                value={formatNumber(financialData.netIncome, { currency: currencySymbol, compact: true })} 
+              <StatsCard
+                label="純利益"
+                value={formatNumber(financialData.netIncome, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.cash && (
               <StatsCard
                 label="現金・短期投資"
-                value={formatNumber(financialData.cash, { currency: currencySymbol, compact: true })}
+                value={formatNumber(financialData.cash, {
+                  currency: currencySymbol,
+                  compact: true,
+                })}
               />
             )}
             {financialData.eps && (
               <StatsCard
                 label="EPS"
-                value={formatNumber(financialData.eps, { currency: currencySymbol, decimals: 2 })}
+                value={formatNumber(financialData.eps, {
+                  currency: currencySymbol,
+                  decimals: 2,
+                })}
               />
             )}
           </CardContent>
         </Card>
       )}
-
     </div>
   );
 }

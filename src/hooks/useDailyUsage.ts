@@ -53,7 +53,12 @@ function saveUsage(data: DailyUsageData): void {
  */
 export function useDailyUsage() {
   const { isPremium } = useSubscription();
-  const [usageData, setUsageData] = useState<DailyUsageData>(getStoredUsage);
+  // SSRとクライアント初回レンダリングを一致させるため、初期値は常に固定。
+  // localStorage の実値はマウント後に反映する（hydration mismatch 回避）。
+  const [usageData, setUsageData] = useState<DailyUsageData>({
+    date: getTodayString(),
+    count: 0,
+  });
 
   // コンポーネントマウント時 & 日付変更時にリフレッシュ
   useEffect(() => {

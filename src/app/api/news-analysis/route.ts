@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
+import { createBundledSkip } from "@/lib/utils/aiBundleToken";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
 
 export interface NewsAnalysisResult {
@@ -73,10 +74,11 @@ async function newsAnalysisHandler(request: NextRequest) {
     }
 
     if (!newsData || newsData.length === 0) {
-      return NextResponse.json(
-        { error: "ニュースが見つかりませんでした" },
-        { status: 404 }
-      );
+      return NextResponse.json({
+        newsData: [],
+        analysis: null,
+        empty: true,
+      });
     }
 
     // AIによるニュース分析
@@ -99,4 +101,6 @@ async function newsAnalysisHandler(request: NextRequest) {
   }
 }
 
-export const POST = withDailyLimit(newsAnalysisHandler);
+export const POST = withDailyLimit(newsAnalysisHandler, {
+  skip: createBundledSkip("news"),
+});

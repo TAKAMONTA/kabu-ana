@@ -8,6 +8,7 @@ interface NewsAnalysisState {
   error: string | null;
   newsData: any[] | null;
   analysis: NewsAnalysisResult | null;
+  empty: boolean;
 }
 
 export function useNewsAnalysis() {
@@ -16,6 +17,7 @@ export function useNewsAnalysis() {
     error: null,
     newsData: null,
     analysis: null,
+    empty: false,
   });
   const lastArgsRef = useRef<{ symbol: string; companyName: string } | null>(null);
   const mountedRef = useRef(true);
@@ -24,43 +26,54 @@ export function useNewsAnalysis() {
     return () => { mountedRef.current = false; };
   }, []);
 
-  const analyzeNews = useCallback(async (symbol: string, companyName: string) => {
-    lastArgsRef.current = { symbol, companyName };
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+  const analyzeNews = useCallback(
+    async (
+      symbol: string,
+      companyName: string,
+      options?: { bundleToken?: string }
+    ) => {
+      lastArgsRef.current = { symbol, companyName };
+      setState(prev => ({ ...prev, isLoading: true, error: null, empty: false }));
 
-    try {
-      const headers = await getAuthHeaders();
-      const options = {
-        url: getApiUrl("/api/news-analysis"),
-        headers,
-        data: { symbol, companyName },
-      };
+      try {
+        const headers = await getAuthHeaders();
+        if (options?.bundleToken) {
+          headers["X-AI-Bundle-Token"] = options.bundleToken;
+        }
+        const requestOptions = {
+          url: getApiUrl("/api/news-analysis"),
+          headers,
+          data: { symbol, companyName },
+        };
 
-      const response = await CapacitorHttp.post(options);
+        const response = await CapacitorHttp.post(requestOptions);
 
-      if (response.status !== 200) {
-        throw new Error(response.data?.error || "ニュース分析に失敗しました");
+        if (response.status !== 200) {
+          throw new Error(response.data?.error || "ニュース分析に失敗しました");
+        }
+
+        if (!mountedRef.current) return;
+        setState({
+          isLoading: false,
+          error: null,
+          newsData: response.data.newsData,
+          analysis: response.data.analysis,
+          empty: Boolean(response.data.empty),
+        });
+      } catch (err) {
+        if (!mountedRef.current) return;
+        setState(prev => ({
+          ...prev,
+          isLoading: false,
+          error:
+            err instanceof Error
+              ? err.message
+              : "ニュース分析中にエラーが発生しました",
+        }));
       }
-
-      if (!mountedRef.current) return;
-      setState({
-        isLoading: false,
-        error: null,
-        newsData: response.data.newsData,
-        analysis: response.data.analysis,
-      });
-    } catch (err) {
-      if (!mountedRef.current) return;
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error:
-          err instanceof Error
-            ? err.message
-            : "ニュース分析中にエラーが発生しました",
-      }));
-    }
-  }, []);
+    },
+    []
+  );
 
   const retry = useCallback(() => {
     if (lastArgsRef.current) {
@@ -75,6 +88,7 @@ export function useNewsAnalysis() {
       error: null,
       newsData: null,
       analysis: null,
+      empty: false,
     });
   }, []);
 

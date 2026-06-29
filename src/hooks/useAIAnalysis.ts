@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { AnalysisResult } from "@/lib/api/openrouter";
-import { parseSSE } from "@/lib/api/analysisStream";
+import { parseSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -19,6 +19,10 @@ export function useAIAnalysis() {
     null
   );
   const [streamingText, setStreamingText] = useState("");
+  const [bundleTokens, setBundleTokens] = useState<{
+    financial: string;
+    news: string;
+  } | null>(null);
   const lastArgsRef = useRef<{
     companyInfo: any;
     stockData: any;
@@ -59,6 +63,7 @@ export function useAIAnalysis() {
       };
       setStreamingText("");
       setAnalysisResult(null);
+      setBundleTokens(null);
       setError(null);
       setIsAnalyzing(true);
 
@@ -100,6 +105,13 @@ export function useAIAnalysis() {
               } catch {
                 // ignore parse errors on result
               }
+            } else if (ev.event === "bundle") {
+              try {
+                if (!mountedRef.current) return;
+                setBundleTokens(JSON.parse(ev.data));
+              } catch {
+                // ignore parse errors on bundle tokens
+              }
             } else if (ev.event === "error") {
               if (!mountedRef.current) return;
               setError(ev.data);
@@ -107,7 +119,7 @@ export function useAIAnalysis() {
             }
           }
           if (!mountedRef.current) return;
-          setStreamingText(narrative);
+          setStreamingText(splitNarrativeAndJson(narrative).narrative);
         } else {
           const res = await fetch(getApiUrl("/api/analyze"), {
             method: "POST",
@@ -158,6 +170,13 @@ export function useAIAnalysis() {
                 } catch {
                   // ignore parse errors on result
                 }
+              } else if (ev.event === "bundle") {
+                try {
+                  if (!mountedRef.current) return;
+                  setBundleTokens(JSON.parse(ev.data));
+                } catch {
+                  // ignore parse errors on bundle tokens
+                }
               } else if (ev.event === "error") {
                 if (!mountedRef.current) return;
                 setError(ev.data);
@@ -165,7 +184,7 @@ export function useAIAnalysis() {
               }
             }
             if (!mountedRef.current) return;
-            setStreamingText(narrative);
+            setStreamingText(splitNarrativeAndJson(narrative).narrative);
           }
         }
       } catch (err) {
@@ -191,6 +210,7 @@ export function useAIAnalysis() {
   const clearAnalysis = useCallback(() => {
     setAnalysisResult(null);
     setStreamingText("");
+    setBundleTokens(null);
     setError(null);
   }, []);
 
@@ -199,6 +219,7 @@ export function useAIAnalysis() {
     error,
     analysisResult,
     streamingText,
+    bundleTokens,
     analyzeStock,
     clearAnalysis,
     retry,

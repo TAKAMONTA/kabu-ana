@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import { createBundledSkip } from "@/lib/utils/aiBundleToken";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -44,4 +45,6 @@ async function financialEvaluationHandler(request: NextRequest) {
   }
 }
 
-export const POST = withDailyLimit(financialEvaluationHandler);
+export const POST = withDailyLimit(financialEvaluationHandler, {
+  skip: createBundledSkip("financial"),
+});

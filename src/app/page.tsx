@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo, useEffect, Suspense } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  useEffect,
+  useRef,
+  Suspense,
+} from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -11,7 +18,10 @@ import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
-import { StockSidePanel } from "@/components/StockSidePanel";
+import {
+  StockPriceHeaderCard,
+  StockSidePanel,
+} from "@/components/StockSidePanel";
 import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
 import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useTopTradingValue } from "@/hooks/useTopTradingValue";
@@ -21,6 +31,7 @@ import { SearchSection } from "@/components/SearchSection";
 import { TopTradingValueSection } from "@/components/TopTradingValueSection";
 import { AskSection } from "@/components/AskSection";
 import { FinancialEvaluationSection } from "@/components/FinancialEvaluationSection";
+import { FreePerformanceSummary } from "@/components/FreePerformanceSummary";
 import { NewsSection } from "@/components/NewsSection";
 import { SubscriptionStatus } from "@/components/SubscriptionStatus";
 import { SponsoredAds } from "@/components/SponsoredAds";
@@ -74,6 +85,7 @@ export default function HomePage() {
     error: analysisError,
     analysisResult,
     streamingText,
+    bundleTokens,
     analyzeStock,
     clearAnalysis: clearAiAnalysis,
     retry: retryAnalysis,
@@ -84,6 +96,7 @@ export default function HomePage() {
     error: newsError,
     newsData: analyzedNews,
     analysis: newsAnalysis,
+    empty: newsEmpty,
     analyzeNews,
     clearAnalysis: clearNewsAnalysis,
     retry: retryNewsAnalysis,
@@ -105,6 +118,7 @@ export default function HomePage() {
     error: financialError,
     result: financialEval,
     evaluate: evaluateFinancials,
+    clear: clearFinancialEval,
     retry: retryFinancialEval,
   } = useFinancialEvaluation();
   const {
@@ -118,6 +132,8 @@ export default function HomePage() {
     isPremium,
     isNativeApp,
   });
+  const autoAnalyzedSymbolRef = useRef<string | null>(null);
+  const autoExtraAnalyzedSymbolRef = useRef<string | null>(null);
 
   useEffect(() => {
     setIsNativeApp(isNative());
@@ -132,6 +148,9 @@ export default function HomePage() {
     clearSuggestions();
     clearAiAnalysis();
     clearNewsAnalysis();
+    clearFinancialEval();
+    autoAnalyzedSymbolRef.current = null;
+    autoExtraAnalyzedSymbolRef.current = null;
 
     await searchCompany(queryToUse, chartPeriod);
   }, [
@@ -141,6 +160,7 @@ export default function HomePage() {
     clearSuggestions,
     clearAiAnalysis,
     clearNewsAnalysis,
+    clearFinancialEval,
   ]);
 
   const handleInputChange = useCallback(
@@ -166,6 +186,9 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      clearFinancialEval();
+      autoAnalyzedSymbolRef.current = null;
+      autoExtraAnalyzedSymbolRef.current = null;
       await searchCompany(symbol, chartPeriod);
     },
     [
@@ -174,6 +197,7 @@ export default function HomePage() {
       clearSuggestions,
       clearAiAnalysis,
       clearNewsAnalysis,
+      clearFinancialEval,
     ]
   );
 
@@ -207,7 +231,7 @@ export default function HomePage() {
     }
   }, []);
 
-  const handleAsk = useCallback(
+  const runAiAnalysis = useCallback(
     async (question: string) => {
       if (!searchResult) return;
       if (!canUseFeature) return;
@@ -231,6 +255,62 @@ export default function HomePage() {
     [searchResult, analyzeStock, canUseFeature, incrementUsage]
   );
 
+  useEffect(() => {
+    if (!searchResult) return;
+    if (isAnalyzing) return;
+    if (!canUseFeature) return;
+
+    const symbol = searchResult.companyInfo.symbol;
+    if (autoAnalyzedSymbolRef.current === symbol) return;
+
+    autoAnalyzedSymbolRef.current = symbol;
+    void runAiAnalysis(
+      "会社紹介は不要です。注目すべき数値ファクトを2〜3個に絞り、それぞれが初心者にとって何を意味するかを説明したうえで、「だから私はこう見ます」という形で見立てを書いてください。最後に次に見るべき確認点を1つ示してください。"
+    );
+  }, [searchResult, isAnalyzing, canUseFeature, runAiAnalysis]);
+
+  useEffect(() => {
+    if (!searchResult) return;
+    if (isAnalyzing) return;
+    if (!analysisResult) return;
+    if (!bundleTokens?.financial || !bundleTokens?.news) return;
+
+    const symbol = searchResult.companyInfo.symbol;
+    if (autoExtraAnalyzedSymbolRef.current === symbol) return;
+    autoExtraAnalyzedSymbolRef.current = symbol;
+
+    const edinetExtras =
+      searchResult.ratios != null || searchResult.financialHistory != null
+        ? {
+            ratios: searchResult.ratios ?? undefined,
+            financialHistory: searchResult.financialHistory ?? undefined,
+            accountingStandard: searchResult.accountingStandard ?? undefined,
+          }
+        : undefined;
+
+    void evaluateFinancials(
+      {
+        symbol: searchResult.companyInfo.symbol,
+        companyName: searchResult.companyInfo.name,
+        financialData: searchResult.financialData,
+        edinetExtras,
+      },
+      { bundleToken: bundleTokens.financial }
+    );
+    void analyzeNews(
+      searchResult.companyInfo.symbol,
+      searchResult.companyInfo.name,
+      { bundleToken: bundleTokens.news }
+    );
+  }, [
+    searchResult,
+    isAnalyzing,
+    analysisResult,
+    bundleTokens,
+    evaluateFinancials,
+    analyzeNews,
+  ]);
+
   const getCurrencySymbol = useMemo(() => {
     if (!searchResult) return "$";
     return searchResult.companyInfo.market === "TYO" ? "¥" : "$";
@@ -245,27 +325,6 @@ export default function HomePage() {
     },
     [searchResult, searchCompany]
   );
-
-  const handleNewsAnalysis = useCallback(async () => {
-    if (!searchResult) return;
-    if (!canUseFeature) return;
-    incrementUsage();
-    await analyzeNews(
-      searchResult.companyInfo.symbol,
-      searchResult.companyInfo.name
-    );
-  }, [searchResult, analyzeNews, canUseFeature, incrementUsage]);
-
-  const handleFinancialEvaluation = useCallback(async () => {
-    if (!searchResult) return;
-    if (!canUseFeature) return;
-    incrementUsage();
-    await evaluateFinancials({
-      symbol: searchResult.companyInfo.symbol,
-      companyName: searchResult.companyInfo.name,
-      financialData: searchResult.financialData,
-    });
-  }, [searchResult, evaluateFinancials, canUseFeature, incrementUsage]);
 
   const getScoreLabel = useCallback((score: number) => {
     switch (score) {
@@ -309,6 +368,9 @@ export default function HomePage() {
       clearSuggestions();
       clearAiAnalysis();
       clearNewsAnalysis();
+      clearFinancialEval();
+      autoAnalyzedSymbolRef.current = null;
+      autoExtraAnalyzedSymbolRef.current = null;
       await searchCompany(query, chartPeriod);
     },
     [
@@ -317,6 +379,7 @@ export default function HomePage() {
       clearSuggestions,
       clearAiAnalysis,
       clearNewsAnalysis,
+      clearFinancialEval,
     ]
   );
 
@@ -485,6 +548,14 @@ export default function HomePage() {
           />
         ) : (
           <>
+            <div className="mb-6">
+              <StockPriceHeaderCard
+                companyInfo={searchResult.companyInfo}
+                stockData={searchResult.stockData}
+                currency={getCurrencySymbol}
+              />
+            </div>
+
             {/* 無料プラン案内 */}
             <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
               <div className="flex items-center justify-between">
@@ -510,17 +581,15 @@ export default function HomePage() {
           </>
         )}
 
-        {/* エラー表示 */}
-        {(error || analysisError || newsError) && (
+        {/* エラー表示（検索・メインAI分析のみ） */}
+        {(error || analysisError) && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <p className="font-semibold">エラーが発生しました</p>
-                  <p className="text-sm mt-1">
-                    {error || analysisError || newsError}
-                  </p>
+                  <p className="text-sm mt-1">{error || analysisError}</p>
                   <div className="flex gap-2 mt-3">
                     {analysisError && (
                       <button
@@ -528,14 +597,6 @@ export default function HomePage() {
                         className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
                       >
                         AI分析を再試行
-                      </button>
-                    )}
-                    {newsError && (
-                      <button
-                        onClick={retryNewsAnalysis}
-                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        ニュース分析を再試行
                       </button>
                     )}
                   </div>
@@ -597,9 +658,21 @@ export default function HomePage() {
                   </Card>
                 )}
 
+                {/* 無料で見られる業績サマリー */}
+                <FreePerformanceSummary
+                  financialData={searchResult.financialData}
+                  ratios={searchResult.ratios}
+                  financialHistory={searchResult.financialHistory}
+                  currencySymbol={getCurrencySymbol}
+                  hidePerformanceComment={
+                    isAnalyzing ||
+                    Boolean(analysisResult) ||
+                    Boolean(streamingText.trim())
+                  }
+                />
+
                 {/* AIに質問するセクション（会話型UI） */}
                 <AskSection
-                  onAsk={handleAsk}
                   isAnalyzing={isAnalyzing}
                   streamingText={streamingText}
                   analysisResult={analysisResult}
@@ -614,13 +687,10 @@ export default function HomePage() {
                 <FinancialEvaluationSection
                   financialEval={financialEval}
                   isFinancialLoading={isFinancialLoading}
-                  onEvaluate={handleFinancialEvaluation}
+                  financialError={financialError}
+                  onRetry={retryFinancialEval}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
-                  canUseFeature={canUseFeature}
-                  remainingUses={remainingUses}
-                  dailyLimit={dailyLimit}
-                  isPremium={isPremium}
                 />
 
                 {/* ニュースセクション */}
@@ -629,11 +699,9 @@ export default function HomePage() {
                   analyzedNews={analyzedNews}
                   newsData={searchResult.newsData}
                   isNewsAnalyzing={isNewsAnalyzing}
-                  onAnalyze={handleNewsAnalysis}
-                  canUseFeature={canUseFeature}
-                  remainingUses={remainingUses}
-                  dailyLimit={dailyLimit}
-                  isPremium={isPremium}
+                  newsError={newsError}
+                  newsEmpty={newsEmpty}
+                  onRetryNews={retryNewsAnalysis}
                 />
               </div>
             </div>
@@ -645,6 +713,7 @@ export default function HomePage() {
                 stockData={searchResult.stockData}
                 financialData={searchResult.financialData}
                 currency={getCurrencySymbol}
+                showPriceHeader={false}
               />
             </div>
           </div>

@@ -1,8 +1,8 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, TrendingUp, ExternalLink, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Brain, TrendingUp, ExternalLink } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { normalizeDisplayText } from "@/lib/displayText";
 
@@ -19,11 +19,9 @@ interface NewsSectionProps {
   analyzedNews: NewsItem[] | null;
   newsData: NewsItem[] | null;
   isNewsAnalyzing: boolean;
-  onAnalyze: () => void;
-  canUseFeature?: boolean;
-  remainingUses?: number;
-  dailyLimit?: number;
-  isPremium?: boolean;
+  newsError?: string | null;
+  newsEmpty?: boolean;
+  onRetryNews?: () => void;
 }
 
 export function NewsSection({
@@ -31,11 +29,9 @@ export function NewsSection({
   analyzedNews,
   newsData,
   isNewsAnalyzing,
-  onAnalyze,
-  canUseFeature = true,
-  remainingUses = 5,
-  dailyLimit = 5,
-  isPremium = false,
+  newsError,
+  newsEmpty = false,
+  onRetryNews,
 }: NewsSectionProps) {
   const renderNewsCard = (news: NewsItem, idx: number) => {
     const title = normalizeDisplayText(news.title || news.snippet);
@@ -72,38 +68,6 @@ export function NewsSection({
       </a>
     );
   };
-
-  const AnalyzeButton = () => {
-    if (!canUseFeature) {
-      return (
-        <Button disabled size="sm" className="opacity-50">
-          <Lock className="h-4 w-4 mr-2" />
-          上限到達
-        </Button>
-      );
-    }
-    return (
-      <Button
-        onClick={onAnalyze}
-        disabled={isNewsAnalyzing}
-        size="sm"
-        className="bg-blue-600 hover:bg-blue-700 text-white"
-      >
-        {isNewsAnalyzing ? (
-          <>
-            <Brain className="h-4 w-4 mr-2 animate-spin" />
-            分析中...
-          </>
-        ) : (
-          <>
-            <Brain className="h-4 w-4 mr-2" />
-            関連ニュースをAI分析
-          </>
-        )}
-      </Button>
-    );
-  };
-
   return (
     <Card>
       <CardHeader>
@@ -112,25 +76,52 @@ export function NewsSection({
             <Brain className="h-5 w-5" />
             関連ニュース分析
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {/* 残り回数バッジ（プレミアムでない場合） */}
-            {!isPremium && (
-              <span
-                className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
-                  canUseFeature
-                    ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200"
-                    : "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200"
-                }`}
-              >
-                残り{remainingUses}/{dailyLimit}
-              </span>
-            )}
-            <AnalyzeButton />
-          </div>
+          {isNewsAnalyzing && (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Brain className="h-4 w-4 animate-spin" />
+              AIが自動分析中...
+            </span>
+          )}
         </div>
       </CardHeader>
       <CardContent>
-        {newsAnalysis ? (
+        {newsError && (
+          <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            <p className="font-semibold">ニュース分析を取得できませんでした</p>
+            <p className="mt-1 text-destructive/80">{newsError}</p>
+            {onRetryNews && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                onClick={onRetryNews}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        )}
+        {newsAnalysis?.parseFailed ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
+            <p className="font-semibold">ニュース影響分析を表示できませんでした</p>
+            <p className="mt-1 text-muted-foreground">
+              {newsAnalysis.analysis ||
+                "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
+            </p>
+            {onRetryNews && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-300 text-amber-900 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900"
+                onClick={onRetryNews}
+              >
+                再試行
+              </Button>
+            )}
+          </div>
+        ) : newsAnalysis ? (
           <div className="space-y-6">
             {/* ニュース影響分析結果 */}
             <div className="p-5 bg-gradient-to-r from-purple-50 to-purple-100/50 rounded-lg border-2 border-purple-300 shadow-sm dark:from-purple-950 dark:to-purple-900/50 dark:border-purple-800">
@@ -223,18 +214,33 @@ export function NewsSection({
               </div>
             )}
           </div>
+        ) : newsEmpty ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900">
+            <p>この銘柄に関する最新ニュースは見つかりませんでした。</p>
+            <p className="mt-1 text-xs">
+              ニュースが無いため、影響分析はスキップされます。
+            </p>
+          </div>
         ) : newsData && newsData.length > 0 ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground mb-4">
-              最新ニュースを取得済みです。「関連ニュースをAI分析」ボタンで材料整理を開始できます。
+              総合AI分析の完了後、関連ニュースの材料整理を自動表示します。
             </p>
             {newsData.slice(0, 3).map(renderNewsCard)}
           </div>
         ) : (
           <div className="text-center py-8">
-            <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+            <Brain
+              className={`h-12 w-12 mx-auto mb-3 ${
+                isNewsAnalyzing
+                  ? "animate-spin text-primary"
+                  : "text-muted-foreground"
+              }`}
+            />
             <p className="text-sm text-muted-foreground mb-4">
-              企業を検索してから、関連ニュースの分析を実行してください
+              {isNewsAnalyzing
+                ? "関連ニュースをAIが自動分析しています。"
+                : "総合AI分析の完了後、関連ニュース分析を自動表示します。"}
             </p>
           </div>
         )}
