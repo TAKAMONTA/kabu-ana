@@ -257,7 +257,7 @@ export function AskSection({
             {(mainText || isAnalyzing) && (
               <div className="rounded-xl border border-slate-200 bg-card p-4 dark:border-slate-800">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">根拠と背景</p>
+                  <p className="text-sm font-semibold text-foreground">根拠とAIの見立て</p>
                   {analysisResult?.riskLevel && (
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -276,7 +276,7 @@ export function AskSection({
                   )}
                 </div>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                  {mainText ? visibleComment : "根拠と背景を生成しています"}
+                  {mainText ? visibleComment : "数字から見立てを整理しています"}
                   {isAnalyzing && !mainText && <LoadingDots />}
                   {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
                 </p>

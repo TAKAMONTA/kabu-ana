@@ -147,8 +147,21 @@ export function buildAnalysisPrompt(
   const conclusionGuide =
     'analysisConclusion は1文・40〜80字で書いてください。「何をしている会社か」という会社紹介は禁止。提供データから業績・収益性の見立てを言い切り、数値や根拠を1つ含め、株価の材料またはリスク、次に注目すべき点のいずれかを短く述べてください。';
 
-  const narrativeGuide =
-    "自然文（ストリーミング本文）では、analysisConclusion の繰り返し・要約は禁止です。具体的な数値（売上成長率、利益率、ROE、株価変動など）とその意味、業界背景、なぜそのリスク/材料が重要かを初心者向けに説明してください。investmentAdvice も結論の言い換えではなく、根拠と背景の補足として書いてください。";
+  const narrativeGuide = `自然文（ストリーミング本文）は200〜400字で、次の4文構成を必ず守ってください。
+1文目: 注目すべきファクトを2〜3個だけ提示（ROE、営業利益率、売上成長率、株価変動、PER、ニュース材料など）
+2文目: その数字が初心者にとって何を意味するかを説明（例: ROEが高い=少ない資本で利益を出せている、営業利益率が高い=本業の稼ぐ力が強い）
+3文目: 「だから私は〜と見ます」でAIの見立てを書く
+4文目: 次に確認すべき点を1つに絞る
+禁止: 指標を並べるだけ、「堅調です」「標準的です」だけで終わる説明、会社概要の繰り返し、analysisConclusion の焼き直し
+
+良い例:
+「ROEが高く、営業利益率も同業より強いです。これは本業で効率よく利益を出せている状態を示します。ただし株価が先に上がっている場合、その良さはすでに織り込まれている可能性があります。だから私は、業績の強さは評価しつつ、次の決算で利益率が維持できるかを見る局面だと考えます。」
+
+悪い例（禁止）:
+「ROEは48.4%、営業利益率は35.8%、売上は堅調です。標準的な水準です。」`;
+
+  const investmentAdviceGuide =
+    "investmentAdvice は結論の焼き直し禁止。指標の意味づけ→その意味から見たリスク/材料→次に確認する点、の順で初心者向けに補足してください。";
 
   const base = `
 ${instruction}
@@ -170,15 +183,16 @@ ${newsData.map(news => `- ${news.title}: ${news.snippet}`).join("\n")}${question
   if (streaming) {
     return `${base}
 
-まず、この企業について${question ? "質問への回答を" : "分析の根拠と背景を"}200〜400字の自然文で述べてください。
+まず、この企業について${question ? "質問への回答を" : "数字ファクトから見立てへつなぐ分析文を"}200〜400字の自然文で述べてください。
 ${narrativeGuide}
+${investmentAdviceGuide}
 その後、改行を挟んで「${STRUCTURED_JSON_SENTINEL}」とだけ書き、その直後に以下のJSON形式で分析結果を返してください：
 
 ${conclusionGuide}
 ${STRUCTURED_JSON_SENTINEL}
 {
   "analysisConclusion": "1文・40〜80字の分析結論（数値を1つ含め、業績見立てと材料/リスク/注目点を短く言い切る）",
-  "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
+  "investmentAdvice": "指標の意味づけ→リスク/材料→次に確認する点の順で書く補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
     "mediumTerm": 中期目標価格,
@@ -208,9 +222,11 @@ ${STRUCTURED_JSON_SENTINEL}
 以下のJSON形式で分析結果を返してください：
 
 ${conclusionGuide}
+${narrativeGuide}
+${investmentAdviceGuide}
 {
   "analysisConclusion": "1文・40〜80字の分析結論（数値を1つ含め、業績見立てと材料/リスク/注目点を短く言い切る）",
-  "investmentAdvice": "結論を繰り返さない根拠・背景の補足コメント",
+  "investmentAdvice": "指標の意味づけ→リスク/材料→次に確認する点の順で書く補足コメント",
   "targetPrice": {
     "shortTerm": 短期目標価格,
     "mediumTerm": 中期目標価格,

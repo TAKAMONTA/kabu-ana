@@ -2,6 +2,7 @@ import axios from "axios";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   OpenRouterClient,
+  buildAnalysisPrompt,
   extractJsonFromContent,
   parseJsonFromAiContent,
 } from "../openrouter";
@@ -78,6 +79,32 @@ describe("OpenRouterClient", () => {
     });
     expect(payload.messages[1]!.content).toContain('"analysisConclusion"');
     expect(payload.messages[1]!.content).toContain('"aiReflection"');
+  });
+
+  it("builds analysis prompt with causal narrative structure", () => {
+    const streamingPrompt = buildAnalysisPrompt(
+      { name: "Example", symbol: "EX", market: "NASDAQ" },
+      { price: 100, change: 1, changePercent: 1 },
+      [],
+      true
+    );
+    const jsonPrompt = buildAnalysisPrompt(
+      { name: "Example", symbol: "EX", market: "NASDAQ" },
+      { price: 100, change: 1, changePercent: 1 },
+      [],
+      false
+    );
+
+    for (const prompt of [streamingPrompt, jsonPrompt]) {
+      expect(prompt).toContain("ファクト");
+      expect(prompt).toContain("意味");
+      expect(prompt).toContain("だから私は");
+      expect(prompt).toContain("指標を並べるだけ");
+      expect(prompt).toContain("指標の意味づけ");
+    }
+
+    expect(streamingPrompt).toContain("良い例");
+    expect(streamingPrompt).toContain("悪い例");
   });
 
   it("extracts JSON from fenced AI responses", () => {

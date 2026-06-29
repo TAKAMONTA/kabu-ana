@@ -265,7 +265,7 @@ export default function HomePage() {
 
     autoAnalyzedSymbolRef.current = symbol;
     void runAiAnalysis(
-      "会社紹介ではなく、業績・収益性・株価材料・リスクから見た結論を初心者向けに短く分析してください。結論には、良い点、注意点、次に見るべき点を必ず含めてください。"
+      "会社紹介は不要です。注目すべき数値ファクトを2〜3個に絞り、それぞれが初心者にとって何を意味するかを説明したうえで、「だから私はこう見ます」という形で見立てを書いてください。最後に次に見るべき確認点を1つ示してください。"
     );
   }, [searchResult, isAnalyzing, canUseFeature, runAiAnalysis]);
 
