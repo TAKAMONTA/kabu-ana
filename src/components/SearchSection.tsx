@@ -28,6 +28,8 @@ interface SearchSectionProps {
   onInputChange: (value: string) => void;
   onSelectSuggestion: (symbol: string, displayText?: string) => void;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
+  remainingUses?: number;
+  isPremium?: boolean;
 }
 
 export function SearchSection({
@@ -44,6 +46,8 @@ export function SearchSection({
   onInputChange,
   onSelectSuggestion,
   renderHighlighted,
+  remainingUses,
+  isPremium,
 }: SearchSectionProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -204,6 +208,11 @@ export function SearchSection({
               {isLoading ? "基本データ取得中..." : "企業を検索"}
             </Button>
           </div>
+          {!isPremium && typeof remainingUses === "number" && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              検索すると自動でAI分析が実行されます（無料枠 本日あと{remainingUses}回）
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

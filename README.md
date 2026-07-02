@@ -15,7 +15,7 @@
 
 - **フロントエンド**: Next.js 16, React 19, TypeScript
 - **スタイリング**: Tailwind CSS, Radix UI
-- **バックエンド**: NestJS (準備中)
+- **バックエンド**: Next.js API Routes (Vercel Serverless Functions)
 - **認証**: Firebase Authentication
 - **データ取得**: J-Quants（日本株）, Twelve Data（米国株）
 - **AI分析**: OpenRouter (Claude 3.5 Sonnet)
@@ -126,7 +126,7 @@ kabu-ana/
 │   │   └── ui/            # UIコンポーネント
 │   ├── hooks/             # カスタムフック
 │   └── lib/               # ユーティリティとAPI統合
-├── backend/               # NestJSバックエンド（開発中）
+├── backend/               # 未使用（NestJS スキャフォールド）
 └── public/               # 静的ファイル
 ```
 

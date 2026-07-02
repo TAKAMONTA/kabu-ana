@@ -1,35 +1,47 @@
-import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeApp, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "demo-key",
-  authDomain:
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "demo.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "demo-project",
-  storageBucket:
-    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "demo.appspot.com",
-  messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "demo-app-id",
-};
+function isFirebaseConfigured(): boolean {
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
 
-// Firebase初期化（ブラウザ環境でのみ）
-let app: ReturnType<typeof initializeApp> | null = null;
-let auth: ReturnType<typeof getAuth> | null = null;
-let db: ReturnType<typeof getFirestore> | null = null;
+  return Boolean(
+    apiKey &&
+      projectId &&
+      apiKey !== "your_firebase_api_key_here" &&
+      apiKey !== "demo-key" &&
+      projectId !== "demo-project"
+  );
+}
 
-if (typeof window !== "undefined") {
+const firebaseConfig = isFirebaseConfigured()
+  ? {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY!,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN!,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID!,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET!,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID!,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
+    }
+  : null;
+
+let app: FirebaseApp | null = null;
+let auth: Auth | null = null;
+let db: Firestore | null = null;
+
+if (typeof window !== "undefined" && firebaseConfig) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  
-  // 開発環境でのみ、Consoleテスト用にグローバルに公開
+
   if (process.env.NODE_ENV === "development") {
-    (window as any).__firebaseAuth = auth;
-    (window as any).__firebaseDb = db;
+    (window as unknown as { __firebaseAuth?: Auth; __firebaseDb?: Firestore }).__firebaseAuth =
+      auth;
+    (window as unknown as { __firebaseAuth?: Auth; __firebaseDb?: Firestore }).__firebaseDb =
+      db;
   }
 }
 
-export { auth, db };
+export { auth, db, isFirebaseConfigured };
 export default app;

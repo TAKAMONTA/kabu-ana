@@ -62,7 +62,7 @@ function PurchaseSuccessHandler() {
   if (!purchaseSuccess) return null;
 
   return (
-    <div className="mb-6 rounded-md border border-green-500 bg-green-100 p-4 text-green-800">
+    <div className="mb-6 rounded-md border border-green-500 bg-green-100 p-4 text-green-800 dark:border-green-600 dark:bg-green-900/30 dark:text-green-200">
       <p className="font-semibold">🎉 ご購入ありがとうございます！</p>
       <p className="text-sm mt-1">
         プレミアム機能がまもなく有効化されます。反映まで数秒お待ちください。
@@ -126,6 +126,7 @@ export default function HomePage() {
     remainingUses,
     isPremium,
     incrementUsage,
+    syncFromServer,
     dailyLimit,
   } = useDailyUsage();
   const showSponsoredAds = shouldShowSponsoredAds({
@@ -235,7 +236,6 @@ export default function HomePage() {
     async (question: string) => {
       if (!searchResult) return;
       if (!canUseFeature) return;
-      incrementUsage();
       const edinetExtras =
         searchResult.ratios != null || searchResult.financialHistory != null
           ? {
@@ -251,6 +251,8 @@ export default function HomePage() {
         edinetExtras,
         question
       );
+      // 分析が成功した場合のみ回数を消費する
+      incrementUsage();
     },
     [searchResult, analyzeStock, canUseFeature, incrementUsage]
   );
@@ -346,17 +348,17 @@ export default function HomePage() {
   const getScoreColor = useCallback((score: number) => {
     switch (score) {
       case 5:
-        return "text-green-700 bg-green-100";
+        return "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/40";
       case 4:
-        return "text-blue-700 bg-blue-100";
+        return "text-blue-700 bg-blue-100 dark:text-blue-300 dark:bg-blue-900/40";
       case 3:
-        return "text-gray-700 bg-gray-100";
+        return "text-gray-700 bg-gray-100 dark:text-gray-300 dark:bg-gray-700/40";
       case 2:
-        return "text-orange-700 bg-orange-100";
+        return "text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-900/40";
       case 1:
-        return "text-red-700 bg-red-100";
+        return "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/40";
       default:
-        return "text-gray-700 bg-gray-100";
+        return "text-gray-700 bg-gray-100 dark:text-gray-300 dark:bg-gray-700/40";
     }
   }, []);
 
@@ -407,6 +409,8 @@ export default function HomePage() {
       onInputChange={handleInputChange}
       onSelectSuggestion={handleSelectSuggestion}
       renderHighlighted={renderHighlighted}
+      remainingUses={remainingUses}
+      isPremium={isPremium}
     />
   );
 
@@ -591,6 +595,14 @@ export default function HomePage() {
                   <p className="font-semibold">エラーが発生しました</p>
                   <p className="text-sm mt-1">{error || analysisError}</p>
                   <div className="flex gap-2 mt-3">
+                    {error && (
+                      <button
+                        onClick={handleSearchAndAnalyze}
+                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                      >
+                        検索を再試行
+                      </button>
+                    )}
                     {analysisError && (
                       <button
                         onClick={retryAnalysis}

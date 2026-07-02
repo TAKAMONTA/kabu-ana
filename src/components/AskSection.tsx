@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -243,11 +244,21 @@ export function AskSection({
 
       <CardContent className="space-y-4">
         {!canUseFeature && (
-          <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900">
-            <Lock className="h-4 w-4 shrink-0" />
-            <span>
-              本日の無料AI分析上限に達しました。プレミアムプランで無制限にご利用いただけます。
+          <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <Lock className="h-4 w-4 shrink-0" />
+              本日の無料AI分析上限に達しました。
             </span>
+            <Link
+              href="#premium"
+              className="ml-auto text-xs font-semibold text-primary underline underline-offset-2"
+              onClick={(e) => {
+                e.preventDefault();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              プレミアムに登録 →
+            </Link>
           </div>
         )}
 

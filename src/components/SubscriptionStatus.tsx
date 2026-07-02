@@ -30,6 +30,7 @@ export function SubscriptionStatus() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isiOS = isIOSNative();
   const isAndroid = isAndroidNative();
@@ -71,7 +72,7 @@ export function SubscriptionStatus() {
     setShowDeleteConfirm(false);
     const result = await deleteAccount();
     if (!result.success) {
-      alert(result.error || "アカウントの削除に失敗しました");
+      setDeleteError(result.error || "アカウントの削除に失敗しました");
       setIsDeleting(false);
     }
   };
@@ -138,11 +139,12 @@ export function SubscriptionStatus() {
   const DeleteConfirmDialog = () => {
     if (!showDeleteConfirm) return null;
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
+        role="dialog" aria-modal="true" aria-labelledby="delete-dialog-title">
         <Card className="w-full max-w-sm">
           <CardHeader>
             <CardTitle className="text-lg text-destructive">
-              アカウント削除の確認
+              <span id="delete-dialog-title">アカウント削除の確認</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -154,11 +156,14 @@ export function SubscriptionStatus() {
               <li>• サブスクリプション情報が削除されます</li>
               <li>• この操作は元に戻すことができません</li>
             </ul>
+            {deleteError && (
+              <p className="text-xs text-destructive">{deleteError}</p>
+            )}
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => { setShowDeleteConfirm(false); setDeleteError(null); }}
                 className="flex-1"
               >
                 キャンセル

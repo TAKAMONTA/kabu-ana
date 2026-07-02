@@ -6,6 +6,9 @@ import { EnergyNewsBoard } from "@/components/signals/EnergyNewsBoard";
 import { GeopolRiskGauge } from "@/components/signals/GeopolRiskGauge";
 import { PriceStrip } from "@/components/signals/PriceStrip";
 import { SeismicTable } from "@/components/signals/SeismicTable";
+import Link from "next/link";
+import { TrendingUp } from "lucide-react";
+import { APP_NAME } from "@/lib/constants";
 import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 

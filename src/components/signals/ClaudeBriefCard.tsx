@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Brain, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -57,9 +58,19 @@ export function ClaudeBriefCard() {
                 {isDeepDiveLoading ? "分析中..." : "深掘り分析"}
               </Button>
             ) : (
-              <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                <Lock className="size-4" />
-                {subscriptionLoading ? "購入状態を確認中..." : "深掘り分析はプレミアム限定です"}
+              <div className="flex flex-col gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground sm:flex-row sm:items-center">
+                <span className="flex items-center gap-2">
+                  <Lock className="size-4 shrink-0" />
+                  {subscriptionLoading ? "購入状態を確認中..." : "深掘り分析はプレミアム限定です"}
+                </span>
+                {!subscriptionLoading && (
+                  <Link
+                    href="/"
+                    className="text-xs font-semibold text-primary underline underline-offset-2 sm:ml-auto"
+                  >
+                    プレミアムに登録 →
+                  </Link>
+                )}
               </div>
             )}
             {deepDiveError && <PanelError error={deepDiveError} />}

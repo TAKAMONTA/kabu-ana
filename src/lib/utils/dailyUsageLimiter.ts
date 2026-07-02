@@ -1,10 +1,18 @@
 import { NextRequest } from "next/server";
+import { getJstDateString } from "@/lib/utils/jstDate";
 
 /** 無料プランの1日あたりのAI機能利用上限 */
-const FREE_DAILY_LIMIT = 5;
+export const FREE_DAILY_LIMIT = 5;
 
-// メモリベースの日次利用回数管理
-const dailyUsageCounts = new Map<string, { count: number; date: string }>();
+const DAILY_USAGE_COLLECTION = "daily_usage_limits";
+
+interface DailyUsageRecord {
+  count: number;
+  date: string; // YYYY-MM-DD (JST)
+}
+
+// Firestore が利用不可の場合のメモリフォールバック
+const memoryUsageCounts = new Map<string, DailyUsageRecord>();
 
 /**
  * クライアントIPを取得
@@ -24,110 +32,99 @@ export function getClientIP(request: NextRequest): string {
   return "unknown";
 }
 
-/**
- * 今日の日付文字列を取得（YYYY-MM-DD）
- */
 function getTodayString(): string {
-  return new Date().toISOString().split("T")[0];
+  return getJstDateString();
+}
+
+async function getFirestoreDb() {
+  const { getAdminApp } = await import("@/lib/auth/verifyAuth");
+  const { getFirestore } = await import("firebase-admin/firestore");
+  return getFirestore(getAdminApp());
+}
+
+async function readUsage(
+  clientIP: string,
+  today: string
+): Promise<DailyUsageRecord> {
+  const mem = memoryUsageCounts.get(clientIP);
+  try {
+    const db = await getFirestoreDb();
+    const doc = await db.collection(DAILY_USAGE_COLLECTION).doc(clientIP).get();
+    if (!doc.exists) return { count: 0, date: today };
+    const data = doc.data() as DailyUsageRecord;
+    if (data.date !== today) return { count: 0, date: today };
+    return { count: data.count ?? 0, date: today };
+  } catch {
+    // Firestore 不可時はメモリ値を返す
+    if (mem && mem.date === today) return mem;
+    return { count: 0, date: today };
+  }
+}
+
+async function writeUsage(
+  clientIP: string,
+  record: DailyUsageRecord
+): Promise<void> {
+  memoryUsageCounts.set(clientIP, record);
+  try {
+    const db = await getFirestoreDb();
+    await db
+      .collection(DAILY_USAGE_COLLECTION)
+      .doc(clientIP)
+      .set(record, { merge: true });
+  } catch {
+    // メモリフォールバックのみで継続
+  }
 }
 
 /**
  * 日次利用制限をチェック
  */
-export function checkDailyLimit(request: NextRequest): {
+export async function checkDailyLimit(request: NextRequest): Promise<{
   allowed: boolean;
   remaining: number;
   limit: number;
-} {
+}> {
   const clientIP = getClientIP(request);
   const today = getTodayString();
-
-  // 古いエントリをクリーンアップ
-  for (const [ip, data] of dailyUsageCounts.entries()) {
-    if (data.date !== today) {
-      dailyUsageCounts.delete(ip);
-    }
-  }
-
-  const currentData = dailyUsageCounts.get(clientIP);
-
-  if (!currentData || currentData.date !== today) {
-    // 今日初めてのリクエスト
-    return {
-      allowed: true,
-      remaining: FREE_DAILY_LIMIT,
-      limit: FREE_DAILY_LIMIT,
-    };
-  }
-
+  const currentData = await readUsage(clientIP, today);
   const remaining = Math.max(0, FREE_DAILY_LIMIT - currentData.count);
-
-  return {
-    allowed: remaining > 0,
-    remaining,
-    limit: FREE_DAILY_LIMIT,
-  };
+  return { allowed: remaining > 0, remaining, limit: FREE_DAILY_LIMIT };
 }
 
 /**
  * 日次利用回数をインクリメント
  */
-export function incrementDailyUsage(request: NextRequest): void {
+export async function incrementDailyUsage(request: NextRequest): Promise<void> {
   const clientIP = getClientIP(request);
   const today = getTodayString();
-
-  const currentData = dailyUsageCounts.get(clientIP);
-
-  if (!currentData || currentData.date !== today) {
-    dailyUsageCounts.set(clientIP, { count: 1, date: today });
-  } else {
-    currentData.count++;
-  }
+  const currentData = await readUsage(clientIP, today);
+  const nextCount = currentData.date === today ? currentData.count + 1 : 1;
+  await writeUsage(clientIP, { count: nextCount, date: today });
 }
 
 /**
  * Firebase IDトークンからプレミアムステータスを確認するヘルパー
- * トークンが無い場合はfalseを返す
  */
 export async function checkPremiumStatus(
   request: NextRequest
 ): Promise<boolean> {
   const authHeader = request.headers.get("authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return false;
-  }
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return false;
 
   const idToken = authHeader.substring(7);
-  if (!idToken) {
-    return false;
-  }
+  if (!idToken) return false;
 
   try {
-    // Firebase Admin SDK を動的インポート
-    const { getApps, initializeApp, cert } = await import("firebase-admin/app");
+    const { getAdminApp } = await import("@/lib/auth/verifyAuth");
     const { getAuth } = await import("firebase-admin/auth");
     const { getFirestore } = await import("firebase-admin/firestore");
 
-    let app;
-    if (getApps().length > 0) {
-      app = getApps()[0];
-    } else {
-      const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-      if (!serviceAccountKey) return false;
-      try {
-        const serviceAccount = JSON.parse(serviceAccountKey);
-        app = initializeApp({ credential: cert(serviceAccount) });
-      } catch {
-        return false;
-      }
-    }
-
-    const auth = getAuth(app);
-    const decodedToken = await auth.verifyIdToken(idToken);
+    const app = getAdminApp();
+    const decodedToken = await getAuth(app).verifyIdToken(idToken);
     const userId = decodedToken.uid;
 
-    const db = getFirestore(app);
-    const subscriptionDoc = await db
+    const subscriptionDoc = await getFirestore(app)
       .collection("subscriptions")
       .doc(userId)
       .get();
@@ -155,13 +152,11 @@ export function withDailyLimit(
   options?: { skip?: (request: NextRequest) => boolean }
 ) {
   return async (request: NextRequest): Promise<Response> => {
-    // プレミアムユーザーかチェック
     const isPremium = await checkPremiumStatus(request);
     const skipDailyLimit = options?.skip?.(request) ?? false;
 
     if (!isPremium && !skipDailyLimit) {
-      // 無料ユーザーの日次利用制限チェック
-      const limitResult = checkDailyLimit(request);
+      const limitResult = await checkDailyLimit(request);
 
       if (!limitResult.allowed) {
         return new Response(
@@ -184,15 +179,13 @@ export function withDailyLimit(
       }
     }
 
-    // ハンドラーを実行
     const response = await handler(request);
 
-    // 成功した場合のみカウントをインクリメント
     if (!isPremium && response.ok) {
       if (!skipDailyLimit) {
-        incrementDailyUsage(request);
+        await incrementDailyUsage(request);
       }
-      const limitResult = checkDailyLimit(request);
+      const limitResult = await checkDailyLimit(request);
       response.headers.set("X-Daily-Remaining", limitResult.remaining.toString());
       response.headers.set("X-Daily-Limit", FREE_DAILY_LIMIT.toString());
     }

@@ -105,7 +105,7 @@ async function analyzeHandler(request: NextRequest) {
       validationResult.data;
 
     const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey || apiKey === "your_openrouter_key_here") {
+    if (!apiKey || apiKey === "your_openrouter_api_key_here") {
       return NextResponse.json(
         {
           error:

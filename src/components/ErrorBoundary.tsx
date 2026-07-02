@@ -32,41 +32,17 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "100vh",
-          padding: "2rem",
-          textAlign: "center",
-          fontFamily: "system-ui, sans-serif",
-        }}>
-          <div style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: "12px",
-            padding: "2rem",
-            maxWidth: "400px",
-            width: "100%",
-          }}>
-            <h2 style={{ color: "#dc2626", fontSize: "1.25rem", marginBottom: "0.75rem" }}>
+        <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
+          <div className="w-full max-w-sm rounded-xl border border-destructive/30 bg-destructive/5 p-8">
+            <h2 className="mb-3 text-xl font-semibold text-destructive">
               エラーが発生しました
             </h2>
-            <p style={{ color: "#6b7280", fontSize: "0.875rem", marginBottom: "1.5rem" }}>
+            <p className="mb-6 text-sm text-muted-foreground">
               予期せぬエラーが発生しました。再試行してください。
             </p>
             <button
               onClick={this.handleRetry}
-              style={{
-                background: "#3b82f6",
-                color: "white",
-                border: "none",
-                borderRadius: "8px",
-                padding: "0.75rem 1.5rem",
-                fontSize: "1rem",
-                cursor: "pointer",
-              }}
+              className="rounded-lg bg-primary px-6 py-3 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               再試行
             </button>

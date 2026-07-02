@@ -9,15 +9,15 @@ export function AnomalyTicker() {
   const anomalies = data?.anomalies ?? [];
   if (anomalies.length === 0) {
     return (
-      <Card className="rounded-lg border-green-200 bg-green-50">
-        <CardContent className="py-3 text-sm text-green-800">緊急アラートはありません</CardContent>
+      <Card className="rounded-lg border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
+        <CardContent className="py-3 text-sm text-green-800 dark:text-green-200">緊急アラートはありません</CardContent>
       </Card>
     );
   }
 
   return (
-    <Card className="overflow-hidden rounded-lg border-red-200 bg-red-50">
-      <CardContent className="flex items-center gap-3 py-3 text-sm text-red-800">
+    <Card className="overflow-hidden rounded-lg border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950">
+      <CardContent className="flex items-center gap-3 py-3 text-sm text-red-800 dark:text-red-300">
         <AlertTriangle className="size-4 shrink-0" />
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="truncate">

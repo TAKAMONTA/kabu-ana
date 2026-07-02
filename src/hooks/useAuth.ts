@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getFirebaseAuthErrorMessage } from "@/lib/firebaseErrorMessages";
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
 
@@ -39,8 +40,8 @@ export function useAuth() {
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: result.user };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: getFirebaseAuthErrorMessage(error) };
     }
   };
 
@@ -53,8 +54,8 @@ export function useAuth() {
         password
       );
       return { success: true, user: result.user };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: getFirebaseAuthErrorMessage(error) };
     }
   };
 
@@ -63,8 +64,8 @@ export function useAuth() {
     try {
       await signOut(auth);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: getFirebaseAuthErrorMessage(error) };
     }
   };
 
@@ -73,8 +74,8 @@ export function useAuth() {
     try {
       await sendPasswordResetEmail(auth, email);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: getFirebaseAuthErrorMessage(error) };
     }
   };
 

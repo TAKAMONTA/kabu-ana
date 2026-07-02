@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
+import { getApiUrl } from "@/lib/utils/apiClient";
+import { CapacitorHttp } from "@capacitor/core";
 
 /**
  * 購入処理を管理するカスタムフック
@@ -19,40 +21,48 @@ export function usePurchase() {
     setError(null);
 
     try {
-      // Firebase Auth ID Tokenを取得（ログイン中の場合）
       let idToken: string | null = null;
       if (auth?.currentUser) {
         idToken = await auth.currentUser.getIdToken();
       }
 
-      // チェックアウトセッションを作成
-      const response = await fetch("/api/lemon-squeezy/checkout", {
-        method: "POST",
+      const response = await CapacitorHttp.post({
+        url: getApiUrl("/api/lemon-squeezy/checkout"),
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
+        data: {
           idToken,
           planType,
-        }),
+        },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "チェックアウトの作成に失敗しました");
+      if (response.status !== 200) {
+        const errorData =
+          typeof response.data === "object" && response.data !== null
+            ? response.data
+            : {};
+        throw new Error(
+          (errorData as { error?: string }).error ||
+            "チェックアウトの作成に失敗しました"
+        );
       }
 
-      const data = await response.json();
-      
+      const data =
+        typeof response.data === "string"
+          ? JSON.parse(response.data)
+          : response.data;
+
       if (!data.checkoutUrl) {
         throw new Error("チェックアウトURLが取得できませんでした");
       }
 
-      // Lemon Squeezyのチェックアウトページに遷移
       window.location.href = data.checkoutUrl;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("購入エラー:", err);
-      setError(err.message || "購入処理中にエラーが発生しました");
+      setError(
+        err instanceof Error ? err.message : "購入処理中にエラーが発生しました"
+      );
       setIsLoading(false);
     }
   };

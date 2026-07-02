@@ -15,9 +15,10 @@ async function callInternal(path: string, origin: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const secret = process.env.SIGNALS_CRON_SECRET;
+  const cronSecret =
+    process.env.CRON_SECRET ?? process.env.SIGNALS_CRON_SECRET;
   const auth = request.headers.get("Authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
     return NextResponse.json(
       { data: null, error: "Unauthorized" },
       { status: 401 }
