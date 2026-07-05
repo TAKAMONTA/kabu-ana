@@ -69,15 +69,15 @@ export function LivePulseStrip() {
           : wtiChange != null
             ? ("up" as const)
             : ("neutral" as const),
-      bg: "from-amber-500/15 to-orange-500/5 border-amber-400/40 dark:from-amber-500/20 dark:to-orange-500/5 dark:border-amber-500/30",
+      dot: "bg-amber-500",
     },
     {
       icon: Radio,
       label: "マーケット・シグナル",
       value: loaded ? `${hot} 件` : "...",
-      sub: hot > 0 ? "注目・緊急シグナルあり" : "現在は通常範囲",
+      sub: hot > 0 ? "注目シグナルあり" : "通常範囲",
       tone: "neutral" as const,
-      bg: "from-sky-500/15 to-blue-500/5 border-sky-400/40 dark:from-sky-500/20 dark:to-blue-500/5 dark:border-sky-500/30",
+      dot: "bg-sky-500",
     },
     {
       icon: Flame,
@@ -85,10 +85,7 @@ export function LivePulseStrip() {
       value: loaded ? `${critical} 件` : "...",
       sub: critical > 0 ? "緊急シグナル発生中" : "現在 0 件",
       tone: critical > 0 ? ("alert" as const) : ("calm" as const),
-      bg:
-        critical > 0
-          ? "from-red-500/20 to-rose-500/10 border-red-400/50 dark:from-red-500/25 dark:to-rose-500/10 dark:border-red-500/40"
-          : "from-emerald-500/12 to-teal-500/5 border-emerald-400/30 dark:from-emerald-500/15 dark:to-teal-500/5 dark:border-emerald-500/25",
+      dot: critical > 0 ? "bg-red-500" : "bg-emerald-500",
     },
   ];
 
@@ -96,46 +93,37 @@ export function LivePulseStrip() {
     <Link
       href="/signals"
       aria-label="マーケット・シグナルを開く"
-      className="group block mb-6"
+      className="group block"
     >
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {cards.map((c, i) => (
           <motion.div
             key={c.label}
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: i * 0.08, ease: "easeOut" }}
+            transition={{ duration: 0.35, delay: i * 0.06, ease: "easeOut" }}
           >
             <Card
-              className={`relative overflow-hidden border bg-gradient-to-br ${c.bg} transition-all duration-300 group-hover:-translate-y-0.5 group-hover:shadow-lg ${c.tone === "alert" ? "animate-pulse-soft" : ""}`}
+              className={`relative overflow-hidden border-border/70 py-0 shadow-sm transition-colors duration-300 group-hover:border-foreground/20 ${
+                c.tone === "alert" ? "animate-pulse-soft" : ""
+              }`}
             >
-              <CardContent className="p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              <CardContent className="p-4 sm:p-5">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                     <c.icon className="size-4" />
                     <span>{c.label}</span>
                   </div>
-                  {i === cards.length - 1 && (
-                    <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                  )}
+                  <span className={`size-2 rounded-full ${c.dot}`} aria-hidden />
                 </div>
-                <div className="text-4xl font-bold tracking-tight tabular-nums mb-2">
+                <div className="mb-2 text-2xl font-bold tracking-tight tabular-nums sm:text-3xl">
                   {c.value}
                 </div>
-                <div
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    c.tone === "alert"
-                      ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                      : c.tone === "down"
-                        ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
-                        : c.tone === "up"
-                          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          : c.tone === "calm"
-                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                            : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {c.sub}
+                <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                  <span>{c.sub}</span>
+                  {i === cards.length - 1 && (
+                    <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+                  )}
                 </div>
               </CardContent>
             </Card>

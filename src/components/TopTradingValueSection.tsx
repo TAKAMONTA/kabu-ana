@@ -21,11 +21,11 @@ interface TopTradingValueSectionProps {
 function attentionBadgeClassName(confidence: number): string {
   switch (getAttentionBadgeTone(confidence)) {
     case "high":
-      return "border-primary/30 bg-primary/10 text-primary";
+      return "border-primary/30 text-primary";
     case "medium":
-      return "border-accent bg-accent text-accent-foreground";
+      return "border-border text-foreground";
     case "low":
-      return "border-border bg-muted text-muted-foreground";
+      return "border-border text-muted-foreground";
   }
 }
 
@@ -71,35 +71,44 @@ export function TopTradingValueSection({
   };
 
   return (
-    <div className="mb-6">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base">注目の日本株（ニュース材料）</CardTitle>
-            <span className="text-xs text-muted-foreground">
-              {isLoading ? "更新中..." : "取得済み"}
+    <div>
+      <Card className="border-border/70 py-0 shadow-sm">
+        <CardHeader className="px-5 py-5 sm:px-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg font-bold tracking-tight">
+                注目のアイデア
+              </CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                ニュース材料から抽出した日本株候補
+              </p>
+            </div>
+            <span className="rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground">
+              {isLoading ? "更新中" : "取得済み"}
             </span>
           </div>
           {error && !isLoading && (
-            <p className="mt-2 text-xs text-red-600">
+            <p className="mt-3 text-xs text-red-600">
               データの取得に失敗しました: {error}
             </p>
           )}
           {!error && warning && !isLoading && (
-            <p className="mt-2 text-xs text-muted-foreground">{warning}</p>
+            <p className="mt-3 text-xs text-muted-foreground">{warning}</p>
           )}
         </CardHeader>
-        <CardContent>
-          <ul className="space-y-2">
+        <CardContent className="px-0 pb-2">
+          <ul className="divide-y divide-border/70">
             {isLoading && items.length === 0
               ? Array.from({ length: 5 }).map((_, index) => (
                   <li
                     key={`skeleton-${index}`}
-                    className="flex items-center justify-between rounded-md border p-2"
+                    className="flex items-center justify-between gap-4 px-5 py-4 sm:px-6"
                   >
-                    <div className="h-4 w-32 shimmer rounded" />
-                    <div className="h-4 w-20 shimmer rounded" />
-                    <div className="h-8 w-16 shimmer rounded" />
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="h-4 w-40 shimmer rounded" />
+                      <div className="h-3 w-3/4 shimmer rounded" />
+                    </div>
+                    <div className="h-8 w-16 shimmer rounded-full" />
                   </li>
                 ))
               : items.map(item => {
@@ -112,64 +121,68 @@ export function TopTradingValueSection({
                   return (
                     <li
                       key={`${item.code}-${item.rank}`}
-                      className="flex items-center justify-between gap-3 rounded-md border p-3"
+                      className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between sm:px-6"
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-sm font-semibold">
-                            {item.rank}. {displayName}
-                          </p>
+                          <span className="flex size-7 items-center justify-center rounded-full border border-border/70 bg-background text-xs font-bold tabular-nums text-muted-foreground">
+                            {item.rank}
+                          </span>
                           {item.code && (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            <span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground">
                               {item.code}
                             </span>
                           )}
+                          <p className="truncate text-sm font-bold">
+                            {displayName}
+                          </p>
                           {item.signalLabel && (
-                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                            <span className="rounded-full border border-border/70 px-2.5 py-1 text-xs text-muted-foreground">
                               {item.signalLabel}
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">
                           {normalizeDisplayText(item.reason)}
                         </p>
                         {sourceText && (
                           <p className="mt-1 truncate text-[11px] leading-4 text-muted-foreground">
                             情報源: {sourceText}
+                            {item.sourceLinks?.[0] && (
+                              <a
+                                href={item.sourceLinks[0]}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="ml-2 font-medium text-foreground underline-offset-4 hover:underline"
+                              >
+                                根拠を見る
+                              </a>
+                            )}
                           </p>
                         )}
-                        {item.sourceLinks && item.sourceLinks.length > 0 && (
-                          <a
-                            href={item.sourceLinks[0]}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="mt-1 inline-block text-[11px] text-blue-600 hover:underline"
-                          >
-                            根拠を見る
-                          </a>
-                        )}
                       </div>
-                      <div className="shrink-0 text-right text-xs">
-                        <p
-                          className={`rounded-full border px-2 py-1 font-medium ${attentionBadgeClassName(
+                      <div className="flex shrink-0 items-center gap-2 sm:justify-end">
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${attentionBadgeClassName(
                             item.confidence
                           )}`}
                         >
                           {attentionLabel}
-                        </p>
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleSelect(item)}
+                          className="rounded-full"
+                        >
+                          分析
+                        </Button>
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleSelect(item)}
-                      >
-                        分析
-                      </Button>
                     </li>
                   );
                 })}
             {!isLoading && items.length === 0 && !error && (
-              <li className="rounded-md border p-4 text-center text-sm text-muted-foreground">
+              <li className="px-5 py-8 text-center text-sm text-muted-foreground sm:px-6">
                 企業名を確認できるニュース材料がまだありません。
               </li>
             )}

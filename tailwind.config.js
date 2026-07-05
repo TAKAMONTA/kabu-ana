@@ -6,6 +6,14 @@ module.exports = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
+    fontFamily: {
+      sans: [
+        "M PLUS Rounded 1c",
+        "Hiragino Maru Gothic ProN",
+        "YuGothic",
+        "sans-serif",
+      ],
+    },
     extend: {
       colors: {
         background: "hsl(var(--background))",

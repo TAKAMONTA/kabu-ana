@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
-import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
-import { CapacitorHttp } from "@capacitor/core";
+import { getAuthHeaders, postJson } from "@/lib/utils/apiClient";
 
 interface NewsAnalysisState {
   isLoading: boolean;
@@ -23,7 +22,10 @@ export function useNewsAnalysis() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    return () => { mountedRef.current = false; };
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
 
   const analyzeNews = useCallback(
@@ -40,13 +42,12 @@ export function useNewsAnalysis() {
         if (options?.bundleToken) {
           headers["X-AI-Bundle-Token"] = options.bundleToken;
         }
-        const requestOptions = {
-          url: getApiUrl("/api/news-analysis"),
-          headers,
-          data: { symbol, companyName },
-        };
-
-        const response = await CapacitorHttp.post(requestOptions);
+        const response = await postJson<{
+          newsData: any[];
+          analysis: NewsAnalysisResult;
+          empty?: boolean;
+          error?: string;
+        }>("/api/news-analysis", { symbol, companyName }, headers);
 
         if (response.status !== 200) {
           throw new Error(response.data?.error || "ニュース分析に失敗しました");

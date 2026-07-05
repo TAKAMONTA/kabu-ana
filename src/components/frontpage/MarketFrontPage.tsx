@@ -52,45 +52,45 @@ export function MarketFrontPage({
   );
 
   return (
-    <div className="space-y-6">
-      <section className="border-y border-border bg-card/55">
-        <div className="grid gap-6 py-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.75fr)]">
-          <div className="min-w-0">
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                  {APP_NAME} market desk
-                </p>
-                <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
-                  今日の市場一面
-                </h2>
-              </div>
-              <p className="text-xs text-muted-foreground">{marketDate}</p>
-            </div>
-
-            <FrontPageLeadStory
-              idea={topIdea}
-              isLoading={isStockIdeasLoading}
-              warning={warning}
-              showAttentionScore={showAttentionScore}
-              onSelectIdea={onSelectIdea}
-            />
-
-            <div className="mt-5">{searchSlot}</div>
+    <div className="space-y-10">
+      <section className="rounded-[2rem] border border-border/70 bg-card px-4 py-10 shadow-sm sm:px-6 lg:px-10 lg:py-12">
+        <div className="mx-auto max-w-4xl text-center">
+          <div className="mb-5 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
+            <span className="rounded-full border border-border/70 bg-background px-3 py-1 font-medium">
+              {APP_NAME} market desk
+            </span>
+            <span>{marketDate}</span>
           </div>
 
-          <aside className="space-y-4">
-            <FrontPageMarketGrid
-              topIdea={topIdea}
-              isLoading={isStockIdeasLoading}
-              remainingUses={remainingUses}
-              dailyLimit={dailyLimit}
-              isPremium={isPremium}
-            />
-            {sampleSlot}
-          </aside>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
+            今日の市場一面
+          </h2>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            気になる企業を検索すると、株価・ニュース・AI分析をまとめて確認できます。
+          </p>
+
+          <div className="mx-auto mt-8 max-w-2xl">{searchSlot}</div>
+          {sampleSlot && <div className="mx-auto mt-4 max-w-2xl">{sampleSlot}</div>}
+        </div>
+
+        <div className="mt-8">
+          <FrontPageMarketGrid
+            topIdea={topIdea}
+            isLoading={isStockIdeasLoading}
+            remainingUses={remainingUses}
+            dailyLimit={dailyLimit}
+            isPremium={isPremium}
+          />
         </div>
       </section>
+
+      <FrontPageLeadStory
+        idea={topIdea}
+        isLoading={isStockIdeasLoading}
+        warning={warning}
+        showAttentionScore={showAttentionScore}
+        onSelectIdea={onSelectIdea}
+      />
 
       {pulseSlot}
       {stockIdeasSlot}

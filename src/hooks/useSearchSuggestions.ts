@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getApiUrl } from "@/lib/utils/apiClient";
-import { CapacitorHttp } from "@capacitor/core";
+import { postJson } from "@/lib/utils/apiClient";
 
 interface SearchSuggestion {
   symbol: string;
@@ -19,6 +18,7 @@ export function useSearchSuggestions() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -35,15 +35,10 @@ export function useSearchSuggestions() {
     setError(null);
 
     try {
-      const options = {
-        url: getApiUrl("/api/search-suggestions"),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        data: { query },
-      };
-
-      const response = await CapacitorHttp.post(options);
+      const response = await postJson<{ suggestions?: SearchSuggestion[] }>(
+        "/api/search-suggestions",
+        { query }
+      );
 
       if (response.status !== 200) {
         throw new Error("検索候補の取得に失敗しました");
@@ -62,7 +57,7 @@ export function useSearchSuggestions() {
       );
       setSuggestions([]);
     } finally {
-      if (mountedRef.current) setIsLoading(false);
+      setIsLoading(false);
     }
   };
 

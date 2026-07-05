@@ -397,7 +397,6 @@ export default function HomePage() {
   const searchSection = (
     <SearchSection
       searchQuery={searchQuery}
-      setSearchQuery={setSearchQuery}
       showSuggestions={showSuggestions}
       setShowSuggestions={setShowSuggestions}
       activeSuggestion={activeSuggestion}
@@ -479,24 +478,24 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* ヘッダー */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
-        <div className="container mx-auto px-4 py-4">
+      <header className="sticky top-0 z-50 border-b border-border/70 bg-background/80 backdrop-blur-md">
+        <div className="container mx-auto px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center space-x-3">
-              <div className="relative">
-                <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
+              <div className="flex size-9 items-center justify-center rounded-full border border-border/70 bg-card text-foreground">
+                <TrendingUp className="h-5 w-5" />
               </div>
               <div className="leading-tight">
-                <h1 className="text-2xl font-bold tracking-tight">
-                  <span className="brand-gradient">{APP_NAME}</span>
+                <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  {APP_NAME}
                 </h1>
-                <p className="hidden sm:block text-xs text-muted-foreground mt-0.5">
+                <p className="hidden text-xs text-muted-foreground sm:block">
                   AIで株式分析と市場シグナルを 30 秒で
                 </p>
               </div>
             </div>
             <SignalsNav active="home" />
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-3">
               <ThemeToggle />
               {user ? (
                 <div className="flex items-center space-x-2">
@@ -580,8 +579,10 @@ export default function HomePage() {
                 )}
               </div>
             </div>
-            <LivePulseStrip />
-            {searchSection}
+            <div className="space-y-6">
+              <LivePulseStrip />
+              {searchSection}
+            </div>
           </>
         )}
 

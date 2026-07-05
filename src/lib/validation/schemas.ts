@@ -75,3 +75,64 @@ export const analysisSchema = z.object({
 // 型のエクスポート
 export type SearchRequest = z.infer<typeof searchSchema>;
 export type AnalysisRequest = z.infer<typeof analysisSchema>;
+
+const SEARCH_QUERY_ALLOWED =
+  /^[a-zA-Z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\s:.-]+$/;
+
+const VALID_CHART_PERIODS = new Set([
+  "1D",
+  "5D",
+  "1W",
+  "1M",
+  "3M",
+  "6M",
+  "1Y",
+  "5Y",
+  "MAX",
+]);
+
+export function normalizeSearchQuery(raw: string): string {
+  const trimmed = raw.normalize("NFKC").trim();
+  if (!trimmed) return "";
+
+  const exchangeMatch = trimmed.match(/\b(\d{4}):([A-Za-z]+)\b/);
+  if (exchangeMatch) {
+    return `${exchangeMatch[1]}:${exchangeMatch[2].toUpperCase()}`;
+  }
+
+  const codeMatch = trimmed.match(/\b(\d{4})\b/);
+  if (codeMatch) return codeMatch[1];
+
+  if (/^[A-Za-z][A-Za-z0-9.]{0,5}$/.test(trimmed)) {
+    return trimmed.toUpperCase();
+  }
+
+  return trimmed
+    .replace(/[^a-zA-Z0-9\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\s:.-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+export function isValidSearchQuery(query: string): boolean {
+  return (
+    query.length >= 1 &&
+    query.length <= 100 &&
+    SEARCH_QUERY_ALLOWED.test(query)
+  );
+}
+
+export function normalizeChartPeriod(period?: string): string {
+  if (period && VALID_CHART_PERIODS.has(period)) return period;
+  return "1M";
+}
+
+export function getSearchQueryError(raw: string): string | null {
+  const normalized = normalizeSearchQuery(raw);
+  if (!normalized) {
+    return "検索キーワードを入力してください。";
+  }
+  if (!isValidSearchQuery(normalized)) {
+    return "検索できない文字が含まれています。証券コード（例: 7203）または企業名で入力してください。";
+  }
+  return null;
+}

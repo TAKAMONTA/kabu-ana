@@ -37,6 +37,7 @@ export function useAIAnalysis() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -193,7 +194,7 @@ export function useAIAnalysis() {
           err instanceof Error ? err.message : "分析中にエラーが発生しました"
         );
       } finally {
-        if (mountedRef.current) setIsAnalyzing(false);
+        setIsAnalyzing(false);
       }
     },
     []

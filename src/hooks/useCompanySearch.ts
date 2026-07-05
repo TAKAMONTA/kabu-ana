@@ -5,8 +5,12 @@ import {
   ChartDataPoint,
   FinancialData,
 } from "@/lib/api/marketDataTypes";
-import { getApiUrl } from "@/lib/utils/apiClient";
-import { CapacitorHttp } from "@capacitor/core";
+import { postJson } from "@/lib/utils/apiClient";
+import {
+  getSearchQueryError,
+  normalizeChartPeriod,
+  normalizeSearchQuery,
+} from "@/lib/validation/schemas";
 
 export interface SearchResultRatios {
   roe?: number;
@@ -56,30 +60,33 @@ export function useCompanySearch() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
   }, []);
 
   const searchCompany = async (query: string, chartPeriod: string = "1M") => {
-    if (!query.trim()) return;
+    const validationError = getSearchQueryError(query);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    const normalizedQuery = normalizeSearchQuery(query);
+    const safeChartPeriod = normalizeChartPeriod(chartPeriod);
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const options = {
-        url: getApiUrl("/api/search"),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        data: { query, chartPeriod },
-      };
-
-      const response = await CapacitorHttp.post(options);
+      const response = await postJson<
+        SearchResult & { error?: string; details?: { message: string }[] }
+      >("/api/search", { query: normalizedQuery, chartPeriod: safeChartPeriod });
 
       if (response.status !== 200) {
-        throw new Error(response.data?.error || "検索に失敗しました");
+        const detail = response.data?.details?.[0]?.message;
+        throw new Error(detail || response.data?.error || "検索に失敗しました");
       }
 
       if (!mountedRef.current) return;
@@ -90,7 +97,7 @@ export function useCompanySearch() {
         err instanceof Error ? err.message : "検索中にエラーが発生しました"
       );
     } finally {
-      if (mountedRef.current) setIsLoading(false);
+      setIsLoading(false);
     }
   };
 

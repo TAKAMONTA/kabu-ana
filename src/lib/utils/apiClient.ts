@@ -3,6 +3,16 @@
  * Capacitorアプリ（静的エクスポート）でも動作するように、本番環境のAPI URLを使用
  */
 
+import { CapacitorHttp } from "@capacitor/core";
+
+function isCapacitorNative(): boolean {
+  if (typeof window === "undefined") return false;
+  const cap = (
+    window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+  ).Capacitor;
+  return cap?.isNativePlatform?.() === true;
+}
+
 /**
  * APIのベースURLを取得
  */
@@ -56,4 +66,28 @@ export function getApiUrl(endpoint: string): string {
     // エンドポイントが / で始まる場合は結合
     const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
     return baseUrl ? `${baseUrl}${cleanEndpoint}` : cleanEndpoint;
+}
+
+/**
+ * Web では fetch、ネイティブアプリでは CapacitorHttp で POST JSON を送信
+ */
+export async function postJson<TResponse>(
+  endpoint: string,
+  body: unknown,
+  headers: Record<string, string> = { "Content-Type": "application/json" }
+): Promise<{ status: number; data: TResponse }> {
+  const url = getApiUrl(endpoint);
+
+  if (isCapacitorNative()) {
+    const response = await CapacitorHttp.post({ url, headers, data: body });
+    return { status: response.status, data: response.data as TResponse };
+  }
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  });
+  const data = (await response.json()) as TResponse;
+  return { status: response.status, data };
 }

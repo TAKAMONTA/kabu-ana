@@ -1,4 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import "@fontsource/m-plus-rounded-1c/japanese-400.css";
+import "@fontsource/m-plus-rounded-1c/japanese-500.css";
+import "@fontsource/m-plus-rounded-1c/japanese-700.css";
+import "@fontsource/m-plus-rounded-1c/latin-400.css";
+import "@fontsource/m-plus-rounded-1c/latin-500.css";
+import "@fontsource/m-plus-rounded-1c/latin-700.css";
 import "./globals.css";
 import { VercelAnalytics } from "@/components/VercelAnalytics";
 import { ErrorBoundary } from "@/components/ErrorBoundary";

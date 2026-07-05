@@ -23,6 +23,7 @@
     "@capgo/native-purchases": "^6.0.42",
     "@firebase/auth": "^1.11.0",
     "@firebase/firestore": "^4.9.2",
+    "@fontsource/m-plus-rounded-1c": "^5.2.10",
     "@hookform/resolvers": "^5.2.2",
     "@opentelemetry/api": "^1.9.0",
     "@radix-ui/react-dialog": "^1.1.15",

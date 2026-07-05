@@ -27,9 +27,10 @@ export function FrontPageMarketGrid({
       value: isLoading
         ? "確認中"
         : topIdea
-          ? `${normalizeDisplayText(topIdea.name)} ${topIdea.code}`
+          ? normalizeDisplayText(topIdea.name)
           : "待機中",
-      sub: topIdea?.signalLabel || "ニュース銘柄を抽出",
+      sub: topIdea?.code || topIdea?.signalLabel || "ニュース銘柄を抽出",
+      dot: "bg-primary",
     },
     {
       icon: Radio,
@@ -37,25 +38,33 @@ export function FrontPageMarketGrid({
       value: "Signals",
       sub: "原油・金利・地政学",
       href: "/signals",
+      dot: "bg-sky-500",
     },
     {
       icon: Search,
       label: "分析枠",
       value: isPremium ? "Premium" : `${remainingUses}/${dailyLimit}`,
       sub: isPremium ? "AI分析利用中" : "本日の残り回数",
+      dot: "bg-emerald-500",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       {items.map(item => {
+        const cardClassName = `group h-full rounded-2xl border border-border/70 bg-background p-4 text-left transition-colors ${
+          item.href ? "hover:border-foreground/20" : ""
+        }`;
         const content = (
-          <div className="rounded-md border bg-background/70 p-3 transition-colors hover:bg-muted/40">
-            <div className="flex items-center gap-2 text-[11px] font-medium uppercase text-muted-foreground">
-              <item.icon className="h-3.5 w-3.5" />
-              {item.label}
+          <div className={cardClassName}>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <item.icon className="h-4 w-4" />
+                {item.label}
+              </div>
+              <span className={`h-2 w-2 rounded-full ${item.dot}`} aria-hidden />
             </div>
-            <div className="mt-2 truncate text-sm font-semibold">
+            <div className="truncate text-base font-bold tabular-nums text-foreground">
               {item.value}
             </div>
             <div className="mt-1 truncate text-xs text-muted-foreground">
@@ -65,11 +74,13 @@ export function FrontPageMarketGrid({
         );
 
         return item.href ? (
-          <Link key={item.label} href={item.href} className="block">
+          <Link key={item.label} href={item.href} className="block h-full">
             {content}
           </Link>
         ) : (
-          <div key={item.label}>{content}</div>
+          <div key={item.label} className="h-full">
+            {content}
+          </div>
         );
       })}
     </div>

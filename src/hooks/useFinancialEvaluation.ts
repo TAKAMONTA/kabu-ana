@@ -2,8 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
-import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
-import { CapacitorHttp } from "@capacitor/core";
+import { getAuthHeaders, postJson } from "@/lib/utils/apiClient";
 
 export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +21,7 @@ export function useFinancialEvaluation() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };
@@ -49,22 +49,21 @@ export function useFinancialEvaluation() {
         if (options?.bundleToken) {
           headers["X-AI-Bundle-Token"] = options.bundleToken;
         }
-        const requestOptions = {
-          url: getApiUrl("/api/financial-evaluation"),
-          headers,
-          data: args,
-        };
-        const response = await CapacitorHttp.post(requestOptions);
-        const data = response.data;
-        if (response.status !== 200)
-          throw new Error(data.error || "財務評価に失敗しました");
+        const response = await postJson<{ analysis: FinancialEvaluationResult; error?: string }>(
+          "/api/financial-evaluation",
+          args,
+          headers
+        );
+        if (response.status !== 200) {
+          throw new Error(response.data.error || "財務評価に失敗しました");
+        }
         if (!mountedRef.current) return;
-        setResult(data.analysis);
+        setResult(response.data.analysis);
       } catch (e: any) {
         if (!mountedRef.current) return;
         setError(e.message || "財務評価に失敗しました");
       } finally {
-        if (mountedRef.current) setIsLoading(false);
+        setIsLoading(false);
       }
     },
     []
