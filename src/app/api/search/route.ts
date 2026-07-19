@@ -17,6 +17,7 @@ export const dynamic =
 
 const SEARCH_OPTIONAL_TIMEOUT_MS = 2200;
 const NEWS_OPTIONAL_TIMEOUT_MS = 1800;
+const EDINET_SEARCH_TIMEOUT_MS = 8000;
 
 async function measureSearchStep<T>(
   timings: Record<string, number>,
@@ -405,6 +406,8 @@ async function searchHandler(request: NextRequest) {
       totalAssets?: number;
       cfOperating?: number;
     }> | null = null;
+    let edinetStatus: "ok" | "timeout" | "empty" | "error" | "skipped" =
+      "skipped";
 
     const edinetDbKey = process.env.EDINETDB_API_KEY;
     const edinetSearchQuery = getEdinetSearchQueryFromSymbol(
@@ -419,19 +422,44 @@ async function searchHandler(request: NextRequest) {
     ) {
       try {
         const edinetApi = new EdinetDBClient(edinetDbKey);
+        const edinetSearchStartedAt = Date.now();
+        let edinetSearchError: unknown = null;
+
         const edinetResults = await Promise.race([
           edinetApi.searchCompanies(edinetSearchQuery, 3),
           new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("EDINET timeout")), 2000)
+            setTimeout(
+              () => reject(new Error("EDINET timeout")),
+              EDINET_SEARCH_TIMEOUT_MS
+            )
           ),
-        ]).catch(
-          () => [] as Awaited<ReturnType<EdinetDBClient["searchCompanies"]>>
-        );
+        ]).catch((error: unknown) => {
+          edinetSearchError = error;
+          return [] as Awaited<
+            ReturnType<EdinetDBClient["searchCompanies"]>
+          >;
+        });
 
-        if (Array.isArray(edinetResults) && edinetResults.length > 0) {
+        timings["edinet.search"] = Date.now() - edinetSearchStartedAt;
+
+        if (edinetSearchError) {
+          const message =
+            edinetSearchError instanceof Error
+              ? edinetSearchError.message
+              : String(edinetSearchError);
+          edinetStatus = /timeout/i.test(message) ? "timeout" : "error";
+          console.warn(
+            `EDINET search failed: ${message} (query=${edinetSearchQuery}, ${timings["edinet.search"]}ms)`
+          );
+        } else if (
+          Array.isArray(edinetResults) &&
+          edinetResults.length > 0
+        ) {
           const company = edinetResults[0];
           edinetCode = company.edinet_code;
+          edinetStatus = "ok";
 
+          const edinetDetailsStartedAt = Date.now();
           const [detail, financialsData, ratiosData] = await Promise.allSettled(
             [
               edinetApi.getCompany(company.edinet_code),
@@ -439,6 +467,7 @@ async function searchHandler(request: NextRequest) {
               edinetApi.getRatios(company.edinet_code),
             ]
           );
+          timings["edinet.details"] = Date.now() - edinetDetailsStartedAt;
 
           if (detail.status === "fulfilled" && detail.value) {
             accountingStandard = detail.value.accounting_standard ?? null;
@@ -482,8 +511,14 @@ async function searchHandler(request: NextRequest) {
               dividendYield: r.dividend_yield ?? undefined,
             };
           }
+        } else {
+          edinetStatus = "empty";
+          console.warn(
+            `EDINET search failed: empty (query=${edinetSearchQuery}, ${timings["edinet.search"]}ms)`
+          );
         }
       } catch (edinetError) {
+        edinetStatus = "error";
         console.error("EDINET DB エンリッチメントエラー:", edinetError);
       }
     }
@@ -492,6 +527,7 @@ async function searchHandler(request: NextRequest) {
     console.info("Search API timings", {
       query,
       dataSource,
+      edinetStatus,
       timings,
       hasChart: chartData.length > 0,
       newsCount: newsData.length,
@@ -509,6 +545,7 @@ async function searchHandler(request: NextRequest) {
         : {}),
       metadata: {
         dataSource,
+        edinetStatus,
         timings,
       },
     });
