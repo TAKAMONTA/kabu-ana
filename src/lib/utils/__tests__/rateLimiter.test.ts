@@ -102,7 +102,7 @@ describe("checkRateLimit", () => {
     expect(resultForIpB.remaining).toBe(MAX_REQUESTS - 1);
   });
 
-  it("XFF/X-Real-IPが無いリクエストは\"unknown\"にフォールバックする（送信元不明なリクエスト同士は同一パス内で1バケットを共有する現仕様の固定化。攻撃対策としては不十分でRedis化/認証キー化はP2）", () => {
+  it('XFF/X-Real-IPが無いリクエストは"unknown"にフォールバックする（送信元不明なリクエスト同士は同一パス内で1バケットを共有する現仕様の固定化。攻撃対策としては不十分でRedis化/認証キー化はP2）', () => {
     const path = "/api/unknown-ip-fallback";
 
     const first = checkRateLimit(createRequestWithoutIP(path));
