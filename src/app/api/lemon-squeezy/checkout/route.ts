@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { createCheckout } from "@/lib/lemon-squeezy";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 // Firebase Admin SDKの初期化
 let adminApp: App | null = null;
@@ -28,7 +29,7 @@ function getAdminApp() {
     });
     return adminApp;
   } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
+    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
     throw new Error("Firebase Admin SDKの初期化に失敗しました");
   }
 }
@@ -57,6 +58,9 @@ export async function POST(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json({ status: "static_export" });
   }
+
+  let userId: string | null = null;
+  let userEmail: string | null = null;
 
   try {
     const body = await request.json();
@@ -94,9 +98,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Firebase Auth ID Tokenの検証（オプション: 未ログインでも購入可能にする場合）
-    let userId: string | null = null;
-    let userEmail: string | null = null;
-
     if (idToken) {
       try {
         const app = getAdminApp();
@@ -105,7 +106,9 @@ export async function POST(request: NextRequest) {
         userId = decodedToken.uid;
         userEmail = decodedToken.email || null;
       } catch (error) {
-        console.warn("ID Token検証失敗（ゲスト購入として処理）:", error);
+        console.warn(
+          `ID Token検証失敗（ゲスト購入として処理）: ${sanitizeError(error)}`
+        );
       }
     }
 
@@ -140,22 +143,21 @@ export async function POST(request: NextRequest) {
       checkoutUrl,
     });
   } catch (error: any) {
-    console.error("チェックアウト作成エラー:", error);
-    const errorMessage = error.message || "チェックアウトの作成に失敗しました";
+    const safeMessage = sanitizeError(error, [userId, userEmail]);
+    console.error(`チェックアウト作成エラー: ${safeMessage}`);
 
     // 404エラーの場合は、環境変数やIDが間違っている可能性がある
-    if (errorMessage.includes("404")) {
+    if (safeMessage.includes("404")) {
       return NextResponse.json(
         {
           error: "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
-          details: errorMessage
         },
         { status: 404 }
       );
     }
 
     return NextResponse.json(
-      { error: errorMessage },
+      { error: "チェックアウトの作成に失敗しました" },
       { status: 500 }
     );
   }

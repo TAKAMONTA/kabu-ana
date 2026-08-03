@@ -9,7 +9,10 @@ describe("maskId", () => {
   it("4文字以下の場合は完全にマスクする", () => {
     expect(maskId("abcd")).toBe("****");
     expect(maskId("abc")).toBe("****");
-    expect(maskId("")).toBe("****");
+  });
+
+  it("空文字列はunknownを返す", () => {
+    expect(maskId("")).toBe("unknown");
   });
 
   it("文字列以外の値もStringに変換してマスクする", () => {
@@ -17,11 +20,11 @@ describe("maskId", () => {
     expect(maskId(true)).toBe("****");
   });
 
-  it("nullやundefinedを渡してもTypeErrorにならない", () => {
+  it("nullやundefinedを渡してもTypeErrorにならずunknownを返す", () => {
     expect(() => maskId(null)).not.toThrow();
     expect(() => maskId(undefined)).not.toThrow();
-    expect(maskId(null)).toBe("****");
-    expect(maskId(undefined)).toBe("...ined");
+    expect(maskId(null)).toBe("unknown");
+    expect(maskId(undefined)).toBe("unknown");
   });
 });
 
@@ -50,11 +53,11 @@ describe("sanitizeError", () => {
     );
   });
 
-  it("200文字を超えるメッセージは200文字に切り詰める", () => {
+  it("200文字を超えるメッセージは200文字に切り詰めた上で省略マーカーを付与する", () => {
     const longMessage = "a".repeat(250);
     const result = sanitizeError(new Error(longMessage));
-    expect(result.length).toBe(200);
-    expect(result).toBe("a".repeat(200));
+    expect(result).toBe(`${"a".repeat(200)}…(truncated)`);
+    expect(result.endsWith("…(truncated)")).toBe(true);
   });
 
   it("200文字以下のメッセージは切り詰めない", () => {
@@ -87,6 +90,18 @@ describe("sanitizeError", () => {
     const error = new Error("x".repeat(195) + secretId);
     const result = sanitizeError(error, [secretId]);
     expect(result).not.toContain(secretId);
-    expect(result.length).toBeLessThanOrEqual(200);
+  });
+
+  it("6文字未満の短いidはマスクをスキップしメッセージを破壊しない", () => {
+    const error = new Error("value a appears in this message about a topic");
+    const result = sanitizeError(error, ["a"]);
+    expect(result).toBe("value a appears in this message about a topic");
+  });
+
+  it("6文字以上のidは通常通りマスクされる", () => {
+    const error = new Error("session abcdef expired");
+    const result = sanitizeError(error, ["abcdef"]);
+    expect(result).not.toContain("abcdef");
+    expect(result).toContain("...cdef");
   });
 });

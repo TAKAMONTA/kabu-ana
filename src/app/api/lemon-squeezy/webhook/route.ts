@@ -29,7 +29,7 @@ function getAdminApp() {
     });
     return adminApp;
   } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
+    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
     throw new Error("Firebase Admin SDKの初期化に失敗しました");
   }
 }

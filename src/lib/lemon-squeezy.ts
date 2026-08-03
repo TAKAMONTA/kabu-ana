@@ -107,17 +107,23 @@ export async function createCheckout(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    const errorDetail = errorData?.errors?.[0]?.detail || errorData?.error || "";
+    const errorDetail =
+      errorData?.errors?.[0]?.detail || errorData?.error || "";
+    const sanitizedDetail = sanitizeError(errorDetail, [
+      options.customData?.userId,
+      options.customData?.email,
+    ]);
 
     console.error("Lemon Squeezy API Error:", {
       status: response.status,
       statusText: response.statusText,
-      detail: sanitizeError(errorDetail),
+      detail: sanitizedDetail,
       variantId: options.variantId,
       storeId,
     });
 
-    const errorMessage = errorDetail || `Failed to create checkout: ${response.status}`;
+    const errorMessage =
+      sanitizedDetail || `Failed to create checkout: ${response.status}`;
     throw new Error(errorMessage);
   }
 

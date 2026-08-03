@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     const safeMessage = sanitizeError(error);
     console.error(`アカウント削除エラー: ${safeMessage}`);
     return NextResponse.json(
-      { error: safeMessage || "アカウントの削除に失敗しました" },
+      { error: "アカウント削除中にエラーが発生しました" },
       { status: 500 }
     );
   }
