@@ -90,6 +90,8 @@ describe("sanitizeError", () => {
     const error = new Error("x".repeat(195) + secretId);
     const result = sanitizeError(error, [secretId]);
     expect(result).not.toContain(secretId);
+    // 切り詰め→マスクの誤順序では200文字境界に元IDの先頭断片が残るため、断片でも検出する
+    expect(result).not.toContain(secretId.slice(0, 8));
   });
 
   it("6文字未満の短いidはマスクをスキップしメッセージを破壊しない", () => {
