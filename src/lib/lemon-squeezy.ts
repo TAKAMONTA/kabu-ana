@@ -2,8 +2,6 @@
  * Lemon Squeezy API クライアント
  */
 
-import crypto from "crypto";
-
 const LEMON_SQUEEZY_API_URL = "https://api.lemonsqueezy.com/v1";
 
 export interface LemonSqueezyCheckoutOptions {
@@ -123,19 +121,6 @@ export async function createCheckout(
   }
 
   return response.json();
-}
-
-/**
- * Webhook署名を検証
- */
-export function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const hmac = crypto.createHmac("sha256", secret);
-  const digest = hmac.update(payload).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
 
 /**

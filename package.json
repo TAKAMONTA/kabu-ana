@@ -15,7 +15,7 @@
     "preflight:release:ios": "node scripts/release-preflight.mjs --target=ios",
     "preflight:release:native": "node scripts/release-preflight.mjs --native",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "next lint --no-cache --max-warnings=138",
     "test:signals": "vitest run src/lib/signals"
   },
   "dependencies": {
