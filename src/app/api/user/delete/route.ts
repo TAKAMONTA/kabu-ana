@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 
 // Firebase Admin SDKの初期化
 let adminApp: App | null = null;
@@ -28,17 +29,9 @@ function getAdminApp() {
     });
     return adminApp;
   } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
+    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
     throw new Error("Firebase Admin SDKの初期化に失敗しました");
   }
-}
-
-/**
- * ログ出力用に識別子をマスクする（末尾4文字のみ表示し、完全な値の露出を防ぐ）
- */
-function maskId(id: string): string {
-  if (!id) return "unknown";
-  return id.length <= 4 ? "****" : `...${id.slice(-4)}`;
 }
 
 export const dynamic =
@@ -75,7 +68,7 @@ export async function POST(request: NextRequest) {
     try {
       decodedToken = await auth.verifyIdToken(idToken);
     } catch (error) {
-      console.error("ID Token検証エラー:", error);
+      console.error(`ID Token検証エラー: ${sanitizeError(error)}`);
       return NextResponse.json(
         { error: "認証に失敗しました" },
         { status: 401 }
@@ -89,7 +82,9 @@ export async function POST(request: NextRequest) {
       await db.collection("subscriptions").doc(userId).delete();
       console.info(`Firestore data deleted for user: ${maskId(userId)}`);
     } catch (error) {
-      console.error("Firestoreデータ削除エラー:", error);
+      console.error(
+        `Firestoreデータ削除エラー: ${sanitizeError(error, [userId])}`
+      );
       // データがない場合もあるので、ここでは続行
     }
 
@@ -98,7 +93,9 @@ export async function POST(request: NextRequest) {
       await auth.deleteUser(userId);
       console.info(`Firebase Auth user deleted: ${maskId(userId)}`);
     } catch (error) {
-      console.error("Firebase Authユーザー削除エラー:", error);
+      console.error(
+        `Firebase Authユーザー削除エラー: ${sanitizeError(error, [userId])}`
+      );
       return NextResponse.json(
         { error: "ユーザーの削除に失敗しました" },
         { status: 500 }
@@ -110,9 +107,10 @@ export async function POST(request: NextRequest) {
       message: "アカウントが正常に削除されました",
     });
   } catch (error: any) {
-    console.error("アカウント削除エラー:", error);
+    const safeMessage = sanitizeError(error);
+    console.error(`アカウント削除エラー: ${safeMessage}`);
     return NextResponse.json(
-      { error: error.message || "アカウントの削除に失敗しました" },
+      { error: safeMessage || "アカウントの削除に失敗しました" },
       { status: 500 }
     );
   }

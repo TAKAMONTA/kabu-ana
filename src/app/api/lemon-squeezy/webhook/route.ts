@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import crypto from "crypto";
+import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 
 // Firebase Admin SDKの初期化
 let adminApp: App | null = null;
@@ -51,14 +52,6 @@ function verifyWebhookSignature(
   }
 }
 
-/**
- * ログ出力用に識別子をマスクする（末尾4文字のみ表示し、完全な値の露出を防ぐ）
- */
-function maskId(id: string): string {
-  if (!id) return "unknown";
-  return id.length <= 4 ? "****" : `...${id.slice(-4)}`;
-}
-
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -81,6 +74,7 @@ export async function POST(request: NextRequest) {
 
   let eventName: string | undefined;
   let eventId: string | undefined;
+  let userId: string | undefined;
 
   try {
     // Webhook署名の検証
@@ -111,7 +105,7 @@ export async function POST(request: NextRequest) {
     console.info(`📦 Lemon Squeezy Webhook: ${eventName}`);
 
     // ユーザーIDの取得
-    const userId = customData.userId;
+    userId = customData.userId;
     if (!userId) {
       console.warn(
         "⚠️ userId not found in custom_data. Skipping Firestore update."
@@ -269,11 +263,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
+    const safeMessage = sanitizeError(error, [userId]);
+    // eventId（LSリソースID）は調査用トレーサビリティのため意図的に非マスク（ユーザー直接識別子ではない）
     console.error(
-      `Webhook処理エラー: event=${eventName ?? "unknown"}, id=${eventId ?? "unknown"}, message=${error?.message ?? "unknown error"}`
+      `Webhook処理エラー: event=${eventName ?? "unknown"}, id=${eventId ?? "unknown"}, message=${safeMessage}`
     );
     return NextResponse.json(
-      { error: error.message || "Webhook processing failed" },
+      { error: safeMessage || "Webhook processing failed" },
       { status: 500 }
     );
   }

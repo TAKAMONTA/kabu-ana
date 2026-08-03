@@ -2,6 +2,8 @@
  * Lemon Squeezy API クライアント
  */
 
+import { sanitizeError } from "@/lib/utils/logSanitizer";
+
 const LEMON_SQUEEZY_API_URL = "https://api.lemonsqueezy.com/v1";
 
 export interface LemonSqueezyCheckoutOptions {
@@ -105,18 +107,17 @@ export async function createCheckout(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    const errorDetail = errorData?.errors?.[0]?.detail || errorData?.error || "";
+
     console.error("Lemon Squeezy API Error:", {
       status: response.status,
       statusText: response.statusText,
-      errorData,
+      detail: sanitizeError(errorDetail),
       variantId: options.variantId,
       storeId,
     });
 
-    const errorMessage =
-      errorData?.errors?.[0]?.detail ||
-      errorData?.error ||
-      `Failed to create checkout: ${response.status}`;
+    const errorMessage = errorDetail || `Failed to create checkout: ${response.status}`;
     throw new Error(errorMessage);
   }
 
