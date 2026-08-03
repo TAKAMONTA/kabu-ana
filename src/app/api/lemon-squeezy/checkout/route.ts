@@ -34,20 +34,19 @@ function getAdminApp() {
   }
 }
 
-
-
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 /**
  * チェックアウトセッションを作成
  * POST /api/lemon-squeezy/checkout
- * 
+ *
  * リクエストボディ:
  * {
  *   idToken: string,  // Firebase Auth ID Token
  *   planType: "monthly" | "yearly"  // プランタイプ
  * }
- * 
+ *
  * レスポンス:
  * {
  *   checkoutUrl: string  // Lemon SqueezyのチェックアウトページURL
@@ -69,9 +68,10 @@ export async function POST(request: NextRequest) {
     // 環境変数のチェック
     const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
     const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
-    const variantId = planType === "yearly"
-      ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
-      : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
+    const variantId =
+      planType === "yearly"
+        ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
+        : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
 
     if (!apiKey) {
       console.error("LEMON_SQUEEZY_API_KEY is not set");
@@ -90,9 +90,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!variantId) {
-      console.error(`LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`);
+      console.error(
+        `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`
+      );
       return NextResponse.json(
-        { error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません` },
+        {
+          error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません`,
+        },
         { status: 500 }
       );
     }
@@ -113,7 +117,10 @@ export async function POST(request: NextRequest) {
     }
 
     // リダイレクトURLの設定
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      request.headers.get("origin") ||
+      "http://localhost:3000";
     const redirectUrl = `${baseUrl}?purchase=success`;
 
     // チェックアウトセッションを作成
@@ -150,7 +157,8 @@ export async function POST(request: NextRequest) {
     if (safeMessage.includes("404")) {
       return NextResponse.json(
         {
-          error: "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
+          error:
+            "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
         },
         { status: 404 }
       );
@@ -162,4 +170,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
