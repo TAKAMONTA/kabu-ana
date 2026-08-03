@@ -14,10 +14,15 @@ function uniqueIp(): string {
   return `203.0.113.${ipSeq}`;
 }
 
-function createRequest(ip: string): NextRequest {
-  return new NextRequest("http://localhost/api/test", {
+function createRequest(ip: string, path: string = "/api/test"): NextRequest {
+  return new NextRequest(`http://localhost${path}`, {
     headers: { "x-forwarded-for": ip },
   });
+}
+
+// XFF/X-Real-IPどちらも持たないリクエスト（"unknown"IPにフォールバックする）
+function createRequestWithoutIP(path: string = "/api/test"): NextRequest {
+  return new NextRequest(`http://localhost${path}`);
 }
 
 beforeEach(() => {
@@ -66,6 +71,47 @@ describe("checkRateLimit", () => {
     const afterReset = checkRateLimit(createRequest(ip));
     expect(afterReset.allowed).toBe(true);
     expect(afterReset.remaining).toBe(MAX_REQUESTS - 1);
+  });
+
+  it("同一IPでもルートパスが異なればバケットは分離される（あるルートの枯渇が他ルートに波及しない）", () => {
+    const ip = uniqueIp();
+
+    for (let i = 0; i < MAX_REQUESTS; i++) {
+      const result = checkRateLimit(createRequest(ip, "/api/a"));
+      expect(result.allowed).toBe(true);
+    }
+    expect(checkRateLimit(createRequest(ip, "/api/a")).allowed).toBe(false);
+
+    const resultOnOtherRoute = checkRateLimit(createRequest(ip, "/api/b"));
+    expect(resultOnOtherRoute.allowed).toBe(true);
+    expect(resultOnOtherRoute.remaining).toBe(MAX_REQUESTS - 1);
+  });
+
+  it("同一ルートパスでもIPが異なればバケットは分離される（既存テストの暗黙依存の明示化）", () => {
+    const ipA = uniqueIp();
+    const ipB = uniqueIp();
+    const path = "/api/ip-isolation";
+
+    for (let i = 0; i < MAX_REQUESTS; i++) {
+      checkRateLimit(createRequest(ipA, path));
+    }
+    expect(checkRateLimit(createRequest(ipA, path)).allowed).toBe(false);
+
+    const resultForIpB = checkRateLimit(createRequest(ipB, path));
+    expect(resultForIpB.allowed).toBe(true);
+    expect(resultForIpB.remaining).toBe(MAX_REQUESTS - 1);
+  });
+
+  it("XFF/X-Real-IPが無いリクエストは\"unknown\"にフォールバックする（送信元不明なリクエスト同士は同一パス内で1バケットを共有する現仕様の固定化。攻撃対策としては不十分でRedis化/認証キー化はP2）", () => {
+    const path = "/api/unknown-ip-fallback";
+
+    const first = checkRateLimit(createRequestWithoutIP(path));
+    expect(first.allowed).toBe(true);
+    expect(first.remaining).toBe(MAX_REQUESTS - 1);
+
+    const second = checkRateLimit(createRequestWithoutIP(path));
+    expect(second.allowed).toBe(true);
+    expect(second.remaining).toBe(MAX_REQUESTS - 2);
   });
 });
 
