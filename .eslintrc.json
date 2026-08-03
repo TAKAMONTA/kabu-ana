@@ -1,8 +1,26 @@
 {
-  "extends": ["next/core-web-vitals", "next/typescript"],
-  "ignorePatterns": ["/.next/**", "/out/**", "/build/**", "/next-env.d.ts"],
+  "extends": [
+    "next/core-web-vitals",
+    "next/typescript"
+  ],
+  "ignorePatterns": [
+    "/.next/**",
+    "/out/**",
+    "/build/**",
+    "/next-env.d.ts",
+    "android/**",
+    "ios/**",
+    "backend/**"
+  ],
   "rules": {
     "@typescript-eslint/no-explicit-any": "warn",
-    "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_", "caughtErrorsIgnorePattern": "^_" }]
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "caughtErrorsIgnorePattern": "^_"
+      }
+    ]
   }
 }
