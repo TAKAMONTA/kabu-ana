@@ -59,9 +59,9 @@ export async function createCheckout(
   const response = await fetch(`${LEMON_SQUEEZY_API_URL}/checkouts`, {
     method: "POST",
     headers: {
-      "Accept": "application/vnd.api+json",
+      Accept: "application/vnd.api+json",
       "Content-Type": "application/vnd.api+json",
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       data: {
@@ -80,7 +80,8 @@ export async function createCheckout(
             desc: options.checkoutOptions?.desc ?? true,
             discount: options.checkoutOptions?.discount ?? true,
             dark: options.checkoutOptions?.dark ?? false,
-            subscription_preview: options.checkoutOptions?.subscriptionPreview ?? true,
+            subscription_preview:
+              options.checkoutOptions?.subscriptionPreview ?? true,
           },
           checkout_data: {
             custom: options.customData,
@@ -113,8 +114,11 @@ export async function createCheckout(
       variantId: options.variantId,
       storeId,
     });
-    
-    const errorMessage = errorData?.errors?.[0]?.detail || errorData?.error || `Failed to create checkout: ${response.status}`;
+
+    const errorMessage =
+      errorData?.errors?.[0]?.detail ||
+      errorData?.error ||
+      `Failed to create checkout: ${response.status}`;
     throw new Error(errorMessage);
   }
 
@@ -148,8 +152,8 @@ export async function getSubscription(subscriptionId: string) {
     `${LEMON_SQUEEZY_API_URL}/subscriptions/${subscriptionId}`,
     {
       headers: {
-        "Accept": "application/vnd.api+json",
-        "Authorization": `Bearer ${apiKey}`,
+        Accept: "application/vnd.api+json",
+        Authorization: `Bearer ${apiKey}`,
       },
     }
   );
@@ -176,8 +180,8 @@ export async function cancelSubscription(subscriptionId: string) {
     {
       method: "DELETE",
       headers: {
-        "Accept": "application/vnd.api+json",
-        "Authorization": `Bearer ${apiKey}`,
+        Accept: "application/vnd.api+json",
+        Authorization: `Bearer ${apiKey}`,
       },
     }
   );
@@ -188,5 +192,3 @@ export async function cancelSubscription(subscriptionId: string) {
 
   return response.json();
 }
-
-

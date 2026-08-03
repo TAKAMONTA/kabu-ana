@@ -157,13 +157,18 @@ export function SearchSection({
                     >
                       {!isSuggestLoading &&
                         suggestions.map((sug, idx) => {
-                          const companyName = normalizeDisplayText(sug.companyName);
+                          const companyName = normalizeDisplayText(
+                            sug.companyName
+                          );
                           const exchange = sug.exchange
                             ? normalizeDisplayText(sug.exchange)
                             : "";
 
                           return (
-                            <li key={`${sug.symbol}-${idx}`} role="presentation">
+                            <li
+                              key={`${sug.symbol}-${idx}`}
+                              role="presentation"
+                            >
                               <button
                                 type="button"
                                 id={`search-suggestion-${idx}`}
