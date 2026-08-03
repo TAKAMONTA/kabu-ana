@@ -1,49 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { getAdminApp } from "@/lib/auth/verifyAuth";
 import type { Subscription } from "@/lib/types/subscription";
 
-// Firebase Admin SDKの初期化
-let adminApp: App | null = null;
-
-function getAdminApp() {
-  if (adminApp) {
-    return adminApp;
-  }
-
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-    return adminApp;
-  }
-
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY環境変数が設定されていません");
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    adminApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
-    return adminApp;
-  } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
-    throw new Error("Firebase Admin SDKの初期化に失敗しました");
-  }
-}
-
-
-
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 /**
  * 購入状態を確認するAPI
  * GET /api/subscription/check
- * 
- * クエリパラメータ:
- * - idToken: Firebase Auth ID Token
+ *
+ * 認証方法（優先順）:
+ * - Authorization: Bearer <idToken> ヘッダー（推奨）
+ * - クエリパラメータ idToken（非推奨・後方互換のため維持。旧バージョンのモバイルアプリ対応）
  */
 export async function GET(request: NextRequest) {
   // 静的エクスポート時はビルドエラーを防ぐためダミーを返す
@@ -52,14 +22,19 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const idToken = searchParams.get("idToken");
+    const authHeader = request.headers.get("Authorization");
+    const headerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+    const queryToken = request.nextUrl.searchParams.get("idToken");
+    const idToken = headerToken || queryToken;
+
+    if (!headerToken && queryToken) {
+      console.warn("subscription/check: deprecated query-param idToken used");
+    }
 
     if (!idToken) {
-      return NextResponse.json(
-        { error: "idTokenが必要です" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "idTokenが必要です" }, { status: 400 });
     }
 
     // Firebase Admin SDKの初期化
@@ -102,14 +77,17 @@ export async function GET(request: NextRequest) {
       purchaseToken: data.purchaseToken,
       orderId: data.orderId,
       purchaseDate: data.purchaseDate?.toDate() || new Date(data.purchaseDate),
-      expiryDate: data.expiryDate?.toDate() || (data.expiryDate ? new Date(data.expiryDate) : undefined),
+      expiryDate:
+        data.expiryDate?.toDate() ||
+        (data.expiryDate ? new Date(data.expiryDate) : undefined),
       isTrial: data.isTrial || false,
       createdAt: data.createdAt?.toDate() || new Date(data.createdAt),
       updatedAt: data.updatedAt?.toDate() || new Date(data.updatedAt),
     };
 
     // 有効期限をチェック
-    const isActive = subscription.status === "active" || subscription.status === "trial";
+    const isActive =
+      subscription.status === "active" || subscription.status === "trial";
     const hasExpired = subscription.expiryDate
       ? new Date() > subscription.expiryDate
       : false;
@@ -128,4 +106,3 @@ export async function GET(request: NextRequest) {
     );
   }
 }
-

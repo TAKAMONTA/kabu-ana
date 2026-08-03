@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import { createCheckout } from "@/lib/lemon-squeezy";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 // Firebase Admin SDKの初期化
 let adminApp: App | null = null;
@@ -28,25 +29,24 @@ function getAdminApp() {
     });
     return adminApp;
   } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
+    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
     throw new Error("Firebase Admin SDKの初期化に失敗しました");
   }
 }
 
-
-
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 /**
  * チェックアウトセッションを作成
  * POST /api/lemon-squeezy/checkout
- * 
+ *
  * リクエストボディ:
  * {
  *   idToken: string,  // Firebase Auth ID Token
  *   planType: "monthly" | "yearly"  // プランタイプ
  * }
- * 
+ *
  * レスポンス:
  * {
  *   checkoutUrl: string  // Lemon SqueezyのチェックアウトページURL
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
 
+  let userId: string | null = null;
+  let userEmail: string | null = null;
+
   try {
     const body = await request.json();
     const { idToken, planType = "monthly" } = body;
@@ -65,9 +68,10 @@ export async function POST(request: NextRequest) {
     // 環境変数のチェック
     const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
     const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
-    const variantId = planType === "yearly"
-      ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
-      : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
+    const variantId =
+      planType === "yearly"
+        ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
+        : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
 
     if (!apiKey) {
       console.error("LEMON_SQUEEZY_API_KEY is not set");
@@ -86,17 +90,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (!variantId) {
-      console.error(`LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`);
+      console.error(
+        `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`
+      );
       return NextResponse.json(
-        { error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません` },
+        {
+          error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません`,
+        },
         { status: 500 }
       );
     }
 
     // Firebase Auth ID Tokenの検証（オプション: 未ログインでも購入可能にする場合）
-    let userId: string | null = null;
-    let userEmail: string | null = null;
-
     if (idToken) {
       try {
         const app = getAdminApp();
@@ -105,12 +110,17 @@ export async function POST(request: NextRequest) {
         userId = decodedToken.uid;
         userEmail = decodedToken.email || null;
       } catch (error) {
-        console.warn("ID Token検証失敗（ゲスト購入として処理）:", error);
+        console.warn(
+          `ID Token検証失敗（ゲスト購入として処理）: ${sanitizeError(error)}`
+        );
       }
     }
 
     // リダイレクトURLの設定
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL ||
+      request.headers.get("origin") ||
+      "http://localhost:3000";
     const redirectUrl = `${baseUrl}?purchase=success`;
 
     // チェックアウトセッションを作成
@@ -140,24 +150,23 @@ export async function POST(request: NextRequest) {
       checkoutUrl,
     });
   } catch (error: any) {
-    console.error("チェックアウト作成エラー:", error);
-    const errorMessage = error.message || "チェックアウトの作成に失敗しました";
+    const safeMessage = sanitizeError(error, [userId, userEmail]);
+    console.error(`チェックアウト作成エラー: ${safeMessage}`);
 
     // 404エラーの場合は、環境変数やIDが間違っている可能性がある
-    if (errorMessage.includes("404")) {
+    if (safeMessage.includes("404")) {
       return NextResponse.json(
         {
-          error: "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
-          details: errorMessage
+          error:
+            "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
         },
         { status: 404 }
       );
     }
 
     return NextResponse.json(
-      { error: errorMessage },
+      { error: "チェックアウトの作成に失敗しました" },
       { status: 500 }
     );
   }
 }
-

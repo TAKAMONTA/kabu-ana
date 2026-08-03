@@ -2,6 +2,8 @@
  * Lemon Squeezy API クライアント
  */
 
+import { sanitizeError } from "@/lib/utils/logSanitizer";
+
 const LEMON_SQUEEZY_API_URL = "https://api.lemonsqueezy.com/v1";
 
 export interface LemonSqueezyCheckoutOptions {
@@ -57,9 +59,9 @@ export async function createCheckout(
   const response = await fetch(`${LEMON_SQUEEZY_API_URL}/checkouts`, {
     method: "POST",
     headers: {
-      "Accept": "application/vnd.api+json",
+      Accept: "application/vnd.api+json",
       "Content-Type": "application/vnd.api+json",
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       data: {
@@ -78,7 +80,8 @@ export async function createCheckout(
             desc: options.checkoutOptions?.desc ?? true,
             discount: options.checkoutOptions?.discount ?? true,
             dark: options.checkoutOptions?.dark ?? false,
-            subscription_preview: options.checkoutOptions?.subscriptionPreview ?? true,
+            subscription_preview:
+              options.checkoutOptions?.subscriptionPreview ?? true,
           },
           checkout_data: {
             custom: options.customData,
@@ -104,33 +107,27 @@ export async function createCheckout(
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    const errorDetail =
+      errorData?.errors?.[0]?.detail || errorData?.error || "";
+    const sanitizedDetail = sanitizeError(errorDetail, [
+      options.customData?.userId,
+      options.customData?.email,
+    ]);
+
     console.error("Lemon Squeezy API Error:", {
       status: response.status,
       statusText: response.statusText,
-      errorData,
+      detail: sanitizedDetail,
       variantId: options.variantId,
       storeId,
     });
-    
-    const errorMessage = errorData?.errors?.[0]?.detail || errorData?.error || `Failed to create checkout: ${response.status}`;
+
+    const errorMessage =
+      sanitizedDetail || `Failed to create checkout: ${response.status}`;
     throw new Error(errorMessage);
   }
 
   return response.json();
-}
-
-/**
- * Webhook署名を検証
- */
-export function verifyWebhookSignature(
-  payload: string,
-  signature: string,
-  secret: string
-): boolean {
-  const crypto = require("crypto");
-  const hmac = crypto.createHmac("sha256", secret);
-  const digest = hmac.update(payload).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
 }
 
 /**
@@ -147,8 +144,8 @@ export async function getSubscription(subscriptionId: string) {
     `${LEMON_SQUEEZY_API_URL}/subscriptions/${subscriptionId}`,
     {
       headers: {
-        "Accept": "application/vnd.api+json",
-        "Authorization": `Bearer ${apiKey}`,
+        Accept: "application/vnd.api+json",
+        Authorization: `Bearer ${apiKey}`,
       },
     }
   );
@@ -175,8 +172,8 @@ export async function cancelSubscription(subscriptionId: string) {
     {
       method: "DELETE",
       headers: {
-        "Accept": "application/vnd.api+json",
-        "Authorization": `Bearer ${apiKey}`,
+        Accept: "application/vnd.api+json",
+        Authorization: `Bearer ${apiKey}`,
       },
     }
   );
@@ -187,5 +184,3 @@ export async function cancelSubscription(subscriptionId: string) {
 
   return response.json();
 }
-
-
