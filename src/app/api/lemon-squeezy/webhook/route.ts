@@ -51,14 +51,21 @@ function verifyWebhookSignature(
   }
 }
 
+/**
+ * ログ出力用に識別子をマスクする（末尾4文字のみ表示し、完全な値の露出を防ぐ）
+ */
+function maskId(id: string): string {
+  if (!id) return "unknown";
+  return id.length <= 4 ? "****" : `...${id.slice(-4)}`;
+}
 
-
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic =
+  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
 /**
  * Lemon Squeezy Webhook処理
  * POST /api/lemon-squeezy/webhook
- * 
+ *
  * 処理するイベント:
  * - subscription_created: サブスクリプション作成
  * - subscription_updated: サブスクリプション更新
@@ -71,6 +78,9 @@ export async function POST(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json({ status: "static_export" });
   }
+
+  let eventName: string | undefined;
+  let eventId: string | undefined;
 
   try {
     // Webhook署名の検証
@@ -88,25 +98,24 @@ export async function POST(request: NextRequest) {
 
     if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
       console.error("Invalid webhook signature");
-      return NextResponse.json(
-        { error: "Invalid signature" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     // ペイロードをパース
     const payload = JSON.parse(rawBody);
-    const eventName = payload.meta?.event_name;
+    eventName = payload.meta?.event_name;
     const customData = payload.meta?.custom_data || {};
     const data = payload.data;
+    eventId = data?.id !== undefined ? String(data.id) : undefined;
 
-    console.log(`📦 Lemon Squeezy Webhook: ${eventName}`);
-    console.log("Custom Data:", customData);
+    console.info(`📦 Lemon Squeezy Webhook: ${eventName}`);
 
     // ユーザーIDの取得
     const userId = customData.userId;
     if (!userId) {
-      console.warn("⚠️ userId not found in custom_data. Skipping Firestore update.");
+      console.warn(
+        "⚠️ userId not found in custom_data. Skipping Firestore update."
+      );
       // userIdがなくても成功を返す（ゲスト購入の可能性）
       return NextResponse.json({ received: true });
     }
@@ -147,7 +156,9 @@ export async function POST(request: NextRequest) {
           { merge: true }
         );
 
-        console.log(`✅ Subscription created/renewed for user: ${userId}`);
+        console.info(
+          `✅ Subscription created/renewed for user: ${maskId(userId)}`
+        );
         break;
       }
 
@@ -192,7 +203,9 @@ export async function POST(request: NextRequest) {
           { merge: true }
         );
 
-        console.log(`✅ Subscription updated for user: ${userId}, status: ${status}`);
+        console.info(
+          `✅ Subscription updated for user: ${maskId(userId)}, status: ${status}`
+        );
         break;
       }
 
@@ -217,7 +230,7 @@ export async function POST(request: NextRequest) {
           { merge: true }
         );
 
-        console.log(`✅ Subscription cancelled for user: ${userId}`);
+        console.info(`✅ Subscription cancelled for user: ${maskId(userId)}`);
         break;
       }
 
@@ -246,22 +259,22 @@ export async function POST(request: NextRequest) {
           { merge: true }
         );
 
-        console.log(`✅ Order created for user: ${userId}`);
+        console.info(`✅ Order created for user: ${maskId(userId)}`);
         break;
       }
 
       default:
-        console.log(`ℹ️ Unhandled event: ${eventName}`);
+        console.info(`ℹ️ Unhandled event: ${eventName}`);
     }
 
     return NextResponse.json({ received: true });
   } catch (error: any) {
-    console.error("Webhook処理エラー:", error);
+    console.error(
+      `Webhook処理エラー: event=${eventName ?? "unknown"}, id=${eventId ?? "unknown"}, message=${error?.message ?? "unknown error"}`
+    );
     return NextResponse.json(
       { error: error.message || "Webhook processing failed" },
       { status: 500 }
     );
   }
 }
-
-
