@@ -32,7 +32,6 @@ interface SearchSectionProps {
 
 export function SearchSection({
   searchQuery,
-  setSearchQuery,
   showSuggestions,
   setShowSuggestions,
   activeSuggestion,

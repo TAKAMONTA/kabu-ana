@@ -192,7 +192,6 @@ export function AskSection({
   analysisResult,
   canUseFeature = true,
   remainingUses = 5,
-  dailyLimit = 5,
   isPremium = false,
   currencySymbol = "¥",
 }: AskSectionProps) {

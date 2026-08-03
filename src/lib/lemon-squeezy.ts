@@ -2,6 +2,8 @@
  * Lemon Squeezy API クライアント
  */
 
+import crypto from "crypto";
+
 const LEMON_SQUEEZY_API_URL = "https://api.lemonsqueezy.com/v1";
 
 export interface LemonSqueezyCheckoutOptions {
@@ -127,7 +129,6 @@ export function verifyWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
-  const crypto = require("crypto");
   const hmac = crypto.createHmac("sha256", secret);
   const digest = hmac.update(payload).digest("hex");
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));

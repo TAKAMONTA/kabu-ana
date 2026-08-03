@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
-import { FreeNewsClient } from "@/lib/api/freeNews";
 import {
   findStocksMentionedInText,
   JPX_STOCK_BY_CODE,

@@ -34,7 +34,6 @@ export function checkRateLimit(request: NextRequest): {
 } {
   const clientIP = getClientIP(request);
   const now = Date.now();
-  const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
 
   // 古いエントリをクリーンアップ
   for (const [ip, data] of requestCounts.entries()) {
