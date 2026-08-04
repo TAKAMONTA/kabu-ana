@@ -4,6 +4,7 @@ import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import { withRateLimit } from "@/lib/utils/rateLimiter";
 
 export interface NewsAnalysisResult {
   impact: "positive" | "negative" | "neutral";
@@ -101,6 +102,8 @@ async function newsAnalysisHandler(request: NextRequest) {
   }
 }
 
-export const POST = withDailyLimit(newsAnalysisHandler, {
-  skip: createBundledSkip("news"),
-});
+export const POST = withRateLimit(
+  withDailyLimit(newsAnalysisHandler, {
+    skip: createBundledSkip("news"),
+  })
+);

@@ -54,11 +54,6 @@ interface StockSidePanelProps {
   showPriceHeader?: boolean;
 }
 
-// ヘルパー関数：数値をフォーマット（後方互換性のため残す）
-function formatLargeNumber(value: string | number | undefined): string {
-  return formatNumber(value, { compact: true });
-}
-
 interface StockPriceHeaderCardProps {
   companyInfo: CompanyInfo;
   stockData: StockData | null;
@@ -193,19 +188,6 @@ export function StockSidePanel({
       </div>
     );
   }
-
-  const isUp = stockData.change >= 0;
-
-  // 52週レンジが有効な場合のみプログレスバーを表示
-  const show52WeekRange =
-    stockData.high52 > 0 &&
-    stockData.low52 > 0 &&
-    stockData.high52 > stockData.low52;
-  const range52WeekPercent = show52WeekRange
-    ? ((stockData.price - stockData.low52) /
-        (stockData.high52 - stockData.low52)) *
-      100
-    : 0;
 
   return (
     <div className="space-y-4">

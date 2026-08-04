@@ -29,6 +29,7 @@ import {
   shouldUseCachedBrief,
   type BriefSourceInput,
 } from "@/lib/signals/briefCache";
+import { withRateLimit } from "@/lib/utils/rateLimiter";
 
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -128,7 +129,7 @@ async function callOpenRouterJson<T>(
   return schema.parse(extractJsonObject(content));
 }
 
-export async function GET(request: NextRequest) {
+async function getHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json(ok<BriefPayload>(null));
   }
@@ -166,7 +167,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function postHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json(
       fail<ClaudeDeepDive>("静的エクスポートでは深掘り分析は利用できません")
@@ -231,3 +232,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const GET = withRateLimit(getHandler);
+export const POST = withRateLimit(postHandler);

@@ -68,7 +68,10 @@ function sentencesOverlap(a: string, b: string): boolean {
   const normB = normalizeForCompare(b);
   if (!normA || !normB) return false;
   const probe = normA.slice(0, Math.min(24, normA.length));
-  return normB.includes(probe) || normA.includes(normB.slice(0, Math.min(24, normB.length)));
+  return (
+    normB.includes(probe) ||
+    normA.includes(normB.slice(0, Math.min(24, normB.length)))
+  );
 }
 
 function getCommentBody(
@@ -192,7 +195,6 @@ export function AskSection({
   analysisResult,
   canUseFeature = true,
   remainingUses = 5,
-  dailyLimit = 5,
   isPremium = false,
   currencySymbol = "¥",
 }: AskSectionProps) {
@@ -200,8 +202,7 @@ export function AskSection({
   const [showFullComment, setShowFullComment] = useState(false);
 
   const mainText = getMainAnalysisText(streamingText, analysisResult);
-  const hasResponse =
-    analysisResult || isAnalyzing || Boolean(mainText.trim());
+  const hasResponse = analysisResult || isAnalyzing || Boolean(mainText.trim());
   const conclusion = getConclusion(analysisResult);
   const commentBody = getCommentBody(mainText, analysisResult) || mainText;
   const shouldCollapseComment = commentBody.length > COMMENT_PREVIEW_LENGTH;
@@ -212,12 +213,12 @@ export function AskSection({
   const keyFactors = analysisResult?.keyFactors ?? [];
   const hasMoreDetails = Boolean(
     analysisResult &&
-      (keyFactors.length > 0 ||
-        (analysisResult.recommendations?.length ?? 0) > 0 ||
-        analysisResult.swot ||
-        analysisResult.targetPrice ||
-        analysisResult.stopLoss ||
-        analysisResult.aiReflection)
+    (keyFactors.length > 0 ||
+      (analysisResult.recommendations?.length ?? 0) > 0 ||
+      analysisResult.swot ||
+      analysisResult.targetPrice ||
+      analysisResult.stopLoss ||
+      analysisResult.aiReflection)
   );
 
   return (
@@ -256,7 +257,9 @@ export function AskSection({
             {(mainText || isAnalyzing) && (
               <div className="rounded-xl border border-slate-200 bg-card p-4 dark:border-slate-800">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">根拠とAIの見立て</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    根拠とAIの見立て
+                  </p>
                   {analysisResult?.riskLevel && (
                     <div className="flex flex-wrap items-center gap-2">
                       <span
@@ -277,7 +280,9 @@ export function AskSection({
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
                   {mainText ? visibleComment : "数字から見立てを整理しています"}
                   {isAnalyzing && !mainText && <LoadingDots />}
-                  {isAnalyzing && mainText && <span className="animate-pulse">▋</span>}
+                  {isAnalyzing && mainText && (
+                    <span className="animate-pulse">▋</span>
+                  )}
                 </p>
                 {shouldCollapseComment && (
                   <Button
@@ -308,7 +313,9 @@ export function AskSection({
             {analysisResult && (
               <>
                 <div>
-                  <h4 className="mb-3 text-sm font-semibold">見るべきポイント</h4>
+                  <h4 className="mb-3 text-sm font-semibold">
+                    見るべきポイント
+                  </h4>
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     {pointCards.map(point => (
                       <div
@@ -499,7 +506,10 @@ export function AskSection({
                               </p>
                               <ul className="space-y-1.5">
                                 {section.items.map((item, i) => (
-                                  <li key={i} className="text-xs leading-relaxed">
+                                  <li
+                                    key={i}
+                                    className="text-xs leading-relaxed"
+                                  >
                                     {item}
                                   </li>
                                 ))}
@@ -512,7 +522,9 @@ export function AskSection({
 
                     {analysisResult.aiReflection && (
                       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-900">
-                        <h4 className="mb-2 text-sm font-semibold">AIの見立て</h4>
+                        <h4 className="mb-2 text-sm font-semibold">
+                          AIの見立て
+                        </h4>
                         <p className="text-sm leading-relaxed text-muted-foreground">
                           {analysisResult.aiReflection}
                         </p>

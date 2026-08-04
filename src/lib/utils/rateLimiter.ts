@@ -1,13 +1,14 @@
 import { NextRequest } from "next/server";
 
 // メモリベースのレート制限（本番環境ではRedis等を使用推奨）
+// 注意: インスタンス毎に独立したメモリ状態であり、XFFヘッダーの最左値をそのまま信頼するため、
+// 意図的な攻撃（複数インスタンス分散・IP偽装）への防護は限定的（Redis化・認証キー化はP2）。
 const requestCounts = new Map<string, { count: number; resetTime: number }>();
 
 // レート制限設定
 const RATE_LIMIT_CONFIG = {
   windowMs: 15 * 60 * 1000, // 15分
   maxRequests: 100, // 最大リクエスト数
-  maxRequestsPerMinute: 20, // 1分間の最大リクエスト数
 };
 
 // クライアントIPを取得
@@ -26,6 +27,15 @@ function getClientIP(request: NextRequest): string {
   return "unknown";
 }
 
+// リクエストパス（バケット分離キー）を取得
+function getPathname(request: NextRequest): string {
+  try {
+    return new URL(request.url).pathname;
+  } catch {
+    return "unknown-path";
+  }
+}
+
 // レート制限チェック
 export function checkRateLimit(request: NextRequest): {
   allowed: boolean;
@@ -33,22 +43,24 @@ export function checkRateLimit(request: NextRequest): {
   resetTime: number;
 } {
   const clientIP = getClientIP(request);
+  const pathname = getPathname(request);
+  // IPとルートパスの組み合わせでバケットを分離し、あるルートの枯渇が他ルートに巻き添えしないようにする
+  const bucketKey = `${clientIP}:${pathname}`;
   const now = Date.now();
-  const windowStart = now - RATE_LIMIT_CONFIG.windowMs;
 
   // 古いエントリをクリーンアップ
-  for (const [ip, data] of requestCounts.entries()) {
+  for (const [key, data] of requestCounts.entries()) {
     if (data.resetTime < now) {
-      requestCounts.delete(ip);
+      requestCounts.delete(key);
     }
   }
 
   // 現在のリクエスト数を取得
-  const currentData = requestCounts.get(clientIP);
+  const currentData = requestCounts.get(bucketKey);
 
   if (!currentData || currentData.resetTime < now) {
     // 新しいウィンドウを開始
-    requestCounts.set(clientIP, {
+    requestCounts.set(bucketKey, {
       count: 1,
       resetTime: now + RATE_LIMIT_CONFIG.windowMs,
     });

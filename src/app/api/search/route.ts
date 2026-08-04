@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
-import { FreeNewsClient } from "@/lib/api/freeNews";
 import {
   findStocksMentionedInText,
   JPX_STOCK_BY_CODE,
@@ -435,9 +434,7 @@ async function searchHandler(request: NextRequest) {
           ),
         ]).catch((error: unknown) => {
           edinetSearchError = error;
-          return [] as Awaited<
-            ReturnType<EdinetDBClient["searchCompanies"]>
-          >;
+          return [] as Awaited<ReturnType<EdinetDBClient["searchCompanies"]>>;
         });
 
         timings["edinet.search"] = Date.now() - edinetSearchStartedAt;
@@ -451,10 +448,7 @@ async function searchHandler(request: NextRequest) {
           console.warn(
             `EDINET search failed: ${message} (query=${edinetSearchQuery}, ${timings["edinet.search"]}ms)`
           );
-        } else if (
-          Array.isArray(edinetResults) &&
-          edinetResults.length > 0
-        ) {
+        } else if (Array.isArray(edinetResults) && edinetResults.length > 0) {
           const company = edinetResults[0];
           edinetCode = company.edinet_code;
           edinetStatus = "ok";
