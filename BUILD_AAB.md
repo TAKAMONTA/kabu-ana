@@ -1,7 +1,7 @@
 # Android AAB ビルド手順
 
 ## バージョン情報
-- **現在のバージョン**: versionCode 25, versionName "1.5.3"
+- **現在のバージョン**: versionCode 27, versionName "1.5.5"
 
 ## ビルド手順
 
