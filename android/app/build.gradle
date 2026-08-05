@@ -39,10 +39,14 @@ android {
     }
 
     defaultConfig {
+        // 【変更禁止】Play Store 公開中の実パッケージ名。TWA 時代から引き継いでおり、
+        // namespace(com.takaapps.kabuana) や iOS の bundle id と異なるのは正常。
+        // 変更すると別アプリ扱いになり既存ユーザーへ更新を配信できず、
+        // 課金検証(src/lib/purchases/nativePurchaseVerification.ts の既定値)も一致しなくなる。
         applicationId "app.vercel.kabu_9t7mdgybz_takamontas_projects.twa"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 27
+        versionCode 28
         versionName "1.5.5"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

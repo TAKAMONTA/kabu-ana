@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "build:ios": "npm run build:static && npx cap sync ios",
+    "build:android": "npm run build:static && npx cap sync android",
+    "build:aab": "npm run build:android && cd android && ./gradlew bundleRelease",
     "build:static": "EXPORT_STATIC=true next build",
     "check:release-env": "node scripts/check-release-env.mjs",
     "check:release-env:ios": "node scripts/check-release-env.mjs --target=ios",
