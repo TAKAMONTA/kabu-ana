@@ -42,12 +42,8 @@ npm install
 
 ```env
 # Market Data Configuration
-JQUANTS_EMAIL=your_jquants_email_here
-JQUANTS_PASSWORD=your_jquants_password_here
+JQUANTS_API_KEY=your_jquants_api_key_here
 TWELVE_DATA_API_KEY=your_twelve_data_key_here
-# Legacy SerpAPI is disabled unless explicitly enabled.
-# ENABLE_LEGACY_SERPAPI=true
-# SERPAPI_API_KEY=your_serpapi_key_here
 
 # OpenRouter Configuration
 OPENROUTER_API_KEY=your_openrouter_key_here
@@ -72,12 +68,9 @@ npm run dev
 ## 📋 必要なAPIキー
 
 ### J-Quants / Twelve Data
-1. [J-Quants](https://jpx-jquants.com/)でアカウントを作成し、メールアドレスとパスワードを取得
+1. [J-Quants](https://jpx-jquants.com/)でアカウントを作成し、APIキーを取得
 2. [Twelve Data](https://twelvedata.com/)でAPIキーを取得
-3. `.env.local`に `JQUANTS_EMAIL`, `JQUANTS_PASSWORD`, `TWELVE_DATA_API_KEY` を設定
-
-### SerpAPI（レガシー）
-通常は使用しません。検証目的で旧SerpAPI経路を使う場合のみ、`ENABLE_LEGACY_SERPAPI=true` と `SERPAPI_API_KEY` を設定してください。
+3. `.env.local`に `JQUANTS_API_KEY`, `TWELVE_DATA_API_KEY` を設定
 
 ### OpenRouter
 1. [OpenRouter](https://openrouter.ai/)でアカウントを作成
@@ -103,8 +96,7 @@ npm run dev
 
 Vercelダッシュボードで以下の環境変数を設定してください：
 
-- `JQUANTS_EMAIL`
-- `JQUANTS_PASSWORD`
+- `JQUANTS_API_KEY`
 - `TWELVE_DATA_API_KEY`
 - `OPENROUTER_API_KEY`
 - `NEXT_PUBLIC_FIREBASE_API_KEY`

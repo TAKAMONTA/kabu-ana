@@ -151,6 +151,64 @@ describe("production smoke check", () => {
     );
   });
 
+  it("fails when a market data route reports an unexpected dataSource", async () => {
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (String(url).endsWith("/api/search")) {
+        const query = JSON.parse(init.body).query;
+        if (query === "AAPL") return jsonResponse(successfulAppleSearchPayload());
+        return jsonResponse({
+          ...successfulSearchPayload(),
+          metadata: { dataSource: "unexpected_source" },
+        });
+      }
+      return jsonResponse(successfulBriefPayload());
+    });
+
+    const result = await runProductionSmokeCheck({
+      baseUrl: "https://kabu-ana.com",
+      fetchImpl,
+      now: new Date("2026-06-17T06:00:00.000Z"),
+      timeoutMs: 1000,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failed).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "market-data-route-7203",
+          message: expect.stringContaining(
+            "metadata.dataSource expected one of jpx_local, market_fast, market_fallback but got unexpected_source"
+          ),
+        }),
+      ])
+    );
+  });
+
+  it("passes even when stockData.pe is a real (non-zero) value", async () => {
+    // J-Quants が将来 PER を返すようになっても誤検知しないことの回帰テスト。
+    const fetchImpl = vi.fn(async (url, init) => {
+      if (String(url).endsWith("/api/search")) {
+        const query = JSON.parse(init.body).query;
+        if (query === "AAPL") return jsonResponse(successfulAppleSearchPayload());
+        return jsonResponse({
+          ...successfulSearchPayload(),
+          stockData: { ...successfulSearchPayload().stockData, pe: 12.5 },
+        });
+      }
+      return jsonResponse(successfulBriefPayload());
+    });
+
+    const result = await runProductionSmokeCheck({
+      baseUrl: "https://kabu-ana.com",
+      fetchImpl,
+      now: new Date("2026-06-17T06:00:00.000Z"),
+      timeoutMs: 1000,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.failed).toEqual([]);
+  });
+
   it("fails when the morning brief is an error payload or has no usable content", async () => {
     const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {

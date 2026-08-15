@@ -113,9 +113,10 @@ export default function PrivacyPolicyPage() {
                   <li>Firebase Authentication / Firestore: 認証、購入状態、利用状況の管理</li>
                   <li>Apple App Store / StoreKit: iOSアプリ内課金、サブスクリプション管理、購入検証</li>
                   <li>Google Play Billing: Androidアプリ内課金、サブスクリプション管理</li>
-                  <li>SERPAPI: 検索データ取得</li>
+                  <li>J-Quants: 日本株の株価・財務データ取得</li>
+                  <li>Twelve Data: 米国株の株価データ取得</li>
+                  <li>EDINET DB: 有価証券報告書等の開示情報取得</li>
                   <li>OpenRouter: AI分析処理</li>
-                  <li>Financial Modeling Prep: 財務データ取得</li>
                   <li>NewsAPI / Google News RSS / Yahoo Finance: 関連ニュース取得</li>
                   <li>EIA / FRED: マーケットシグナル関連データ取得</li>
                   <li>Lemon Squeezy: Web版の決済処理</li>
