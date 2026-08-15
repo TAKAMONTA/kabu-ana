@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
+import { resolveSearchQuery } from "@/lib/jpx/searchResolution";
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -20,7 +21,9 @@ async function searchSuggestionsHandler(request: NextRequest) {
     // 市場データクライアントで検索候補を取得
     try {
       const marketApi = createMarketDataClient();
-      const result = await marketApi.searchCompany(query);
+      // 優先順位規則（4桁コード直指定 → 個別株言及とETFの一致長比較）は /api/search と共通化。
+      const { effectiveQuery } = resolveSearchQuery(query);
+      const result = await marketApi.searchCompany(effectiveQuery);
       if (result) {
         suggestions = [result];
       }

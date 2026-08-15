@@ -4,50 +4,81 @@ import {
   JPX_STOCK_MASTER,
   JPX_STOCK_MASTER_UPDATED_AT,
 } from "../stockMaster";
+import { STOCK_IDEA_UNIVERSE } from "@/lib/topTradingValue";
 
 describe("JPX_STOCK_MASTER", () => {
   it("contains a broad domestic equity master generated from JPX listed company data", () => {
     expect(JPX_STOCK_MASTER.length).toBeGreaterThan(3500);
     expect(JPX_STOCK_MASTER_UPDATED_AT).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    expect(JPX_STOCK_MASTER.find(stock => stock.code === "7203")).toMatchObject({
-      name: "トヨタ自動車",
-      marketSegment: "プライム",
-    });
-    expect(JPX_STOCK_MASTER.find(stock => stock.code === "3350")).toMatchObject({
-      name: "メタプラネット",
-    });
-    expect(JPX_STOCK_MASTER.find(stock => stock.code === "130A")).toMatchObject({
-      marketSegment: "グロース",
-    });
+    expect(JPX_STOCK_MASTER.find(stock => stock.code === "7203")).toMatchObject(
+      {
+        name: "トヨタ自動車",
+        marketSegment: "プライム",
+      }
+    );
+    expect(JPX_STOCK_MASTER.find(stock => stock.code === "3350")).toMatchObject(
+      {
+        name: "メタプラネット",
+      }
+    );
+    expect(JPX_STOCK_MASTER.find(stock => stock.code === "130A")).toMatchObject(
+      {
+        marketSegment: "グロース",
+      }
+    );
   });
 
   it("excludes ETFs and funds from the stock idea universe", () => {
-    expect(JPX_STOCK_MASTER.find(stock => stock.code === "1306")).toBeUndefined();
+    // ETF/REITは検索できる必要があるためマスタには収録する。
+    // 一方、ニュース本文とのスコアリングで作る銘柄アイデアの母集団からは
+    // 除外する（「TOPIX」「日経平均」等の頻出語で指数連動商品が上位を占めるため）。
+    const topixEtf = JPX_STOCK_MASTER.find(stock => stock.code === "1306");
+    expect(topixEtf).toMatchObject({ assetType: "etf" });
+
+    expect(
+      STOCK_IDEA_UNIVERSE.find(stock => stock.code === "1306")
+    ).toBeUndefined();
+    expect(
+      STOCK_IDEA_UNIVERSE.every(stock => stock.assetType === "equity")
+    ).toBe(true);
+    expect(STOCK_IDEA_UNIVERSE.length).toBeLessThan(JPX_STOCK_MASTER.length);
+    // 個別株はアイデア母集団に残っていること（絞り込みすぎの検知）。
+    expect(
+      STOCK_IDEA_UNIVERSE.find(stock => stock.code === "7203")
+    ).toBeDefined();
   });
 });
 
 describe("findStocksMentionedInText", () => {
   it("finds less obvious stocks from direct company mentions", () => {
-    const matches = findStocksMentionedInText("メタプラネット、ビットコイン追加購入で急騰");
+    const matches = findStocksMentionedInText(
+      "メタプラネット、ビットコイン追加購入で急騰"
+    );
 
     expect(matches.map(stock => stock.code)).toContain("3350");
   });
 
   it("prefers the longest company mention instead of substring matches", () => {
-    const matches = findStocksMentionedInText("メタプラネット、ビットコイン追加購入で急騰");
+    const matches = findStocksMentionedInText(
+      "メタプラネット、ビットコイン追加購入で急騰"
+    );
 
     expect(matches.map(stock => stock.code)).not.toContain("2391");
   });
 
   it("does not match a short company name inside a generic market word", () => {
-    const matches = findStocksMentionedInText("本日のランキング【値上がり率】 | 個別株");
+    const matches = findStocksMentionedInText(
+      "本日のランキング【値上がり率】 | 個別株"
+    );
 
     expect(matches.map(stock => stock.code)).not.toContain("8118");
   });
 
   it("does not turn sector-only headlines into specific stock picks", () => {
-    const matches = findStocksMentionedInText("生成AI投資の拡大で半導体関連株に関心");
+    const matches = findStocksMentionedInText(
+      "生成AI投資の拡大で半導体関連株に関心"
+    );
 
     expect(matches).toHaveLength(0);
   });

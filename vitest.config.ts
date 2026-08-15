@@ -20,6 +20,9 @@ export default defineConfig({
       "backend/**",
       "ios/**",
       "android/**",
+      // 銘柄マスタ全件スキャンは数十秒かかるため既定スイートから外す。
+      // 実行は `npm run test:jpx-fullscan`（vitest.fullscan.config.ts）。
+      "**/*.fullscan.test.ts",
     ],
   },
 });

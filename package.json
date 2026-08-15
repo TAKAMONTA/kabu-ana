@@ -19,6 +19,7 @@
     "start": "next start",
     "lint": "next lint --no-cache --max-warnings=138",
     "test:signals": "vitest run src/lib/signals",
+    "test:jpx-fullscan": "vitest run --config vitest.fullscan.config.ts",
     "postinstall": "patch-package"
   },
   "dependencies": {

@@ -52,3 +52,6 @@ HANDOFF_TO_CURSOR.md
 # local agent workspaces
 /.claude/worktrees/
 /docs/superpowers/plans/
+
+# python bytecode cache (scripts/sync-jpx-stock-master.py)
+__pycache__/
