@@ -34,6 +34,9 @@ export default function PrivacyPolicyPage() {
                   <li>アクセス日時（サービス改善目的）</li>
                   <li>使用デバイス情報（最適化目的）</li>
                 </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  広告配信に伴う第三者への情報送信については5.3をご参照ください。
+                </p>
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-2">2.2 ユーザー入力情報</h3>
@@ -106,6 +109,9 @@ export default function PrivacyPolicyPage() {
                   <li>法的義務に基づく場合</li>
                   <li>サービス提供に必要な場合（API連携等）</li>
                 </ul>
+                <p className="text-sm text-muted-foreground mt-2">
+                  なお、広告配信に伴いブラウザから広告事業者へ直接送信される情報については5.3に記載しています。
+                </p>
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-2">5.2 外部サービス連携</h3>
@@ -118,8 +124,27 @@ export default function PrivacyPolicyPage() {
                   <li>EDINET DB: 有価証券報告書等の開示情報取得</li>
                   <li>OpenRouter: AI分析処理</li>
                   <li>NewsAPI / Google News RSS / Yahoo Finance: 関連ニュース取得</li>
-                  <li>EIA / FRED: マーケットシグナル関連データ取得</li>
+                  <li>
+                    EIA / FRED / USGS（米国地質調査所）/ ニュースRSS各社（Reuters、Bloomberg、AP、BBC、OilPrice.com、Argus
+                    Media、Hellenic Shipping News、MEES、Energy Voice、JOGMEC）:
+                    マーケットシグナル機能（地震・エネルギー関連ニュース等）向けデータ取得（当社サーバーが公開情報を取得するのみで、利用者情報は送信されません）
+                  </li>
                   <li>Lemon Squeezy: Web版の決済処理</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-lg font-medium mb-2">5.3 広告配信</h3>
+                <p className="text-sm text-muted-foreground">
+                  Web版をご利用の非プレミアムユーザーには、以下の広告サービスによる広告を表示します。
+                </p>
+                <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
+                  <li>
+                    A8.net（アフィリエイト広告）:
+                    広告の表示時点で、クリックの有無にかかわらずユーザーのブラウザからA8.netへIPアドレス、User-Agent、リファラ情報が自動的に送信されます
+                  </li>
+                  <li>
+                    広告をクリックした場合はA8.netのサイトを経由して提携先サイトへ遷移し、以降はA8.netのプライバシーポリシーが適用されます
+                  </li>
                 </ul>
               </div>
             </div>
