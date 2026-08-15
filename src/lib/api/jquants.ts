@@ -1,5 +1,6 @@
 import { FreeNewsClient } from "./freeNews";
 import { JPX_STOCK_BY_CODE } from "@/lib/jpx/stockMaster";
+import { normalizeDisplayText } from "@/lib/displayText";
 import type {
   CompanyInfo,
   StockData,
@@ -85,12 +86,16 @@ export class JQuantsClient implements MarketDataClient {
     // ETF・ETN / REIT は J-Quants の CoName が「<運用会社名>　<ファンド名>」形式
     // （例:「野村アセットマネジメント株式会社　ＮＥＸＴ　ＦＵＮＤＳ　ＴＯＰＩＸ
     // 連動型上場投信」）で、UIに出すと冗長。ローカルマスタは JPX 公式の
-    // ファンド名のみを持つのでそちらを表示名に使う。
+    // ファンド名のみを持つのでそちらを表示名に使う。マスタの表示名は全角の
+    // ままJPXから来るため、UI表示・ニュース検索語としては normalizeDisplayText
+    // （NFKC + 空白畳み）で半角に正規化してから使う。
     // 個別株(equity)は従来どおり CoName を優先し、表示を一切変えない。
     // マスタ未収録コード（jpx === undefined）も従来どおり CoName へフォールバック。
     const preferLocalName = jpx !== undefined && jpx.assetType !== "equity";
     return {
-      name: preferLocalName ? jpx.name : (m.CoName ?? jpx?.name ?? query),
+      name: preferLocalName
+        ? normalizeDisplayText(jpx.name)
+        : (m.CoName ?? jpx?.name ?? query),
       symbol: code4,
       market: jpx?.marketSegment ?? "東証",
       description: m.S33Nm ?? jpx?.sector33 ?? "",
@@ -167,10 +172,16 @@ export class JQuantsClient implements MarketDataClient {
 
   async getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> {
     const code4 = extract4(symbol);
-    // 銘柄マスタが ETF・ETN / REIT も収録するようになったため、
-    // etfAliases.ts の getEtfNameByCode() フォールバックは到達不能になった
-    // （収録33コードは全て JPX_STOCK_BY_CODE 側で解決される）。
-    const name = JPX_STOCK_BY_CODE.get(code4)?.name ?? symbol;
+    // ETF・ETN / REIT の正式名称はマスタ上は全角のままなので、ニュース検索語に
+    // 使う前に normalizeDisplayText で半角へ正規化する（freeNews.ts は完全一致
+    // フレーズとして埋め込むため、全角のままだとヒット率が落ちる）。
+    // 個別株(equity)は従来どおりマスタの表示名をそのまま使う。
+    const jpx = JPX_STOCK_BY_CODE.get(code4);
+    const name = jpx
+      ? jpx.assetType === "equity"
+        ? jpx.name
+        : normalizeDisplayText(jpx.name)
+      : symbol;
     return this.freeNews.getComprehensiveNews(name, symbol, limit);
   }
 

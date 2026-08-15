@@ -86,7 +86,8 @@ export interface ResolvedSearchQuery {
  * 長い方を採用する。これは、ETFの正式名称に「・コア」のような短い個別株名の
  * 断片が偶然含まれるケース（例: "iシェアーズ・コアJリートETF" が個別株
  * 「コア」に奪われる）を防ぐ。マスタ内部の同種の衝突は findStockMatchesInText の
- * shadow判定＋マッチ長ソートで既に解決済み。
+ * shadow判定で既に解決済み（マッチ長ソートは load-bearing ではなく、複数銘柄が
+ * 併記されたテキストで先頭要素が最強マッチになる順序を保証するためのもの）。
  */
 export function resolveSearchQuery(query: string): ResolvedSearchQuery {
   const codeMatch = findLocalJpxStockByCode(query);

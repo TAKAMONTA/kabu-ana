@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  findStocksMentionedInText,
+  findStockMatchesInText,
   JPX_STOCK_MASTER,
   JPX_STOCK_MASTER_UPDATED_AT,
 } from "../stockMaster";
@@ -50,33 +50,38 @@ describe("JPX_STOCK_MASTER", () => {
   });
 });
 
-describe("findStocksMentionedInText", () => {
+// 旧 findStocksMentionedInText（本文言及の銘柄コード一覧だけを返す薄いラッパ）は
+// 本番呼び出し元がゼロだったうえ、queryTerms 走査へ黙って切り替わっており
+// docstring（searchTerms=本文スキャン用）と実装の分担が食い違っていた
+// （例: "昴" が本文中で誤ヒットする）。罠を残さないよう削除し、テストは
+// 本体の findStockMatchesInText を直接呼ぶ形に寄せる。
+describe("findStockMatchesInText", () => {
   it("finds less obvious stocks from direct company mentions", () => {
-    const matches = findStocksMentionedInText(
+    const matches = findStockMatchesInText(
       "メタプラネット、ビットコイン追加購入で急騰"
     );
 
-    expect(matches.map(stock => stock.code)).toContain("3350");
+    expect(matches.map(match => match.stock.code)).toContain("3350");
   });
 
   it("prefers the longest company mention instead of substring matches", () => {
-    const matches = findStocksMentionedInText(
+    const matches = findStockMatchesInText(
       "メタプラネット、ビットコイン追加購入で急騰"
     );
 
-    expect(matches.map(stock => stock.code)).not.toContain("2391");
+    expect(matches.map(match => match.stock.code)).not.toContain("2391");
   });
 
   it("does not match a short company name inside a generic market word", () => {
-    const matches = findStocksMentionedInText(
+    const matches = findStockMatchesInText(
       "本日のランキング【値上がり率】 | 個別株"
     );
 
-    expect(matches.map(stock => stock.code)).not.toContain("8118");
+    expect(matches.map(match => match.stock.code)).not.toContain("8118");
   });
 
   it("does not turn sector-only headlines into specific stock picks", () => {
-    const matches = findStocksMentionedInText(
+    const matches = findStockMatchesInText(
       "生成AI投資の拡大で半導体関連株に関心"
     );
 
@@ -84,23 +89,42 @@ describe("findStocksMentionedInText", () => {
   });
 
   it("does not confuse source names or bylines with listed company mentions", () => {
-    const matches = findStocksMentionedInText(
+    const matches = findStockMatchesInText(
       "日経平均が続伸、野村證券のストラテジストは大型株優位と分析"
     );
 
-    expect(matches.map(stock => stock.code)).not.toContain("8604");
+    expect(matches.map(match => match.stock.code)).not.toContain("8604");
   });
 
   it("distinguishes SoftBank Group from the telecom stock", () => {
-    const groupMatches = findStocksMentionedInText(
+    const groupMatches = findStockMatchesInText(
       "ソフトバンクグループ急反発、AI投資への期待が続く"
     );
-    const telecomMatches = findStocksMentionedInText(
+    const telecomMatches = findStockMatchesInText(
       "ソフトバンク、通信料金プランの見直しを発表"
     );
 
-    expect(groupMatches.map(stock => stock.code)).toContain("9984");
-    expect(groupMatches.map(stock => stock.code)).not.toContain("9434");
-    expect(telecomMatches.map(stock => stock.code)).toContain("9434");
+    expect(groupMatches.map(match => match.stock.code)).toContain("9984");
+    expect(groupMatches.map(match => match.stock.code)).not.toContain("9434");
+    expect(telecomMatches.map(match => match.stock.code)).toContain("9434");
+  });
+
+  // マッチ長ソートのガード（レビュー指摘）。ソート句を消しても
+  // isShadowedMatch は複数銘柄併記テキストでは効かない（3銘柄とも shadow に
+  // 該当しないため全件残る）ので、先頭要素はマスタの並び順（コード昇順）に
+  // 依存してしまう。実測: ソート無し(マスタ順) -> 先頭 6857 アドバンテスト、
+  // ソート有り -> 先頭 8035 東京エレクトロン（マッチ長8文字で最長）。
+  // 「先頭が最強マッチ」という不変条件を実行可能な仕様として固定する。
+  it("ranks the longest company mention first when multiple stocks are named together", () => {
+    const matches = findStockMatchesInText(
+      "東京エレクトロン、アドバンテスト、レーザーテックが上昇"
+    );
+
+    expect(matches.map(match => match.stock.code)).toEqual([
+      "8035",
+      "6857",
+      "6920",
+    ]);
+    expect(matches[0].matchLength).toBeGreaterThan(matches[1].matchLength);
   });
 });

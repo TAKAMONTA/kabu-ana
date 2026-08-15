@@ -213,7 +213,11 @@ export function containsStockTerm(
     return hasJapaneseWordBoundary(normalizedText, normalizedTerm);
   }
 
-  return normalizedText.includes(normalizedTerm);
+  // ここに到達した時点で、関数冒頭の includes 足切りにより
+  // normalizedText は normalizedTerm を部分文字列として含むことが確定している
+  // （恒真）。以前は `normalizedText.includes(normalizedTerm)` を再評価していたが、
+  // 足切り追加後は無意味な再計算だったため `true` に置き換えて意図を明確にする。
+  return true;
 }
 
 export const JPX_STOCK_MASTER: JpxStock[] = generated.stocks.map(stock => ({
@@ -309,11 +313,4 @@ export function findStockMatchesInText(
       return a.stock.code < b.stock.code ? -1 : 1;
     })
     .slice(0, limit);
-}
-
-export function findStocksMentionedInText(
-  text: string,
-  limit = 20
-): JpxStock[] {
-  return findStockMatchesInText(text, limit).map(match => match.stock);
 }

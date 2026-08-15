@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildStableTopTradingItems } from "../topTradingValue";
+import { JPX_STOCK_BY_CODE } from "../jpx/stockMaster";
 
 const RECENT_DATE = new Date().toISOString();
 const STALE_DATE = "2026-03-04T00:00:00.000Z";
@@ -425,5 +426,48 @@ describe("buildStableTopTradingItems", () => {
     expect(new Set(confidences).size).toBeGreaterThan(1);
     expect(result.items[0].confidence).toBeGreaterThan(result.items[1].confidence);
     expect(Math.max(...confidences)).toBeLessThanOrEqual(0.94);
+  });
+
+  // 振る舞いテスト（レビュー指摘）: stockMaster.test.ts の
+  // "excludes ETFs and funds from the stock idea universe" は STOCK_IDEA_UNIVERSE
+  // という定数の性質しか検証しておらず、topTradingValue.ts 側で
+  // `STOCK_IDEA_UNIVERSE.map(...)` を `JPX_STOCK_MASTER.map(...)` に書き換えても
+  // 定数テストは緑のままETFが銘柄アイデアに漏れる。ここでは実際に
+  // buildStableTopTradingItems へETF/REITの正式名称を含むニュースを渡し、
+  // 返る items の全コードが equity であることを直接検証する。
+  it("never surfaces ETFs/REITs as stock ideas even when their official name is in the news", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "NEXT FUNDS TOPIX連動型上場投信が続伸、資金流入が拡大",
+        snippet: "TOPIX連動のETFに買いが続いています。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/topix-etf",
+      },
+      {
+        title: "東証REIT ETFが上昇、分配金利回りに注目",
+        snippet: "東証REIT指数に連動するETFが物色されています。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/reit-etf",
+      },
+      {
+        title: "トヨタ自動車、円安と自動車販売が追い風",
+        snippet: "トヨタの電動化戦略にも注目が集まっています。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/toyota",
+      },
+    ]);
+
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(
+      result.items.every(
+        item => JPX_STOCK_BY_CODE.get(item.code)?.assetType === "equity"
+      )
+    ).toBe(true);
+    expect(result.items.map(item => item.code)).not.toContain("1306");
+    expect(result.items.map(item => item.code)).not.toContain("2555");
+    expect(result.items.map(item => item.code)).toContain("7203");
   });
 });

@@ -11,6 +11,8 @@
 import { resolveSearchQuery } from "../searchResolution";
 import {
   JPX_STOCK_BY_CODE,
+  JPX_STOCK_MASTER,
+  normalizeStockText,
   type JpxAssetType,
   type JpxStock,
 } from "../stockMaster";
@@ -152,6 +154,13 @@ export function expectedNoMiss(report: ResolutionReport): string {
 
 /**
  * 決定的な等間隔サンプリング。ランダムサンプルは「たまたま緑」を生むため使わない。
+ *
+ * ただし、これ単体では「名称衝突による奪取」というこのスイートが本来守りたい
+ * リスクとは無相関に散らばる。実測では、他の銘柄名の真部分文字列になっている
+ * 危険な名称159件（shadowRiskCandidates）のうち、等間隔サンプルがカバーできるのは
+ * 7件（4.4%）に過ぎない。等間隔サンプルは分布の目視確認には使えても、
+ * リスクコホートの代わりにはならない。既定スイートでは riskCohortOf と
+ * 組み合わせて使うこと。
  */
 export function sampleByStride<T>(items: T[], stride: number): T[] {
   return items.filter((_, index) => index % stride === 0);
@@ -163,4 +172,56 @@ export function equitiesOf(stocks: JpxStock[]): JpxStock[] {
 
 export function nonEquitiesOf(stocks: JpxStock[]): JpxStock[] {
   return stocks.filter(stock => stock.assetType !== "equity");
+}
+
+/**
+ * 他の銘柄名の真部分文字列になっている名称を抽出する。
+ *
+ * findStockMatchesInText の shadow 判定は「長い語に完全に包含される短い語は
+ * 誤検出として弾く」という規則で動くため、この部分文字列関係こそが
+ * 「名称衝突による奪取」というリスクの本体である。判定基準はマスタ全体
+ * （JPX_STOCK_MASTER、equity/非equityの垣根なし）に対して行う。
+ */
+export function shadowRiskCandidates(stocks: JpxStock[]): JpxStock[] {
+  const allNormalizedNames = JPX_STOCK_MASTER.map(stock =>
+    normalizeStockText(stock.name)
+  );
+  return stocks.filter(stock => {
+    const normalized = normalizeStockText(stock.name);
+    return allNormalizedNames.some(
+      other => other !== normalized && other.includes(normalized)
+    );
+  });
+}
+
+/**
+ * 短い名称（既定2文字以下）を抽出する。containsStockTerm の日本語ワード境界判定
+ * （U+30FB のすり抜け等）は短い語ほど誤検出源になりやすく、shadowRiskCandidates
+ * と並ぶリスクコホートを構成する。
+ */
+export function shortNameCandidates(
+  stocks: JpxStock[],
+  maxLength = 2
+): JpxStock[] {
+  return stocks.filter(stock => stock.name.length <= maxLength);
+}
+
+/** 銘柄コード基準で重複排除した和集合。 */
+export function dedupeStocksByCode(...groups: JpxStock[][]): JpxStock[] {
+  const byCode = new Map<string, JpxStock>();
+  for (const group of groups) {
+    for (const stock of group) byCode.set(stock.code, stock);
+  }
+  return [...byCode.values()];
+}
+
+/**
+ * 名称衝突（shadowRiskCandidates）と短い名称（shortNameCandidates）の和集合。
+ * 「たまたま緑」を防ぐための既定スイートの中核サンプルはこれを必ず含めること。
+ */
+export function riskCohortOf(stocks: JpxStock[]): JpxStock[] {
+  return dedupeStocksByCode(
+    shadowRiskCandidates(stocks),
+    shortNameCandidates(stocks)
+  );
 }

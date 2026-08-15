@@ -4,11 +4,13 @@ import { JPX_STOCK_MASTER } from "../stockMaster";
 import { resolveSearchQuery } from "../searchResolution";
 import {
   crossAssetSummary,
+  dedupeStocksByCode,
   equitiesOf,
   expectedNoMiss,
   missSummary,
   nonEquitiesOf,
   resolveToTarget,
+  riskCohortOf,
   sampleByStride,
   scanSelfResolution,
 } from "./coverageHelpers";
@@ -17,7 +19,11 @@ import {
  * 銘柄マスタ全体に対する「名称 → 自コード」の総当たり検証（既定スイート版）。
  *
  * 全件スキャンは実行時間が長すぎるため `npm run test:jpx-fullscan` に切り出し、
- * ここでは決定的な等間隔サンプル＋別名保持銘柄＋実害が観測された明示ケースを回す。
+ * ここでは決定的な等間隔サンプル＋リスクコホート（名称衝突の部分文字列関係＋
+ * 短い名称）＋別名保持銘柄＋実害が観測された明示ケースを回す。等間隔サンプル
+ * だけでは「名称衝突による奪取」というこのスイートが守るべきリスク本体を
+ * ほとんど見ない（実測: リスクコホート159件中7件＝4.4%しかカバーしない）ため、
+ * リスクコホートを必ず和集合として加える。
  * サンプルと全件で判定ロジックがぶれないよう、判定は coverageHelpers に集約する。
  */
 
@@ -28,6 +34,39 @@ const NON_EQUITY_SAMPLE_STRIDE = 5;
 const equities = equitiesOf(JPX_STOCK_MASTER);
 const nonEquities = nonEquitiesOf(JPX_STOCK_MASTER);
 const equitiesWithAliases = equities.filter(stock => stock.aliases.length > 0);
+
+// 既定スイートのサンプル = 等間隔サンプル（分布の目視確認用）∪ リスクコホート
+// （名称衝突の部分文字列関係＋短い名称。このスイートが守りたいリスクの本体）。
+const equitySample = dedupeStocksByCode(
+  sampleByStride(equities, EQUITY_SAMPLE_STRIDE),
+  riskCohortOf(equities)
+);
+const nonEquitySample = dedupeStocksByCode(
+  sampleByStride(nonEquities, NON_EQUITY_SAMPLE_STRIDE),
+  riskCohortOf(nonEquities)
+);
+
+// リスクコホートが将来もサンプルから漏れないことをテスト自体で担保する
+// （equitySample/nonEquitySample の組み立てを誰かが書き換えても即座に検知する）。
+describe("sampling: default samples always include the full risk cohort", () => {
+  it("covers every equity shadow/short-name risk candidate", () => {
+    const sampleCodes = new Set(equitySample.map(stock => stock.code));
+    const uncovered = riskCohortOf(equities).filter(
+      stock => !sampleCodes.has(stock.code)
+    );
+
+    expect(uncovered.map(stock => `${stock.code} ${stock.name}`)).toEqual([]);
+  });
+
+  it("covers every non-equity shadow/short-name risk candidate", () => {
+    const sampleCodes = new Set(nonEquitySample.map(stock => stock.code));
+    const uncovered = riskCohortOf(nonEquities).filter(
+      stock => !sampleCodes.has(stock.code)
+    );
+
+    expect(uncovered.map(stock => `${stock.code} ${stock.name}`)).toEqual([]);
+  });
+});
 
 describe("master composition", () => {
   it("contains both equities and non-equity instruments", () => {
@@ -54,10 +93,8 @@ describe("master composition", () => {
 
 // --- (a) 個別株 → 自コード -------------------------------------------------
 describe("(a) equity names resolve to their own code", () => {
-  it("resolves a deterministic stride sample of equity names", () => {
-    const report = scanSelfResolution(
-      sampleByStride(equities, EQUITY_SAMPLE_STRIDE)
-    );
+  it("resolves the stride sample + shadow-risk cohort of equity names", () => {
+    const report = scanSelfResolution(equitySample);
 
     expect(missSummary(report)).toBe(expectedNoMiss(report));
   });
@@ -86,10 +123,8 @@ describe("(a) equity names resolve to their own code", () => {
 
 // --- (b) ETF等 → 自コード ---------------------------------------------------
 describe("(b) non-equity names resolve to their own code", () => {
-  it("resolves a deterministic stride sample of ETF/REIT names", () => {
-    const report = scanSelfResolution(
-      sampleByStride(nonEquities, NON_EQUITY_SAMPLE_STRIDE)
-    );
+  it("resolves the stride sample + shadow-risk cohort of ETF/REIT names", () => {
+    const report = scanSelfResolution(nonEquitySample);
 
     expect(missSummary(report)).toBe(expectedNoMiss(report));
   });
@@ -117,17 +152,13 @@ describe("(b) non-equity names resolve to their own code", () => {
 // --- (c) 相互奪取ゼロ -------------------------------------------------------
 describe("(c) no cross-asset hijacking between equities and funds", () => {
   it("never resolves a sampled equity name to a fund", () => {
-    const report = scanSelfResolution(
-      sampleByStride(equities, EQUITY_SAMPLE_STRIDE)
-    );
+    const report = scanSelfResolution(equitySample);
 
     expect(crossAssetSummary(report.crossAssetMisses)).toBe("0 cross-asset");
   });
 
   it("never resolves a sampled fund name to an equity", () => {
-    const report = scanSelfResolution(
-      sampleByStride(nonEquities, NON_EQUITY_SAMPLE_STRIDE)
-    );
+    const report = scanSelfResolution(nonEquitySample);
 
     expect(crossAssetSummary(report.crossAssetMisses)).toBe("0 cross-asset");
   });
