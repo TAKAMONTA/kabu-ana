@@ -44,8 +44,6 @@ const translateErrorCode = (code: string): string | null => {
   switch (code) {
     case "api_key_missing":
       return "外部株価APIキーが未設定です。";
-    case "fmp_forbidden":
-      return "外部株価APIのアクセス制限により最新ランキングを取得できませんでした。";
     case "empty_response":
       return "外部株価APIから有効なデータが得られませんでした。";
     case "ranking_fetch_failed":

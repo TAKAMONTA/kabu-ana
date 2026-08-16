@@ -304,21 +304,6 @@ export class EdinetDBClient {
   }
 }
 
-/** 証券コード（4桁）から FMP シンボルへの変換（東証: XXXX.T） */
-export function secCodeToFmpSymbol(secCode: string): string | null {
-  // 末尾の "0" を除いた純数字4桁のみ対応（例: "72030" → "7203", "330A0" → null）
-  const pure = secCode.replace(/0$/, ""); // 末尾の0を除去（5桁→4桁）
-  if (/^\d{4}$/.test(pure)) {
-    return `${pure}.T`;
-  }
-  // 5桁の場合は末尾を除去
-  const digits = secCode.replace(/\D/g, "");
-  if (digits.length >= 4) {
-    return `${digits.slice(0, 4)}.T`;
-  }
-  return null;
-}
-
 /** クエリが日本企業（EDINET DB 検索対象）かどうかを事前判定 */
 export function isJapaneseQuery(query: string): boolean {
   // 4桁の数字は日本の証券コード
