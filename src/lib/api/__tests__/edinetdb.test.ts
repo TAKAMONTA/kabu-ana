@@ -139,7 +139,7 @@ describe("getEdinetSearchQueryFromSymbol", () => {
     expect(getEdinetSearchQueryFromSymbol("7203", "TYO")).toBe("7203");
   });
 
-  it("accepts FMP-style Tokyo symbols with .T", () => {
+  it("accepts .T-suffixed Tokyo symbols", () => {
     expect(getEdinetSearchQueryFromSymbol("7203.T")).toBe("7203");
   });
 
