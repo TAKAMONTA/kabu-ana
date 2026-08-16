@@ -32,8 +32,19 @@ async function newsAnalysisHandler(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
   try {
-    const body = await request.json();
-    const { symbol, companyName } = body;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "シンボルと企業名が必要です" },
+        { status: 400 }
+      );
+    }
+    const { symbol: rawSymbol, companyName: rawCompanyName } = body;
+    // trim後に空なら弾く（空白のみの入力がYahoo/RSSへの無意味な外部リクエストや
+    // 後続のAI分析（課金）まですり抜けないようにする）。下流にはtrim済みの値を渡す
+    const symbol = typeof rawSymbol === "string" ? rawSymbol.trim() : "";
+    const companyName =
+      typeof rawCompanyName === "string" ? rawCompanyName.trim() : "";
 
     if (!symbol || !companyName) {
       return NextResponse.json(
