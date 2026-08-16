@@ -102,10 +102,6 @@ export class JQuantsClient implements MarketDataClient {
     };
   }
 
-  async searchCompanyByGoogle(query: string): Promise<CompanyInfo | null> {
-    return this.searchCompany(query);
-  }
-
   /** bars/daily を昇順で取得（getStockData/getChartData 共用） */
   private async bars(code4: string, window: string): Promise<any[]> {
     const rows = await this.getData(
@@ -173,10 +169,10 @@ export class JQuantsClient implements MarketDataClient {
   async getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> {
     const code4 = extract4(symbol);
     // ETF・ETN / REIT の正式名称はマスタ上は全角のままなので、ニュース検索語に
-    // 使う前に normalizeDisplayText で半角へ正規化する。全角のままだと、
-    // freeNews.ts の関連度フィルタ（query.split(/\s+/) した全キーワードを
-    // every で title/snippet に要求する）が常に false になり結果が0件になる
-    // （日本語のニュース記事本文は基本的に半角英数字で書かれるため）。
+    // 使う前に normalizeDisplayText で半角へ正規化する。関連度フィルタ自体は
+    // 全角/半角どちらの表記でも一致するようになったが、Google News RSS など
+    // 外部検索エンジンに投げるクエリとしては半角表記の方がヒットしやすいため、
+    // 検索語の品質向上を目的に正規化して渡す。
     // 個別株(equity)は従来どおりマスタの表示名をそのまま使う。
     const jpx = JPX_STOCK_BY_CODE.get(code4);
     const name = jpx
@@ -187,7 +183,12 @@ export class JQuantsClient implements MarketDataClient {
     return this.freeNews.getComprehensiveNews(name, symbol, limit);
   }
 
-  async getCompanyNewsFromGoogle(
+  /**
+   * symbol を渡さず企業名（companyName）だけで検索する。Yahoo Finance 経路
+   * （FreeNewsClient は symbol 有りの場合のみ Yahoo を叩く）をスキップし、
+   * NewsAPI・Google News RSS を並列で取得し関連度で絞る。Google専用ではない。
+   */
+  async getCompanyNewsByName(
     _symbol: string,
     companyName: string,
     limit = 10
