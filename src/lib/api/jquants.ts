@@ -173,8 +173,10 @@ export class JQuantsClient implements MarketDataClient {
   async getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> {
     const code4 = extract4(symbol);
     // ETF・ETN / REIT の正式名称はマスタ上は全角のままなので、ニュース検索語に
-    // 使う前に normalizeDisplayText で半角へ正規化する（freeNews.ts は完全一致
-    // フレーズとして埋め込むため、全角のままだとヒット率が落ちる）。
+    // 使う前に normalizeDisplayText で半角へ正規化する。全角のままだと、
+    // freeNews.ts の関連度フィルタ（query.split(/\s+/) した全キーワードを
+    // every で title/snippet に要求する）が常に false になり結果が0件になる
+    // （日本語のニュース記事本文は基本的に半角英数字で書かれるため）。
     // 個別株(equity)は従来どおりマスタの表示名をそのまま使う。
     const jpx = JPX_STOCK_BY_CODE.get(code4);
     const name = jpx

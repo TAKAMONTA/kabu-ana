@@ -127,4 +127,17 @@ describe("findStockMatchesInText", () => {
     ]);
     expect(matches[0].matchLength).toBeGreaterThan(matches[1].matchLength);
   });
+
+  // レビュー指摘（M-1）: shadow 判定（isShadowedMatch）が実際に守るのは
+  // 包含する側（長い名前、この例では 1476 のETF正式名称）であって、
+  // coverageHelpers.ts の shadowRiskCandidates が抽出する被包含側（短い名前、
+  // ここでは個別株「コア」2359）ではない。shadow フィルタを外すと 2359 が
+  // 混入して本テストは RED になることを実測確認済み。
+  it("shadows the equity 「コア」(2359) when it is a proper substring of the ETF's official name (1476)", () => {
+    const matches = findStockMatchesInText(
+      "ｉシェアーズ・コア　Ｊリート　ＥＴＦ"
+    );
+
+    expect(matches.map(match => match.stock.code)).toEqual(["1476"]);
+  });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const fetchMock = vi.fn();
 vi.stubGlobal("fetch", fetchMock);
 import { JQuantsClient, toJQuantsCode } from "../jquants";
@@ -9,6 +9,11 @@ import { FreeNewsClient } from "../freeNews";
 const okJson = (data: any) => ({ json: async () => ({ data }) });
 
 beforeEach(() => fetchMock.mockReset());
+// getCompanyNews のテストが張る vi.spyOn(FreeNewsClient.prototype, ...) は、
+// expect の失敗時に mockRestore() まで到達せずプロトタイプが汚染されたまま
+// 後続テストへ波及しうる（restoreMocks も afterEach も未設定のため）。
+// これを確実に断ち切るための保険。
+afterEach(() => vi.restoreAllMocks());
 
 describe("toJQuantsCode", () => {
   it("pads 4-digit to 5-digit", () => {
@@ -185,8 +190,9 @@ describe("JQuantsClient", () => {
   });
 
   describe("getCompanyNews search term by assetType", () => {
-    // freeNews.ts はニュース検索語を完全一致フレーズとして埋め込むため、
-    // 全角のままだとヒット率が落ちる。非個別株はマスタの正式名称を
+    // freeNews.ts の関連度フィルタは検索語を空白で分割した全キーワードを
+    // 記事に要求するため、全角のままだと日本語記事に現れず常に落ちる。
+    // 非個別株はマスタの正式名称を
     // normalizeDisplayText で半角に正規化してから渡す。個別株は従来どおり
     // マスタの表示名をそのまま渡す。
     it("normalizes an ETF's official name to half-width before searching news (1306)", async () => {
