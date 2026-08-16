@@ -102,6 +102,8 @@ function validateToyotaEdinetSearch(payload) {
   }
 }
 
+const VALID_DATA_SOURCES = ["jpx_local", "market_fast", "market_fallback"];
+
 function validateMarketDataRoute(payload, { symbol, expectedMarket }) {
   const errors = [];
   const expectedMarkets = Array.isArray(expectedMarket)
@@ -142,9 +144,9 @@ function validateMarketDataRoute(payload, { symbol, expectedMarket }) {
   if (Number.isFinite(high52) && Number.isFinite(low52) && high52 <= low52) {
     errors.push(`52w range is invalid: low=${low52}, high=${high52}`);
   }
-  if (/serp/i.test(dataSource)) {
+  if (!VALID_DATA_SOURCES.includes(dataSource)) {
     errors.push(
-      `metadata.dataSource still points to legacy serp path: ${dataSource}`
+      `metadata.dataSource expected one of ${VALID_DATA_SOURCES.join(", ")} but got ${dataSource}`
     );
   }
 

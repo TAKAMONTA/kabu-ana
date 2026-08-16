@@ -1,40 +1,50 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createMarketDataClient } from "../marketDataClient";
 import { MarketDataRouter } from "../marketDataRouter";
-import { SerpApiClient } from "../serpapi";
+import { JQuantsClient } from "../jquants";
+import { TwelveDataClient } from "../twelveData";
+import type { MarketDataClient } from "../marketDataTypes";
 
 describe("createMarketDataClient", () => {
-  const ORIGINAL = { ...process.env };
-  beforeEach(() => {});
   afterEach(() => {
-    process.env = { ...ORIGINAL };
+    vi.restoreAllMocks();
   });
 
-  it("defaults to MarketDataRouter when no provider is set", () => {
-    delete process.env.MARKET_DATA_PROVIDER;
-    delete process.env.SERPAPI_API_KEY;
-    expect(createMarketDataClient()).toBeInstanceOf(MarketDataRouter);
+  it("returns a MarketDataRouter instance that fully implements MarketDataClient", () => {
+    const client: MarketDataClient = createMarketDataClient();
+    expect(client).toBeInstanceOf(MarketDataRouter);
+
+    // 型レベル: MarketDataClient のメソッド面をすべて備えていること
+    const methodNames: Array<keyof MarketDataClient> = [
+      "getFastSearchResult",
+      "searchCompany",
+      "searchCompanyByGoogle",
+      "getStockData",
+      "getCompanyNews",
+      "getCompanyNewsFromGoogle",
+      "getChartData",
+      "getFinancialData",
+    ];
+    for (const name of methodNames) {
+      expect(typeof client[name]).toBe("function");
+    }
   });
 
-  it("keeps using MarketDataRouter when serpapi is selected without the legacy opt-in", () => {
-    process.env.MARKET_DATA_PROVIDER = "serpapi";
-    process.env.SERPAPI_API_KEY = "real-key";
-    delete process.env.ENABLE_LEGACY_SERPAPI;
-    expect(createMarketDataClient()).toBeInstanceOf(MarketDataRouter);
-  });
+  it("routes Japanese stock codes to J-Quants and US tickers to Twelve Data", async () => {
+    // 挙動レベル: 生成されたクライアントが実際に銘柄種別ごとに正しい下位クライアントへ委譲すること
+    const jpSpy = vi
+      .spyOn(JQuantsClient.prototype, "getStockData")
+      .mockResolvedValue(null);
+    const usSpy = vi
+      .spyOn(TwelveDataClient.prototype, "getStockData")
+      .mockResolvedValue(null);
 
-  it("returns SerpApiClient only when explicitly selected, opted in, and keyed", () => {
-    process.env.MARKET_DATA_PROVIDER = "serpapi";
-    process.env.ENABLE_LEGACY_SERPAPI = "true";
-    process.env.SERPAPI_API_KEY = "real-key";
-    expect(createMarketDataClient()).toBeInstanceOf(SerpApiClient);
-  });
+    const client = createMarketDataClient();
+    await client.getStockData("7203");
+    await client.getStockData("AAPL");
 
-  it("falls back to MarketDataRouter when serpapi is selected but key is a placeholder", () => {
-    process.env.MARKET_DATA_PROVIDER = "serpapi";
-    process.env.ENABLE_LEGACY_SERPAPI = "true";
-    process.env.SERPAPI_API_KEY = "your_serpapi_key_here";
-    expect(createMarketDataClient()).toBeInstanceOf(MarketDataRouter);
+    expect(jpSpy).toHaveBeenCalledWith("7203");
+    expect(usSpy).toHaveBeenCalledWith("AAPL");
   });
 });
