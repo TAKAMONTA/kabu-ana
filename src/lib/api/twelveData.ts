@@ -81,10 +81,6 @@ export class TwelveDataClient implements MarketDataClient {
     };
   }
 
-  async searchCompanyByGoogle(query: string): Promise<CompanyInfo | null> {
-    return this.searchCompany(query);
-  }
-
   async getChartData(
     symbol: string,
     window: string = "1M"
@@ -111,7 +107,12 @@ export class TwelveDataClient implements MarketDataClient {
     return this.freeNews.getComprehensiveNews(symbol, symbol, limit);
   }
 
-  async getCompanyNewsFromGoogle(
+  /**
+   * symbol を渡さず企業名（companyName）だけで検索する。Yahoo Finance 経路
+   * （FreeNewsClient は symbol 有りの場合のみ Yahoo を叩く）をスキップし、
+   * NewsAPI → Google News RSS の順で試す。名前に反し Google 専用ではない。
+   */
+  async getCompanyNewsByName(
     _symbol: string,
     companyName: string,
     limit = 10

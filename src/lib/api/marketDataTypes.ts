@@ -73,10 +73,15 @@ export interface MarketDataClient {
     window?: string
   ): Promise<FastSearchResult | null>;
   searchCompany(query: string): Promise<CompanyInfo | null>;
-  searchCompanyByGoogle(query: string): Promise<CompanyInfo | null>;
   getStockData(symbol: string): Promise<StockData | null>;
   getCompanyNews(symbol: string, limit?: number): Promise<NewsItem[]>;
-  getCompanyNewsFromGoogle(
+  /**
+   * symbol を渡さずに企業名（companyName）だけでニュースを検索する。
+   * FreeNewsClient.getComprehensiveNews に symbol を渡さないことで
+   * Yahoo Finance 経路をスキップし、名称ベースの検索のみを行う。
+   * 名前に反して Google News RSS 専用ではない（NewsAPI が先に試される）。
+   */
+  getCompanyNewsByName(
     symbol: string,
     companyName: string,
     limit?: number

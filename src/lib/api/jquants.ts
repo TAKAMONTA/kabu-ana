@@ -102,10 +102,6 @@ export class JQuantsClient implements MarketDataClient {
     };
   }
 
-  async searchCompanyByGoogle(query: string): Promise<CompanyInfo | null> {
-    return this.searchCompany(query);
-  }
-
   /** bars/daily を昇順で取得（getStockData/getChartData 共用） */
   private async bars(code4: string, window: string): Promise<any[]> {
     const rows = await this.getData(
@@ -187,7 +183,12 @@ export class JQuantsClient implements MarketDataClient {
     return this.freeNews.getComprehensiveNews(name, symbol, limit);
   }
 
-  async getCompanyNewsFromGoogle(
+  /**
+   * symbol を渡さず企業名（companyName）だけで検索する。Yahoo Finance 経路
+   * （FreeNewsClient は symbol 有りの場合のみ Yahoo を叩く）をスキップし、
+   * NewsAPI → Google News RSS の順で試す。名前に反し Google 専用ではない。
+   */
+  async getCompanyNewsByName(
     _symbol: string,
     companyName: string,
     limit = 10

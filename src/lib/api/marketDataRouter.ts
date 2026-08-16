@@ -29,9 +29,6 @@ export class MarketDataRouter implements MarketDataClient {
   searchCompany(q: string): Promise<CompanyInfo | null> {
     return this.pick(q).searchCompany(q);
   }
-  searchCompanyByGoogle(q: string): Promise<CompanyInfo | null> {
-    return this.pick(q).searchCompanyByGoogle(q);
-  }
   getStockData(s: string): Promise<StockData | null> {
     return this.pick(s).getStockData(s);
   }
@@ -44,11 +41,11 @@ export class MarketDataRouter implements MarketDataClient {
   getCompanyNews(s: string, l?: number): Promise<NewsItem[]> {
     return this.pick(s).getCompanyNews(s, l);
   }
-  getCompanyNewsFromGoogle(
+  getCompanyNewsByName(
     s: string,
     c: string,
     l?: number
   ): Promise<NewsItem[]> {
-    return this.pick(s).getCompanyNewsFromGoogle(s, c, l);
+    return this.pick(s).getCompanyNewsByName(s, c, l);
   }
 }

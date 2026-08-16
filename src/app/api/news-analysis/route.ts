@@ -5,6 +5,7 @@ import { FreeNewsClient } from "@/lib/api/freeNews";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
+import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
 
 export interface NewsAnalysisResult {
   impact: "positive" | "negative" | "neutral";
@@ -15,6 +16,14 @@ export interface NewsAnalysisResult {
 }
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+
+// getComprehensiveNews は NewsAPI → Yahoo Finance → Google News RSS を
+// 最大3段階、逐次で呼び出しうる（各呼び出し自体に個別タイムアウトは無い）。
+// search/route.ts の NEWS_OPTIONAL_TIMEOUT_MS(1800ms)
+// は多数の並列オプション処理の一本を守る値だが、news-analysis はニュース取得が
+// 主目的で後続のAI分析の方が総じて長くかかるため、正当な多段フェッチを
+// 途中で打ち切りすぎないよう、やや長めの値を設定する。
+const NEWS_ANALYSIS_TIMEOUT_MS = 3000;
 
 async function newsAnalysisHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
@@ -50,23 +59,29 @@ async function newsAnalysisHandler(request: NextRequest) {
 
     // 1. 無料ニュースAPIを試行
     const freeNewsClient = new FreeNewsClient();
-    newsData = await freeNewsClient.getComprehensiveNews(
-      companyName,
-      symbol,
-      10
-    );
+    newsData =
+      (await optionalWithTimeout(
+        freeNewsClient.getComprehensiveNews(companyName, symbol, 10),
+        NEWS_ANALYSIS_TIMEOUT_MS,
+        "freeNews.getComprehensiveNews"
+      )) ?? [];
 
-    // 2. 市場データクライアント（既定 Yahoo）をフォールバックとして使用
+    // 2. 市場データクライアント（日本株=J-Quants、米国株=Twelve Data に振り分ける
+    //    MarketDataRouter）をフォールバックとして使用
     if (!newsData || newsData.length === 0) {
       const marketApi = createMarketDataClient();
-      const marketNews = await marketApi.getCompanyNews(symbol, 10);
+      const marketNews = await optionalWithTimeout(
+        marketApi.getCompanyNews(symbol, 10),
+        NEWS_ANALYSIS_TIMEOUT_MS,
+        "market.getCompanyNews"
+      );
       if (marketNews && marketNews.length > 0) {
         newsData = marketNews;
       } else {
-        const altNews = await marketApi.getCompanyNewsFromGoogle(
-          symbol,
-          companyName,
-          10
+        const altNews = await optionalWithTimeout(
+          marketApi.getCompanyNewsByName(symbol, companyName, 10),
+          NEWS_ANALYSIS_TIMEOUT_MS,
+          "market.getCompanyNewsByName"
         );
         if (altNews && altNews.length > 0) {
           newsData = altNews;

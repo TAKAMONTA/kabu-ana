@@ -19,10 +19,9 @@ describe("createMarketDataClient", () => {
     const methodNames: Array<keyof MarketDataClient> = [
       "getFastSearchResult",
       "searchCompany",
-      "searchCompanyByGoogle",
       "getStockData",
       "getCompanyNews",
-      "getCompanyNewsFromGoogle",
+      "getCompanyNewsByName",
       "getChartData",
       "getFinancialData",
     ];
