@@ -153,14 +153,18 @@ export class FreeNewsClient {
         return [];
       }
 
+      // Google RSS側（hasQuery）と同じtrim基準に揃える。空白のみのsymbolで
+      // Yahooへ無意味なリクエストを飛ばさないようにする
+      const trimmedSymbol = (symbol ?? "").trim();
+      const hasSymbol = trimmedSymbol !== "";
       const hasQuery = (query || "").trim() !== "";
 
       // 2ソースを並列取得（レイテンシを合計ではなく最大値に抑える）
       // 配列の順序 = 重複除去の優先順位・同日付記事の並び順なので変更しないこと
       const settled = await Promise.allSettled([
         // 1. Yahoo Finance（シンボルがある場合）
-        symbol
-          ? this.getNewsFromYahooFinance(symbol, limit)
+        hasSymbol
+          ? this.getNewsFromYahooFinance(trimmedSymbol, limit)
           : Promise.resolve<NewsItem[]>([]),
         // 2. Google RSS（空クエリでは一般ニュースしか返らないので叩かない）
         hasQuery
@@ -286,6 +290,13 @@ export class FreeNewsClient {
     const isAsciiIdentifier = /^[\x20-\x7e]+$/.test(identifier);
 
     // queryもsymbol（identifier）も判定材料が無い場合のみ、フィルタを適用せず全件通す
+    // 注: getComprehensiveNews側でhasQuery/hasSymbolのtrim判定を揃えたため、
+    // この分岐が真になる入力（query・symbolとも空/空白のみ）では
+    // Yahoo・Google RSSのどちらも発火せず、フィルタ対象の配列が必ず空になる。
+    // そのため戻り値自体は152行目のnull判定・180行目の.filterで使われるものの、
+    // 中身（常にtrueを返す関数）が結果に影響することは無い（観測上デッド）。
+    // 呼び出し元が増えて判定材料無しでフィルタが呼ばれる経路が復活した場合の
+    // 最後の防御として、分岐自体は残す
     if (!normalizedQuery && !identifier) {
       return () => true;
     }

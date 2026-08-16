@@ -489,22 +489,20 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(0);
   });
 
-  it("判定材料が無い場合は全件通す", async () => {
-    // 小細工ではなく実入力の再現。news-analysis/route.ts のガードは
-    // `if (!symbol || !companyName)` という truthy 判定なので、
-    // {"symbol":" ","companyName":" "} が400をすり抜けてこの経路に到達する。
-    // 空白のみのsymbolは `symbol ? ... : ...` を通過してYahooを叩くが、
-    // normalizeForMatch().trim() 後は空になり識別子の判定材料はゼロになる。
+  it("空白のみのquery・symbolでは外部リクエストを一切発火せず空を返す", async () => {
+    // news-analysis/route.ts側でも {"symbol":" ","companyName":" "} は
+    // trim後に空となり400で弾かれるが、freeNews単体でも空白入力を渡された場合に
+    // 外部（Yahoo/Google RSS）を叩かないことを二重防御として保証する。
+    // hasSymbol/hasQueryのtrim判定が対称化されたことで、空白のみのsymbolも
+    // Yahoo分岐をスキップするようになった
     const get = mockSources(["日経平均、続伸", "米国株はまちまち"]);
 
     const client = new FreeNewsClient();
     const news = await client.getComprehensiveNews(" ", " ", 10);
 
-    // 前提（Yahooだけが発火する）を先に固定する。将来 symbol 側も trim して
-    // 判定するよう整理された場合、結果ではなく原因側がここで落ちる
-    expect(callsTo(get, YAHOO_URL)).toHaveLength(1);
+    expect(callsTo(get, YAHOO_URL)).toHaveLength(0);
     expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(0);
-    expect(titlesOf(news)).toEqual(["日経平均、続伸", "米国株はまちまち"]);
+    expect(news).toEqual([]);
   });
 
   it("極端に長い識別子では外部リクエストを行わず空を返す", async () => {
