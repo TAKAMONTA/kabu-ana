@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
             プライバシーポリシー
           </CardTitle>
           <p className="text-center text-muted-foreground">
-            最終更新日: 2026年5月11日
+            最終更新日: 2026年8月16日
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -140,7 +140,7 @@ export default function PrivacyPolicyPage() {
                 <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1 mt-2">
                   <li>
                     A8.net（アフィリエイト広告）:
-                    広告の表示時点で、クリックの有無にかかわらずユーザーのブラウザからA8.netへIPアドレス、User-Agent、リファラ情報が自動的に送信されます
+                    広告の表示時点で、クリックの有無にかかわらずユーザーのブラウザからA8.netへIPアドレス、User-Agent、リファラ（当サイトのオリジンのみ）が自動的に送信され、アフィリエイト成果の計測・不正防止の目的で利用されます
                   </li>
                   <li>
                     広告をクリックした場合はA8.netのサイトを経由して提携先サイトへ遷移し、以降はA8.netのプライバシーポリシーが適用されます
@@ -202,6 +202,7 @@ export default function PrivacyPolicyPage() {
             <p className="text-sm text-muted-foreground leading-relaxed">
               本アプリは、サービス提供のために必要なクッキーを使用します。
               クッキーの使用は、ユーザー体験の向上とセキュリティの確保を目的としています。
+              また、広告事業者が成果計測のためCookie等を利用する場合があります（詳細は5.3をご参照ください）。
             </p>
           </section>
 
