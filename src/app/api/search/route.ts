@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import {
-  findStocksMentionedInText,
-  JPX_STOCK_BY_CODE,
-  type JpxStock,
-} from "@/lib/jpx/stockMaster";
+  resolveSearchQuery,
+  isLikelyPlainUsTicker,
+} from "@/lib/jpx/searchResolution";
 import {
   EdinetDBClient,
   getEdinetSearchQueryFromSymbol,
@@ -56,17 +55,6 @@ function optionalWithTimeout<T>(
         resolve(null);
       });
   });
-}
-
-function findLocalJpxStock(query: string): JpxStock | null {
-  const normalized = query.normalize("NFKC").trim();
-  const code = normalized.match(/\b\d{4}\b/)?.[0];
-  if (code) return JPX_STOCK_BY_CODE.get(code) || null;
-  return findStocksMentionedInText(normalized, 1)[0] || null;
-}
-
-function isLikelyPlainUsTicker(query: string): boolean {
-  return /^[A-Z][A-Z.]{0,5}$/i.test(query.trim());
 }
 
 async function searchHandler(request: NextRequest) {
@@ -152,9 +140,11 @@ async function searchHandler(request: NextRequest) {
     const timings: Record<string, number> = {};
     const requestStartedAt = Date.now();
     let dataSource = "none";
-    const localJpxStock = findLocalJpxStock(query);
+    // 優先順位規則（4桁コード直指定 → 個別株言及とETFの一致長比較）は両ルートで共通化。
+    const { localJpxStock, etfCode, effectiveQuery } =
+      resolveSearchQuery(query);
     const shouldSkipFastSearch =
-      Boolean(localJpxStock) || isLikelyPlainUsTicker(query);
+      Boolean(localJpxStock) || isLikelyPlainUsTicker(effectiveQuery);
 
     if (localJpxStock) {
       companyInfo = {
@@ -244,7 +234,7 @@ async function searchHandler(request: NextRequest) {
         const fastResult = await measureSearchStep(
           timings,
           "market.fast_search",
-          () => marketApi.getFastSearchResult(query, chartPeriod)
+          () => marketApi.getFastSearchResult(effectiveQuery, chartPeriod)
         );
 
         if (fastResult) {
@@ -269,12 +259,12 @@ async function searchHandler(request: NextRequest) {
           async () => {
             const [financeLookup, googleLookup] = await Promise.all([
               optionalWithTimeout(
-                marketApi.searchCompany(query),
+                marketApi.searchCompany(effectiveQuery),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
                 "market.searchCompany"
               ),
               optionalWithTimeout(
-                marketApi.searchCompanyByGoogle(query),
+                marketApi.searchCompanyByGoogle(effectiveQuery),
                 SEARCH_OPTIONAL_TIMEOUT_MS,
                 "market.searchCompanyByGoogle"
               ),
@@ -520,6 +510,7 @@ async function searchHandler(request: NextRequest) {
     timings.total = Date.now() - requestStartedAt;
     console.info("Search API timings", {
       query,
+      etfCode,
       dataSource,
       edinetStatus,
       timings,

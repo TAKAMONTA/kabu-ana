@@ -1,5 +1,6 @@
 import { FreeNewsClient } from "./freeNews";
 import { JPX_STOCK_BY_CODE } from "@/lib/jpx/stockMaster";
+import { normalizeDisplayText } from "@/lib/displayText";
 import type {
   CompanyInfo,
   StockData,
@@ -77,13 +78,24 @@ export class JQuantsClient implements MarketDataClient {
   async searchCompany(query: string): Promise<CompanyInfo | null> {
     const code4 = extract4(query);
     const rows = await this.getData(
-      `/equities/master?code=${toJQuantsCode(code4)}`
+      `/equities/master?code=${encodeURIComponent(toJQuantsCode(code4))}`
     );
     const m = rows[0];
     if (!m) return null;
     const jpx = JPX_STOCK_BY_CODE.get(code4);
+    // ETF・ETN / REIT は J-Quants の CoName が「<運用会社名>　<ファンド名>」形式
+    // （例:「野村アセットマネジメント株式会社　ＮＥＸＴ　ＦＵＮＤＳ　ＴＯＰＩＸ
+    // 連動型上場投信」）で、UIに出すと冗長。ローカルマスタは JPX 公式の
+    // ファンド名のみを持つのでそちらを表示名に使う。マスタの表示名は全角の
+    // ままJPXから来るため、UI表示・ニュース検索語としては normalizeDisplayText
+    // （NFKC + 空白畳み）で半角に正規化してから使う。
+    // 個別株(equity)は従来どおり CoName を優先し、表示を一切変えない。
+    // マスタ未収録コード（jpx === undefined）も従来どおり CoName へフォールバック。
+    const preferLocalName = jpx !== undefined && jpx.assetType !== "equity";
     return {
-      name: m.CoName ?? jpx?.name ?? query,
+      name: preferLocalName
+        ? normalizeDisplayText(jpx.name)
+        : (m.CoName ?? jpx?.name ?? query),
       symbol: code4,
       market: jpx?.marketSegment ?? "東証",
       description: m.S33Nm ?? jpx?.sector33 ?? "",
@@ -97,7 +109,7 @@ export class JQuantsClient implements MarketDataClient {
   /** bars/daily を昇順で取得（getStockData/getChartData 共用） */
   private async bars(code4: string, window: string): Promise<any[]> {
     const rows = await this.getData(
-      `/equities/bars/daily?code=${toJQuantsCode(code4)}&from=${jFrom(window)}&to=${today()}`
+      `/equities/bars/daily?code=${encodeURIComponent(toJQuantsCode(code4))}&from=${jFrom(window)}&to=${today()}`
     );
     return rows
       .filter((r: any) => r && r.Date)
@@ -142,7 +154,7 @@ export class JQuantsClient implements MarketDataClient {
 
   async getFinancialData(symbol: string): Promise<FinancialData | null> {
     const rows = await this.getData(
-      `/fins/summary?code=${toJQuantsCode(extract4(symbol))}`
+      `/fins/summary?code=${encodeURIComponent(toJQuantsCode(extract4(symbol)))}`
     );
     const s = rows[rows.length - 1];
     if (!s) return null;
@@ -159,7 +171,19 @@ export class JQuantsClient implements MarketDataClient {
   }
 
   async getCompanyNews(symbol: string, limit = 10): Promise<NewsItem[]> {
-    const name = JPX_STOCK_BY_CODE.get(extract4(symbol))?.name ?? symbol;
+    const code4 = extract4(symbol);
+    // ETF・ETN / REIT の正式名称はマスタ上は全角のままなので、ニュース検索語に
+    // 使う前に normalizeDisplayText で半角へ正規化する。全角のままだと、
+    // freeNews.ts の関連度フィルタ（query.split(/\s+/) した全キーワードを
+    // every で title/snippet に要求する）が常に false になり結果が0件になる
+    // （日本語のニュース記事本文は基本的に半角英数字で書かれるため）。
+    // 個別株(equity)は従来どおりマスタの表示名をそのまま使う。
+    const jpx = JPX_STOCK_BY_CODE.get(code4);
+    const name = jpx
+      ? jpx.assetType === "equity"
+        ? jpx.name
+        : normalizeDisplayText(jpx.name)
+      : symbol;
     return this.freeNews.getComprehensiveNews(name, symbol, limit);
   }
 

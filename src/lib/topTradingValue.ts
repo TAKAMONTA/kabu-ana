@@ -6,6 +6,18 @@ import {
 } from "./jpx/stockMaster";
 import { normalizeDisplayText } from "./displayText";
 
+/**
+ * 銘柄アイデアの母集団は個別株のみ。
+ *
+ * 銘柄マスタには ETF・ETN / REIT も収録されているが、これらを混ぜると
+ * 「TOPIX」「日経平均」「東証REIT」のようにニュース見出しへ日常的に現れる語が
+ * そのままETF名の一部として加点され、ランキングが指数連動商品で埋まってしまう。
+ * 検索・サジェストは全 assetType を対象にする一方、ここだけは equity に絞る。
+ */
+export const STOCK_IDEA_UNIVERSE: JpxStock[] = JPX_STOCK_MASTER.filter(
+  stock => stock.assetType === "equity"
+);
+
 export interface MarketNewsItem {
   title?: string;
   snippet?: string;
@@ -91,8 +103,14 @@ function normalizeNewsTitleForIdentity(title: string): string {
   const withoutSourceSuffix = title
     .normalize("NFKC")
     .replace(/\s+[-–—|｜]\s+[^-–—|｜]+$/u, "")
-    .replace(/（[^）]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^）]*）/gu, "")
-    .replace(/\([^)]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^)]*\)/giu, "");
+    .replace(
+      /（[^）]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^）]*）/gu,
+      ""
+    )
+    .replace(
+      /\([^)]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^)]*\)/giu,
+      ""
+    );
 
   return withoutSourceSuffix
     .toLowerCase()
@@ -136,25 +154,68 @@ interface MaterialSignal {
 
 const MATERIAL_SIGNALS: MaterialSignal[] = [
   { label: "ストップ高", score: 8, pattern: /ストップ高|s高|制限値幅上限/i },
-  { label: "決算・業績", score: 7, pattern: /決算|上方修正|増益|最高益|黒字転換|営業利益|純利益|業績/i },
-  { label: "株主還元", score: 6, pattern: /自社株買い|増配|復配|配当|株主還元/i },
-  { label: "受注・提携", score: 6, pattern: /受注|大型受注|提携|採用|契約|m&a|買収|tob/i },
-  { label: "値動き", score: 5, pattern: /急騰|急伸|続伸|反発|買い|値上がり|出来高|物色/i },
-  { label: "個別材料", score: 5, pattern: /個別材料|銘柄材料|新聞からの銘柄材料/i },
-  { label: "政策テーマ", score: 4, pattern: /政策|政府|補助金|防衛|原発|規制|関税|経済安全保障/i },
-  { label: "AI・半導体", score: 4, pattern: /生成ai|ai|半導体|データセンター|hbm/i },
-  { label: "暗号資産", score: 4, pattern: /ビットコイン|暗号資産|bitcoin|btc/i },
-  { label: "新製品・事業", score: 3, pattern: /新製品|新サービス|新事業|発売|発表|開始/i },
+  {
+    label: "決算・業績",
+    score: 7,
+    pattern: /決算|上方修正|増益|最高益|黒字転換|営業利益|純利益|業績/i,
+  },
+  {
+    label: "株主還元",
+    score: 6,
+    pattern: /自社株買い|増配|復配|配当|株主還元/i,
+  },
+  {
+    label: "受注・提携",
+    score: 6,
+    pattern: /受注|大型受注|提携|採用|契約|m&a|買収|tob/i,
+  },
+  {
+    label: "値動き",
+    score: 5,
+    pattern: /急騰|急伸|続伸|反発|買い|値上がり|出来高|物色/i,
+  },
+  {
+    label: "個別材料",
+    score: 5,
+    pattern: /個別材料|銘柄材料|新聞からの銘柄材料/i,
+  },
+  {
+    label: "政策テーマ",
+    score: 4,
+    pattern: /政策|政府|補助金|防衛|原発|規制|関税|経済安全保障/i,
+  },
+  {
+    label: "AI・半導体",
+    score: 4,
+    pattern: /生成ai|ai|半導体|データセンター|hbm/i,
+  },
+  {
+    label: "暗号資産",
+    score: 4,
+    pattern: /ビットコイン|暗号資産|bitcoin|btc/i,
+  },
+  {
+    label: "新製品・事業",
+    score: 3,
+    pattern: /新製品|新サービス|新事業|発売|発表|開始/i,
+  },
 ];
 
-function classifyMaterial(item: MarketNewsItem): { label: string; score: number } {
+function classifyMaterial(item: MarketNewsItem): {
+  label: string;
+  score: number;
+} {
   const text = `${item.title ?? ""} ${item.snippet ?? ""}`;
   const signal = MATERIAL_SIGNALS.find(rule => rule.pattern.test(text));
-  return signal ? { label: signal.label, score: signal.score } : { label: "企業材料", score: 2 };
+  return signal
+    ? { label: signal.label, score: signal.score }
+    : { label: "企業材料", score: 2 };
 }
 
 function evidenceText(item: MarketNewsItem): string {
-  return item.title?.trim() || item.snippet?.trim() || item.source || "ニュース";
+  return (
+    item.title?.trim() || item.snippet?.trim() || item.source || "ニュース"
+  );
 }
 
 function compactEvidence(value: string, maxLength = 64): string {
@@ -163,7 +224,11 @@ function compactEvidence(value: string, maxLength = 64): string {
   return `${compacted.slice(0, maxLength)}...`;
 }
 
-function attentionConfidence(score: number, minScore: number, maxScore: number): number {
+function attentionConfidence(
+  score: number,
+  minScore: number,
+  maxScore: number
+): number {
   if (maxScore <= minScore) return FLAT_ATTENTION_CONFIDENCE;
 
   const relativeScore = (score - minScore) / (maxScore - minScore);
@@ -208,19 +273,26 @@ interface ScoredStock {
   signalLabel: string;
 }
 
-function isShadowedScoredStock(entry: ScoredStock, entries: ScoredStock[]): boolean {
+function isShadowedScoredStock(
+  entry: ScoredStock,
+  entries: ScoredStock[]
+): boolean {
   return entry.matchedAliases.every(term =>
     entries.some(
       other =>
         other.stock.code !== entry.stock.code &&
         other.matchedAliases.some(
-          otherTerm => otherTerm.length > term.length && otherTerm.includes(term)
+          otherTerm =>
+            otherTerm.length > term.length && otherTerm.includes(term)
         )
     )
   );
 }
 
-function selectDiverseScoredStocks(entries: ScoredStock[], limit: number): ScoredStock[] {
+function selectDiverseScoredStocks(
+  entries: ScoredStock[],
+  limit: number
+): ScoredStock[] {
   const MIN_DISTINCT_SOURCE_ITEMS = 4;
   const selected: ScoredStock[] = [];
   const selectedCodes = new Set<string>();
@@ -287,7 +359,7 @@ export function buildStableTopTradingItems(
     snippet: normalizeStockText(item.snippet ?? ""),
   }));
 
-  const scored: ScoredStock[] = JPX_STOCK_MASTER.map(stock => {
+  const scored: ScoredStock[] = STOCK_IDEA_UNIVERSE.map(stock => {
     let score = 0;
     let directScore = 0;
     const sources: string[] = [];
@@ -298,11 +370,16 @@ export function buildStableTopTradingItems(
     const materialScores = new Map<string, number>();
 
     normalizedNews.forEach(({ item, title, snippet }) => {
-      const titleMatchedTerms = stock.searchTerms.filter(term => containsStockTerm(title, term));
+      const titleMatchedTerms = stock.searchTerms.filter(term =>
+        containsStockTerm(title, term)
+      );
       const snippetMatchedTerms = stock.searchTerms.filter(term =>
         containsStockTerm(snippet, term)
       );
-      const matchedTerms = uniqueStrings([...titleMatchedTerms, ...snippetMatchedTerms]);
+      const matchedTerms = uniqueStrings([
+        ...titleMatchedTerms,
+        ...snippetMatchedTerms,
+      ]);
 
       if (matchedTerms.length === 0) return;
 
@@ -325,8 +402,10 @@ export function buildStableTopTradingItems(
       }
     });
 
-    const signalLabel = Array.from(materialScores.entries())
-      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "企業材料";
+    const signalLabel =
+      Array.from(materialScores.entries()).sort(
+        (a, b) => b[1] - a[1]
+      )[0]?.[0] ?? "企業材料";
 
     return {
       stock,
@@ -351,27 +430,29 @@ export function buildStableTopTradingItems(
   const minSelectedScore = Math.min(...selectedScores);
   const maxSelectedScore = Math.max(...selectedScores);
 
-  const matchedItems: TradingValueItem[] = selectedScored.map((entry, index) => {
-    const confidence = attentionConfidence(
-      entry.score,
-      minSelectedScore,
-      maxSelectedScore
-    );
-    const evidence = entry.evidences[0] || entry.sources[0] || "ニュース";
+  const matchedItems: TradingValueItem[] = selectedScored.map(
+    (entry, index) => {
+      const confidence = attentionConfidence(
+        entry.score,
+        minSelectedScore,
+        maxSelectedScore
+      );
+      const evidence = entry.evidences[0] || entry.sources[0] || "ニュース";
 
-    return {
-      rank: index + 1,
-      code: entry.stock.code,
-      name: normalizeDisplayText(entry.stock.name),
-      reason: `${entry.signalLabel}: ${compactEvidence(evidence)}を確認。`,
-      confidence,
-      sources: entry.sources,
-      signalLabel: entry.signalLabel,
-      evidence,
-      sourceLinks: entry.sourceLinks,
-      ...blankMarketFields(),
-    };
-  });
+      return {
+        rank: index + 1,
+        code: entry.stock.code,
+        name: normalizeDisplayText(entry.stock.name),
+        reason: `${entry.signalLabel}: ${compactEvidence(evidence)}を確認。`,
+        confidence,
+        sources: entry.sources,
+        signalLabel: entry.signalLabel,
+        evidence,
+        sourceLinks: entry.sourceLinks,
+        ...blankMarketFields(),
+      };
+    }
+  );
 
   return {
     items: matchedItems,

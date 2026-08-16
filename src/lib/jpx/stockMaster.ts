@@ -1,12 +1,23 @@
 import generatedStockMaster from "./stockMaster.generated.json";
 
+/**
+ * 銘柄の商品種別。scripts/sync-jpx-stock-master.py が JPX の
+ * 「市場・商品区分」から決定して stockMaster.generated.json に書き込む。
+ * - equity: 内国株式（プライム/スタンダード/グロース）
+ * - etf:    ETF・ETN
+ * - reit:   REIT・ベンチャーファンド・カントリーファンド・インフラファンド
+ */
+export type JpxAssetType = "equity" | "etf" | "reit";
+
 interface GeneratedStock {
   code: string;
   name: string;
   marketSegment: string;
   marketProduct: string;
+  /** ETF/REIT は JPX 側が "-"。生成時に空文字へ正規化済み。 */
   sector33: string;
   sector17: string;
+  assetType: JpxAssetType;
 }
 
 interface GeneratedStockMaster {
@@ -18,7 +29,17 @@ interface GeneratedStockMaster {
 
 export interface JpxStock extends GeneratedStock {
   aliases: string[];
+  /**
+   * ニュース本文スキャン用の語。短すぎる語は誤検出源なので2文字未満を落とす。
+   * topTradingValue の銘柄アイデア生成が使う。
+   */
   searchTerms: string[];
+  /**
+   * ユーザーが明示的に打ち込んだ検索クエリとの照合用の語。
+   * 正式名称は「本文にたまたま紛れ込む」ことがないため長さで落とさない
+   * （例: 9778「昴」は1文字だが検索できなければならない）。
+   */
+  queryTerms: string[];
 }
 
 const generated = generatedStockMaster as GeneratedStockMaster;
@@ -139,28 +160,49 @@ function escapeRegExp(value: string): string {
 }
 
 function hasJapaneseCharacters(value: string): boolean {
-  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/u.test(value);
+  return /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー]/u.test(
+    value
+  );
 }
 
 function hasJapaneseWordBoundary(text: string, term: string): boolean {
-  const japaneseChar = "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}ー]";
-  return new RegExp(`(?<!${japaneseChar})${escapeRegExp(term)}(?!${japaneseChar})`, "u").test(text);
+  const japaneseChar =
+    "[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}ー]";
+  return new RegExp(
+    `(?<!${japaneseChar})${escapeRegExp(term)}(?!${japaneseChar})`,
+    "u"
+  ).test(text);
 }
 
 function buildSearchTerms(stock: GeneratedStock): string[] {
   const aliases = CURATED_STOCK_ALIASES[stock.code] ?? [];
-  return uniqueValues([stock.code, stock.name, ...aliases].map(normalizeStockText)).filter(
-    term => term.length >= 2
-  );
+  return uniqueValues(
+    [stock.code, stock.name, ...aliases].map(normalizeStockText)
+  ).filter(term => term.length >= 2);
 }
 
-export function containsStockTerm(normalizedText: string, normalizedTerm: string): boolean {
+function buildQueryTerms(stock: GeneratedStock): string[] {
+  // 2文字未満を落とすのはニュース本文スキャンの誤検出対策であって、
+  // ユーザーが打った検索クエリには当てはまらない。正式名称だけは長さを問わず残す。
+  const name = normalizeStockText(stock.name);
+  return uniqueValues([...buildSearchTerms(stock), name]);
+}
+
+export function containsStockTerm(
+  normalizedText: string,
+  normalizedTerm: string
+): boolean {
   if (!normalizedText || !normalizedTerm) return false;
 
+  // どの分岐も「term が text の部分文字列であること」を必須条件に含むため、
+  // 高価な RegExp 構築の前に安価な includes で足切りする（挙動は不変）。
+  // マスタが4252件に拡大し、1クエリあたりの照合回数が跳ね上がったため必要。
+  if (!normalizedText.includes(normalizedTerm)) return false;
+
   if (/^[a-z0-9+&.\- ]+$/.test(normalizedTerm)) {
-    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(normalizedTerm)}($|[^a-z0-9])`).test(
-      normalizedText
-    );
+    return new RegExp(
+      `(^|[^a-z0-9])${escapeRegExp(normalizedTerm)}($|[^a-z0-9])`
+    ).test(normalizedText);
   }
 
   if (normalizedTerm === "ソフトバンク") {
@@ -171,41 +213,86 @@ export function containsStockTerm(normalizedText: string, normalizedTerm: string
     return hasJapaneseWordBoundary(normalizedText, normalizedTerm);
   }
 
-  return normalizedText.includes(normalizedTerm);
+  // ここに到達した時点で、関数冒頭の includes 足切りにより
+  // normalizedText は normalizedTerm を部分文字列として含むことが確定している
+  // （恒真）。以前は `normalizedText.includes(normalizedTerm)` を再評価していたが、
+  // 足切り追加後は無意味な再計算だったため `true` に置き換えて意図を明確にする。
+  return true;
 }
 
 export const JPX_STOCK_MASTER: JpxStock[] = generated.stocks.map(stock => ({
   ...stock,
   aliases: CURATED_STOCK_ALIASES[stock.code] ?? [],
   searchTerms: buildSearchTerms(stock),
+  queryTerms: buildQueryTerms(stock),
 }));
 
-export const JPX_STOCK_BY_CODE = new Map(JPX_STOCK_MASTER.map(stock => [stock.code, stock]));
+export const JPX_STOCK_BY_CODE = new Map(
+  JPX_STOCK_MASTER.map(stock => [stock.code, stock])
+);
+
+export interface JpxStockMatch {
+  stock: JpxStock;
+  matchedTerms: string[];
+  /** マッチした語のうち最長の文字数。優先順位の比較に使う。 */
+  matchLength: number;
+}
 
 interface StockTextMatch {
   stock: JpxStock;
   matchedTerms: string[];
 }
 
-function isShadowedMatch(match: StockTextMatch, matches: StockTextMatch[]): boolean {
+function isShadowedMatch(
+  match: StockTextMatch,
+  matches: StockTextMatch[]
+): boolean {
   return match.matchedTerms.every(term =>
     matches.some(
       other =>
         other.stock.code !== match.stock.code &&
         other.matchedTerms.some(
-          otherTerm => otherTerm.length > term.length && otherTerm.includes(term)
+          otherTerm =>
+            otherTerm.length > term.length && otherTerm.includes(term)
         )
     )
   );
 }
 
-export function findStocksMentionedInText(text: string, limit = 20): JpxStock[] {
+function longestTermLength(terms: string[]): number {
+  return terms.reduce((max, term) => Math.max(max, term.length), 0);
+}
+
+/**
+ * テキスト中で言及されている銘柄を、確度の高い順に返す。
+ *
+ * 個別株とETF/REITを同一のマスタ配列で走査するため、`isShadowedMatch` の
+ * 「長い語が短い語を覆っていれば短い方は誤検出」という規則が資産種別を
+ * またいで自動的に効く。ETF正式名称に偶然含まれる短い社名（例:
+ * 「iシェアーズ・コアJリートETF」の中の「コア」2359）はこれで落ちる。
+ * `・`(U+30FB) は Script=Common で日本語ワード境界の lookbehind を
+ * すり抜けるため、境界判定だけでは防げないことに注意。
+ *
+ * 影に隠れなかった候補どうしは「実際にマッチした語が長い順」で並べ、
+ * 同点は個別株優先、次にコード昇順で決定的にする。これにより先頭要素が
+ * 「最も強いマッチ」を意味するようになり、searchResolution 側が
+ * etfAliases とのマッチ長比較に使う前提が成立する。
+ * ただし実測では、全4252銘柄名の自己解決において shadow 判定だけで
+ * 曖昧さが解消される（shadow通過後に候補が2件以上残るクエリは0件）ため、
+ * この並び替えが効くのは複数銘柄が併記されたテキストに対してのみである。
+ */
+export function findStockMatchesInText(
+  text: string,
+  limit = 20
+): JpxStockMatch[] {
   const normalizedText = normalizeStockText(text);
   if (!normalizedText) return [];
 
   const matches: StockTextMatch[] = [];
   for (const stock of JPX_STOCK_MASTER) {
-    const matchedTerms = stock.searchTerms.filter(term => containsStockTerm(normalizedText, term));
+    const matchedTerms = stock.queryTerms.filter(term =>
+      containsStockTerm(normalizedText, term)
+    );
     if (matchedTerms.length > 0) {
       matches.push({ stock, matchedTerms });
     }
@@ -213,6 +300,17 @@ export function findStocksMentionedInText(text: string, limit = 20): JpxStock[] 
 
   return matches
     .filter(match => !isShadowedMatch(match, matches))
-    .slice(0, limit)
-    .map(match => match.stock);
+    .map(match => ({
+      stock: match.stock,
+      matchedTerms: match.matchedTerms,
+      matchLength: longestTermLength(match.matchedTerms),
+    }))
+    .sort((a, b) => {
+      if (b.matchLength !== a.matchLength) return b.matchLength - a.matchLength;
+      const aEquity = a.stock.assetType === "equity" ? 0 : 1;
+      const bEquity = b.stock.assetType === "equity" ? 0 : 1;
+      if (aEquity !== bEquity) return aEquity - bEquity;
+      return a.stock.code < b.stock.code ? -1 : 1;
+    })
+    .slice(0, limit);
 }
