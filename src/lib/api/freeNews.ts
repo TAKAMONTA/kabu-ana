@@ -9,11 +9,11 @@ export interface NewsItem {
 }
 
 // getComprehensiveNewsの並列取得用。
-// search/route.ts:18 の NEWS_OPTIONAL_TIMEOUT_MS=1800 の内側で先に切れる値
+// search/route.ts の NEWS_OPTIONAL_TIMEOUT_MS=1800 の内側で先に切れる値
 const NEWS_FETCH_TIMEOUT_MS = 1500;
 
 // 単発呼び出し用の既定値。
-// top-trading-value/route.ts:23 の NEWS_FETCH_TIMEOUT_MS=4000 ラッパーの内側で先に切れる値
+// top-trading-value/route.ts の NEWS_FETCH_TIMEOUT_MS=4000 ラッパーの内側で先に切れる値
 const NEWS_STANDALONE_TIMEOUT_MS = 3500;
 
 // 識別子の長さ上限。銘柄コード・ティッカーは十分収まる。
@@ -330,15 +330,16 @@ export class FreeNewsClient {
     // ASCII単語境界は日本語識別子に対して意味を成さないため、判定方法を切り替える
     const isAsciiIdentifier = /^[\x20-\x7e]+$/.test(identifier);
 
-    // queryもsymbolも判定材料が無い場合のみ、フィルタを適用せず全件通す
-    if (!normalizedQuery && !symbolPattern) {
+    // queryもsymbol（identifier）も判定材料が無い場合のみ、フィルタを適用せず全件通す
+    if (!normalizedQuery && !identifier) {
       return () => true;
     }
 
     // 名前キーワードも識別子も無い場合は何も通らない。
-    // nameKeywordsが空になるのはqueryが空かコード表記のときだけで、
-    // コード表記ならidentifierが立つため、ここに到達するのは
-    // 「コード表記のqueryがMAX_SYMBOL_LENGTHを超える」異常入力に限られる
+    // nameKeywordsが空になるのはqueryが空文字（トリム後）かコード表記のときだけで、
+    // ここに到達するのは次のいずれかの異常入力に限られる:
+    // ・コード表記のqueryがMAX_SYMBOL_LENGTHを超える場合
+    // ・queryが空文字で、symbol（identifier）がMAX_SYMBOL_LENGTHを超える場合
     if (nameKeywords.length === 0 && !symbolPattern) {
       return null;
     }

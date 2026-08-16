@@ -245,7 +245,8 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     );
 
     const client = new FreeNewsClient();
-    // news-analysis/route.ts:66 → jquants.ts:171 の経路（companyNameがコードにフォールバック）
+    // コード表記の query が symbol 無しで渡ってきた場合の分岐検証
+    // （isCodeLikeQuery が identifier に昇格し、文脈マーカー必須で照合される）
     const news = await client.getComprehensiveNews("1306", undefined, 10);
 
     expect(titlesOf(news).sort()).toEqual([
@@ -273,7 +274,7 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     mockSources([...titles, "SNAAPLE launches a new app"]);
 
     const client = new FreeNewsClient();
-    // twelveData.ts:111 の経路
+    // twelveData.ts の getCompanyNews（query===symbol）の経路
     const news = await client.getComprehensiveNews("AAPL", "AAPL", 10);
 
     expect(titlesOf(news).sort()).toEqual([...titles].sort());
@@ -325,6 +326,25 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     );
 
     expect(titlesOf(news)).toEqual(["トヨタ自動車が新型EVを発表"]);
+  });
+
+  it("全角のJPX名称（未正規化）のqueryでも半角記事に一致する", async () => {
+    // getCompanyNewsByName はJPXマスタの表示名をnormalizeDisplayTextせず
+    // そのまま渡す実経路がある（jquants.tsのgetCompanyNewsByName）。
+    // NFKC正規化は両側にかかるため、queryが全角のままでも半角記事に一致する
+    mockSources(
+      [],
+      buildRss(["JESCOホールディングスが上昇", "無関係な別のニュース"])
+    );
+
+    const client = new FreeNewsClient();
+    const news = await client.getComprehensiveNews(
+      "ＪＥＳＣＯホールディングス",
+      undefined,
+      10
+    );
+
+    expect(titlesOf(news)).toEqual(["JESCOホールディングスが上昇"]);
   });
 
   it("非CDATAのRSSタイトルをHTMLエンティティごとデコードする", async () => {
@@ -574,6 +594,19 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it("空クエリ＋極端に長いsymbolでも外部リクエストを行わず空を返す（回帰）", async () => {
+    const get = mockSources(["何かのニュース"], buildRss(["何かのニュース"]));
+
+    const client = new FreeNewsClient();
+    // query空文字・symbolがMAX_SYMBOL_LENGTH超過 → buildSymbolPatternがnullになり
+    // 判定材料ゼロが確定する。修正前はここが「判定材料なし＝全件通す」に
+    // 誤って倒れ、Yahooの無関係記事が無検査で返っていた
+    const news = await client.getComprehensiveNews("", "A".repeat(20), 10);
+
+    expect(news).toEqual([]);
+    expect(get).not.toHaveBeenCalled();
+  });
+
   it("長すぎるsymbolでも名前一致は生き残る", async () => {
     mockSources([], buildRss(["トヨタ自動車、通期予想を上方修正"]));
 
@@ -602,7 +635,8 @@ describe("FreeNewsClient.getNewsFromGoogleRSS", () => {
     const get = mockSources([], buildRss(["市場サマリー"]));
 
     const client = new FreeNewsClient();
-    // top-trading-value/route.ts:57 と同じ呼び方（4000msラッパーの内側で先に切れる）
+    // top-trading-value/route.ts の fetchMarketNews と同じ呼び方
+    // （NEWS_FETCH_TIMEOUT_MS=4000 ラッパーの内側で先に切れる）
     await client.getNewsFromGoogleRSS("日本株 個別銘柄 材料", 8);
 
     const calls = callsTo(get, GOOGLE_RSS_URL);
@@ -666,7 +700,7 @@ describe("FreeNewsClient.getNewsFromGoogleRSS", () => {
       buildRss(["トヨタ自動車、決算を発表"])
     );
 
-    // jquants.ts:54 と同様に単一インスタンスを共有する
+    // jquants.ts の JQuantsClient（freeNewsフィールド）と同様に単一インスタンスを共有する
     const client = new FreeNewsClient();
     await Promise.all([
       client.getComprehensiveNews("トヨタ自動車", "7203", 5),

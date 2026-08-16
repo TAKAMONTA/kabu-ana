@@ -17,8 +17,10 @@ export interface NewsAnalysisResult {
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
-// getComprehensiveNews は NewsAPI → Yahoo Finance → Google News RSS を
-// 最大3段階、逐次で呼び出しうる（各呼び出し自体に個別タイムアウトは無い）。
+// getComprehensiveNews は内部で NewsAPI・Yahoo Finance・Google News RSS の
+// 3ソースを Promise.allSettled で並列に取得し、各呼び出し自体は
+// freeNews.ts の NEWS_FETCH_TIMEOUT_MS(1500ms) で個別にタイムアウトする。
+// NEWS_ANALYSIS_TIMEOUT_MS はその外側を包む値。
 // search/route.ts の NEWS_OPTIONAL_TIMEOUT_MS(1800ms)
 // は多数の並列オプション処理の一本を守る値だが、news-analysis はニュース取得が
 // 主目的で後続のAI分析の方が総じて長くかかるため、正当な多段フェッチを
