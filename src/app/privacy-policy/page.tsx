@@ -123,7 +123,7 @@ export default function PrivacyPolicyPage() {
                   <li>Twelve Data: 米国株の株価データ取得</li>
                   <li>EDINET DB: 有価証券報告書等の開示情報取得</li>
                   <li>OpenRouter: AI分析処理</li>
-                  <li>NewsAPI / Google News RSS / Yahoo Finance: 関連ニュース取得</li>
+                  <li>Google News RSS / Yahoo Finance: 関連ニュース取得</li>
                   <li>
                     EIA / FRED / USGS（米国地質調査所）/ ニュースRSS各社（Reuters、Bloomberg、AP、BBC、OilPrice.com、Argus
                     Media、Hellenic Shipping News、MEES、Energy Voice、JOGMEC）:

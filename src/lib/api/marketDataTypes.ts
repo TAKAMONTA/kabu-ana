@@ -78,9 +78,7 @@ export interface MarketDataClient {
   /**
    * symbol を渡さずに企業名（companyName）だけでニュースを検索する。
    * FreeNewsClient.getComprehensiveNews に symbol を渡さないことで
-   * Yahoo Finance 経路をスキップし、名称ベースの検索のみを行う。
-   * 名前に反して Google News RSS 専用ではない（NewsAPI・Google News RSS を
-   * 並列で取得し関連度で絞る）。
+   * Yahoo Finance 経路をスキップするため、実質的に Google News RSS のみで検索する。
    */
   getCompanyNewsByName(
     symbol: string,
