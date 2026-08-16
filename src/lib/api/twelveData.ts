@@ -109,8 +109,8 @@ export class TwelveDataClient implements MarketDataClient {
 
   /**
    * symbol を渡さず企業名（companyName）だけで検索する。Yahoo Finance 経路
-   * （FreeNewsClient は symbol 有りの場合のみ Yahoo を叩く）をスキップし、
-   * NewsAPI・Google News RSS を並列で取得し関連度で絞る。Google専用ではない。
+   * （FreeNewsClient は symbol 有りの場合のみ Yahoo を叩く）をスキップするため、
+   * 実質的に Google News RSS のみで検索する。
    */
   async getCompanyNewsByName(
     _symbol: string,

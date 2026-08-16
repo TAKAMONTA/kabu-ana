@@ -1,5 +1,5 @@
 import axios from "axios";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FreeNewsClient } from "../freeNews";
 
 vi.mock("axios", () => ({
@@ -8,20 +8,10 @@ vi.mock("axios", () => ({
   },
 }));
 
-const NEWSAPI_URL = "newsapi.org";
 const YAHOO_URL = "query1.finance.yahoo.com";
 const GOOGLE_RSS_URL = "news.google.com/rss/search";
 const EMPTY_RSS = "<rss><channel></channel></rss>";
 const DUP_LINK = "https://example.com/dup";
-
-const buildNewsApiArticles = (titles: string[]) =>
-  titles.map((title, index) => ({
-    title,
-    description: title,
-    source: { name: "NewsAPI" },
-    publishedAt: "2026-08-10T09:00:00Z",
-    url: `https://example.com/newsapi/${index}`,
-  }));
 
 const buildYahooNews = (titles: string[]) =>
   titles.map((title, index) => ({
@@ -55,20 +45,11 @@ const buildPlainRss = (titles: string[]) =>
     )
     .join("")}</channel></rss>`;
 
-/** NewsAPI / Yahoo Finance / Google RSS の3系統にaxios.getを振り分ける */
-const mockSources = (
-  yahooTitles: string[],
-  rssXml: string = EMPTY_RSS,
-  newsApiTitles: string[] = []
-) => {
+/** Yahoo Finance / Google RSS の2系統にaxios.getを振り分ける */
+const mockSources = (yahooTitles: string[], rssXml: string = EMPTY_RSS) => {
   const get = vi.mocked(axios.get);
   get.mockImplementation((url: unknown) => {
     const target = String(url);
-    if (target.includes(NEWSAPI_URL)) {
-      return Promise.resolve({
-        data: { articles: buildNewsApiArticles(newsApiTitles) },
-      });
-    }
     if (target.includes(YAHOO_URL)) {
       return Promise.resolve({ data: { news: buildYahooNews(yahooTitles) } });
     }
@@ -91,12 +72,6 @@ const titlesOf = (items: { title: string }[]) => items.map(item => item.title);
 describe("FreeNewsClient.getComprehensiveNews", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // NewsAPIはキー未設定で常に0件（本番と同条件）
-    vi.stubEnv("NEWSAPI_API_KEY", "");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("ETFの4桁コードが偶然含まれるだけの記事を除外する（回帰）", async () => {
@@ -379,7 +354,7 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     expect(titlesOf(news)).toEqual(["Toyota &lt;script&gt; 検証"]);
   });
 
-  it("3ソースを並列に発行し、Yahooがlimit件返してもGoogle RSSを取得する", async () => {
+  it("2ソースを並列に発行し、Yahooがlimit件返してもGoogle RSSを取得する", async () => {
     const irrelevant = Array.from(
       { length: 10 },
       (_, index) => `Unrelated market wrap ${index}`
@@ -398,57 +373,7 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
     expect(titlesOf(news)).toEqual(["トヨタ自動車、電池新工場の稼働を開始"]);
   });
 
-  it("同一linkはNewsAPI→Yahoo→RSSの先勝ちで残る", async () => {
-    vi.stubEnv("NEWSAPI_API_KEY", "test-key");
-    const get = vi.mocked(axios.get);
-    get.mockImplementation((url: unknown) => {
-      const target = String(url);
-      if (target.includes(NEWSAPI_URL)) {
-        return Promise.resolve({
-          data: {
-            articles: [
-              {
-                title: "トヨタ自動車の決算記事",
-                description: "d",
-                source: { name: "NewsAPI" },
-                publishedAt: "2026-08-10T09:00:00Z",
-                url: DUP_LINK,
-              },
-            ],
-          },
-        });
-      }
-      if (target.includes(YAHOO_URL)) {
-        return Promise.resolve({
-          data: {
-            news: [
-              {
-                title: "トヨタ自動車の決算記事",
-                summary: "s",
-                publisher: "Yahoo Finance",
-                providerPublishTime: 1786000000,
-                link: DUP_LINK,
-              },
-            ],
-          },
-        });
-      }
-      return Promise.resolve({
-        data:
-          `<rss><channel><item><title><![CDATA[トヨタ自動車の決算記事]]></title>` +
-          `<link>${DUP_LINK}</link>` +
-          `<pubDate>Mon, 10 Aug 2026 09:00:00 GMT</pubDate></item></channel></rss>`,
-      });
-    });
-
-    const client = new FreeNewsClient();
-    const news = await client.getComprehensiveNews("トヨタ自動車", "7203", 10);
-
-    expect(news).toHaveLength(1);
-    expect(news[0].source).toBe("NewsAPI");
-  });
-
-  it("NewsAPIが無い場合はYahooがRSSより優先される", async () => {
+  it("同一linkはYahooがRSSより優先される（先勝ち）", async () => {
     const get = vi.mocked(axios.get);
     get.mockImplementation((url: unknown) => {
       const target = String(url);
@@ -565,18 +490,21 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
   });
 
   it("判定材料が無い場合は全件通す", async () => {
-    // NewsAPIのみが応答する状況を作り、フィルタ無適用を観測する
-    vi.stubEnv("NEWSAPI_API_KEY", "test-key");
-    const get = mockSources([], EMPTY_RSS, [
-      "日経平均、続伸",
-      "米国株はまちまち",
-    ]);
+    // 小細工ではなく実入力の再現。news-analysis/route.ts のガードは
+    // `if (!symbol || !companyName)` という truthy 判定なので、
+    // {"symbol":" ","companyName":" "} が400をすり抜けてこの経路に到達する。
+    // 空白のみのsymbolは `symbol ? ... : ...` を通過してYahooを叩くが、
+    // normalizeForMatch().trim() 後は空になり識別子の判定材料はゼロになる。
+    const get = mockSources(["日経平均、続伸", "米国株はまちまち"]);
 
     const client = new FreeNewsClient();
-    const news = await client.getComprehensiveNews("", undefined, 10);
+    const news = await client.getComprehensiveNews(" ", " ", 10);
 
-    expect(titlesOf(news)).toEqual(["日経平均、続伸", "米国株はまちまち"]);
+    // 前提（Yahooだけが発火する）を先に固定する。将来 symbol 側も trim して
+    // 判定するよう整理された場合、結果ではなく原因側がここで落ちる
+    expect(callsTo(get, YAHOO_URL)).toHaveLength(1);
     expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(0);
+    expect(titlesOf(news)).toEqual(["日経平均、続伸", "米国株はまちまち"]);
   });
 
   it("極端に長い識別子では外部リクエストを行わず空を返す", async () => {
@@ -624,11 +552,6 @@ describe("FreeNewsClient.getComprehensiveNews", () => {
 describe("FreeNewsClient.getNewsFromGoogleRSS", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEWSAPI_API_KEY", "");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
   });
 
   it("引数2つの単発呼び出しには3500msの既定タイムアウトを使う", async () => {

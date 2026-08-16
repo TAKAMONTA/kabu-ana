@@ -33,49 +33,6 @@ export class FreeNewsClient {
   private inFlightGoogleRSS = new Map<string, Promise<NewsItem[]>>();
 
   /**
-   * NewsAPIを使用してニュースを取得（無料プラン: 100リクエスト/日）
-   */
-  async getNewsFromNewsAPI(
-    query: string,
-    limit: number = 10
-  ): Promise<NewsItem[]> {
-    try {
-      const apiKey = process.env.NEWSAPI_API_KEY;
-      if (!apiKey || apiKey === "your_newsapi_key_here") {
-        return [];
-      }
-
-      // より具体的な検索クエリを作成
-      const searchQuery = `"${query}" AND (株価 OR 決算 OR 業績 OR ニュース)`;
-
-      const response = await axios.get("https://newsapi.org/v2/everything", {
-        params: {
-          q: searchQuery,
-          apiKey,
-          language: "ja",
-          sortBy: "publishedAt",
-          pageSize: limit * 2, // フィルタリング前により多くの結果を取得
-          from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 過去1週間
-        },
-        timeout: NEWS_FETCH_TIMEOUT_MS,
-      });
-
-      return (
-        response.data.articles?.map((article: any) => ({
-          title: article.title,
-          snippet: article.description || article.title,
-          source: article.source.name,
-          date: new Date(article.publishedAt).toLocaleDateString("ja-JP"),
-          link: article.url,
-        })) || []
-      );
-    } catch (error: any) {
-      console.error("NewsAPI取得エラー:", error.message);
-      return [];
-    }
-  }
-
-  /**
    * Google News RSSを使用してニュースを取得（完全無料）
    * 同一クエリのリクエストが進行中ならそのPromiseを共有し、429を招く重複発火を防ぐ
    * timeoutMsの既定値は単発呼び出し向け。getComprehensiveNewsからは短い値を明示的に渡す
@@ -198,16 +155,14 @@ export class FreeNewsClient {
 
       const hasQuery = (query || "").trim() !== "";
 
-      // 3ソースを並列取得（レイテンシを合計ではなく最大値に抑える）
+      // 2ソースを並列取得（レイテンシを合計ではなく最大値に抑える）
       // 配列の順序 = 重複除去の優先順位・同日付記事の並び順なので変更しないこと
       const settled = await Promise.allSettled([
-        // 1. NewsAPI（APIキーがある場合）
-        this.getNewsFromNewsAPI(query, limit),
-        // 2. Yahoo Finance（シンボルがある場合）
+        // 1. Yahoo Finance（シンボルがある場合）
         symbol
           ? this.getNewsFromYahooFinance(symbol, limit)
           : Promise.resolve<NewsItem[]>([]),
-        // 3. Google RSS（空クエリでは一般ニュースしか返らないので叩かない）
+        // 2. Google RSS（空クエリでは一般ニュースしか返らないので叩かない）
         hasQuery
           ? this.getNewsFromGoogleRSS(query, limit, NEWS_FETCH_TIMEOUT_MS)
           : Promise.resolve<NewsItem[]>([]),
