@@ -104,22 +104,22 @@ export async function checkPremiumStatus(
 
   try {
     // Firebase Admin SDK を動的インポート
-    const { getApps, initializeApp, cert } = await import("firebase-admin/app");
+    const { getAdminApp, FirebaseAdminConfigError } = await import(
+      "@/lib/firebase/admin"
+    );
     const { getAuth } = await import("firebase-admin/auth");
     const { getFirestore } = await import("firebase-admin/firestore");
 
     let app;
-    if (getApps().length > 0) {
-      app = getApps()[0];
-    } else {
-      const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-      if (!serviceAccountKey) return false;
-      try {
-        const serviceAccount = JSON.parse(serviceAccountKey);
-        app = initializeApp({ credential: cert(serviceAccount) });
-      } catch {
-        return false;
+    try {
+      app = getAdminApp();
+    } catch (error) {
+      if (error instanceof FirebaseAdminConfigError) {
+        console.error(
+          "checkPremiumStatus: Firebase Admin SDKの設定エラーのため無料枠として扱います"
+        );
       }
+      return false;
     }
 
     const auth = getAuth(app);

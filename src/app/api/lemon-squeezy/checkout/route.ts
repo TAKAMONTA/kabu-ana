@@ -1,38 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
 import { createCheckout } from "@/lib/lemon-squeezy";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
-
-// Firebase Admin SDKの初期化
-let adminApp: App | null = null;
-
-function getAdminApp() {
-  if (adminApp) {
-    return adminApp;
-  }
-
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-    return adminApp;
-  }
-
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY環境変数が設定されていません");
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    adminApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
-    return adminApp;
-  } catch (error) {
-    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
-    throw new Error("Firebase Admin SDKの初期化に失敗しました");
-  }
-}
 
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -103,8 +73,27 @@ export async function POST(request: NextRequest) {
 
     // Firebase Auth ID Tokenの検証（オプション: 未ログインでも購入可能にする場合）
     if (idToken) {
+      // Admin SDKの設定エラーは「ゲスト購入」に握り潰さず中断する。
+      // ここを内側catchに含めると、ログイン済みユーザーの購入がuserId無しで
+      // 成立してしまい、webhookが購入をユーザーに紐付けられなくなる
+      // （課金されたのにpremiumが付かない静かな失敗）。
+      let app;
       try {
-        const app = getAdminApp();
+        app = getAdminApp();
+      } catch (error) {
+        if (error instanceof FirebaseAdminConfigError) {
+          console.error(
+            "lemon-squeezy/checkout: Firebase Admin SDKの設定エラー"
+          );
+          return NextResponse.json(
+            { error: "認証サービスが利用できません" },
+            { status: 503 }
+          );
+        }
+        throw error;
+      }
+
+      try {
         const auth = getAuth(app);
         const decodedToken = await auth.verifyIdToken(idToken);
         userId = decodedToken.uid;

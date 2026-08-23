@@ -73,6 +73,32 @@ async function fetchJson({ baseUrl, fetchImpl, path, timeoutMs, init = {} }) {
   }
 }
 
+/**
+ * ステータスコード自体を検証したいプローブ用に、HTTPステータスと本文を
+ * そのまま返す（fetchJsonと違い、!response.okでも例外を投げない）。
+ */
+async function fetchStatus({ baseUrl, fetchImpl, path, timeoutMs, init = {} }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const url = `${baseUrl}${path}`;
+
+  try {
+    const response = await fetchImpl(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    return { status: response.status, text };
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`${path} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 function validateToyotaEdinetSearch(payload) {
   const errors = [];
   const companyInfo = isRecord(payload?.companyInfo) ? payload.companyInfo : {};
@@ -203,6 +229,34 @@ function validateMorningBrief(payload, { now, briefMaxAgeHours }) {
   }
 }
 
+/**
+ * Firebase Admin SDK が本番で正しく初期化されているかを検証する。
+ * 偽トークンでGETするだけで書き込みは発生しないため、本番に副作用を起こさない。
+ * - 401: Admin初期化に成功し、偽トークンを正しく拒否できている → 健全
+ * - 503/500: Admin初期化に失敗している（FIREBASE_SERVICE_ACCOUNT_KEY未設定/不正の疑い）
+ * - 400: idTokenがルートに届いていない＝プローブ自体の不備
+ * - それ以外: 想定外のレスポンス
+ */
+function validateFirebaseAdminHealth({ status, text }) {
+  if (status === 401) return;
+
+  if (status === 503 || status === 500) {
+    throw new Error(
+      `Firebase Admin health check failed: HTTP ${status} (Firebase Admin が初期化できていない可能性があります。FIREBASE_SERVICE_ACCOUNT_KEY を確認してください): ${truncate(text)}`
+    );
+  }
+
+  if (status === 400) {
+    throw new Error(
+      `Firebase Admin health check probe malfunction: HTTP 400 (トークンがルートに届いていない可能性があります): ${truncate(text)}`
+    );
+  }
+
+  throw new Error(
+    `Firebase Admin health check returned unexpected HTTP ${status}: ${truncate(text)}`
+  );
+}
+
 export function createProductionSmokeChecks(options = {}) {
   const baseUrl = normalizeBaseUrl(options.baseUrl);
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
@@ -218,6 +272,8 @@ export function createProductionSmokeChecks(options = {}) {
 
   const requestJson = (path, init) =>
     fetchJson({ baseUrl, fetchImpl, path, timeoutMs, init });
+  const requestStatus = (path, init) =>
+    fetchStatus({ baseUrl, fetchImpl, path, timeoutMs, init });
 
   return [
     {
@@ -271,6 +327,22 @@ export function createProductionSmokeChecks(options = {}) {
           headers: { Accept: "application/json" },
         });
         validateMorningBrief(payload, { now, briefMaxAgeHours });
+      },
+    },
+    {
+      name: "firebase-admin-health",
+      label: "Firebase Admin SDK is initialized and rejects invalid tokens",
+      async run() {
+        // GETに偽トークンを付けるだけで、書き込みも認証成功も発生しない
+        // （偽トークンは即座に拒否される）ため、本番に副作用を起こさない。
+        const { status, text } = await requestStatus(
+          "/api/subscription/check",
+          {
+            method: "GET",
+            headers: { Authorization: "Bearer smoke-check-invalid-token" },
+          }
+        );
+        validateFirebaseAdminHealth({ status, text });
       },
     },
   ];
