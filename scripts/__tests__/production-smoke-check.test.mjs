@@ -16,6 +16,13 @@ function healthySubscriptionCheckResponse() {
   return jsonResponse({ error: "認証に失敗しました" }, 401);
 }
 
+function textResponse(body, status) {
+  return new Response(body, {
+    status,
+    headers: { "Content-Type": "text/plain" },
+  });
+}
+
 function firebaseAdminHealthCheckOnly(options) {
   return createProductionSmokeChecks(options).filter(
     (check) => check.name === "firebase-admin-health"
@@ -398,6 +405,109 @@ describe("production smoke check", () => {
           message: expect.stringContaining("probe malfunction"),
         }),
       ]);
+    });
+
+    it("fails when subscription/check returns 401 with a non-app body (e.g. Vercel Deployment Protection)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        textResponse("<html>Authentication Required</html>", 401)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failed).toEqual([
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining("Deployment Protection"),
+        }),
+      ]);
+    });
+
+    it("fails when subscription/check returns 401 with an app JSON body that is not the auth-failure message", async () => {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: "something else" }, 401)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failed).toEqual([
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining("Deployment Protection"),
+        }),
+      ]);
+    });
+
+    it("fails with an inconclusive (not config-blaming) message when subscription/check returns 503 with a non-app body (Vercel platform error)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        textResponse("A server error has occurred\n\nFUNCTION_THROTTLED", 503)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      const [failure] = result.failed;
+      expect(failure).toEqual(
+        expect.objectContaining({ name: "firebase-admin-health" })
+      );
+      expect(failure.message).toContain("Vercel プラットフォーム");
+      expect(failure.message).not.toContain(
+        "FIREBASE_SERVICE_ACCOUNT_KEY を確認してください"
+      );
+    });
+
+    it("fails with an inconclusive (not config-blaming) message when subscription/check returns 500 with a non-app body (error field is an object, not a string)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: { code: "FUNCTION_INVOCATION_FAILED" } }, 500)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      const [failure] = result.failed;
+      expect(failure).toEqual(
+        expect.objectContaining({ name: "firebase-admin-health" })
+      );
+      expect(failure.message).not.toContain(
+        "FIREBASE_SERVICE_ACCOUNT_KEY を確認してください"
+      );
     });
   });
 });
