@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
+import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 import {
   buildSubscriptionDocumentFromVerification,
   parseNativePurchaseUpdateRequest,
@@ -81,16 +83,23 @@ export async function POST(request: NextRequest) {
         isTrial: subscriptionData.isTrial,
       },
     });
-  } catch (error: any) {
-    console.error("購入状態再検証エラー:", error);
+  } catch (error: unknown) {
+    if (error instanceof FirebaseAdminConfigError) {
+      console.error("subscription/refresh: Firebase Admin SDKの設定エラー");
+      return NextResponse.json(
+        { error: "認証サービスが利用できません" },
+        { status: 503 }
+      );
+    }
     if (error instanceof PurchaseVerificationError) {
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode }
       );
     }
+    console.error(`購入状態再検証エラー: ${sanitizeError(error)}`);
     return NextResponse.json(
-      { error: error.message || "購入状態の再検証に失敗しました" },
+      { error: "購入状態の再検証に失敗しました" },
       { status: 500 }
     );
   }
