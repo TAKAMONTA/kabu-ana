@@ -1,45 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
+import { getAdminApp } from "@/lib/firebase/admin";
 import {
   buildSubscriptionDocumentFromVerification,
   parseNativePurchaseUpdateRequest,
   PurchaseVerificationError,
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
-
-// Firebase Admin SDKの初期化
-let adminApp: App | null = null;
-
-function getAdminApp() {
-  if (adminApp) {
-    return adminApp;
-  }
-
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-    return adminApp;
-  }
-
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY環境変数が設定されていません");
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    adminApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
-    return adminApp;
-  } catch (error) {
-    console.error("Firebase Admin SDK初期化エラー:", error);
-    throw new Error("Firebase Admin SDKの初期化に失敗しました");
-  }
-}
-
-
 
 export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
 
@@ -123,7 +91,7 @@ export async function POST(request: NextRequest) {
       );
     }
     return NextResponse.json(
-      { error: error.message || "購入状態の更新に失敗しました" },
+      { error: "購入状態の更新に失敗しました" },
       { status: 500 }
     );
   }

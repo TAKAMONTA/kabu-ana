@@ -1,11 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
-import { runProductionSmokeCheck } from "../production-smoke-check.mjs";
+import {
+  createProductionSmokeChecks,
+  runProductionSmokeCheck,
+} from "../production-smoke-check.mjs";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json" },
   });
+}
+
+// firebase-admin-healthチェック用: 偽トークンが正しく拒否された健全な状態(401)のレスポンス。
+function healthySubscriptionCheckResponse() {
+  return jsonResponse({ error: "認証に失敗しました" }, 401);
+}
+
+function firebaseAdminHealthCheckOnly(options) {
+  return createProductionSmokeChecks(options).filter(
+    (check) => check.name === "firebase-admin-health"
+  );
 }
 
 function successfulBriefPayload() {
@@ -95,6 +109,12 @@ describe("production smoke check", () => {
       if (String(url).endsWith("/api/signals/claude-brief")) {
         return jsonResponse(successfulBriefPayload());
       }
+      if (String(url).endsWith("/api/subscription/check")) {
+        expect(init.headers.Authorization).toBe(
+          "Bearer smoke-check-invalid-token"
+        );
+        return healthySubscriptionCheckResponse();
+      }
       throw new Error(`Unexpected URL: ${url}`);
     });
 
@@ -113,8 +133,9 @@ describe("production smoke check", () => {
       "market-data-route-7203",
       "market-data-route-aapl",
       "morning-brief",
+      "firebase-admin-health",
     ]);
-    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    expect(fetchImpl).toHaveBeenCalledTimes(5);
   });
 
   it("fails when Toyota search does not include EDINET enrichment", async () => {
@@ -125,6 +146,9 @@ describe("production smoke check", () => {
         return jsonResponse({
           companyInfo: { name: "トヨタ自動車", symbol: "7203", market: "TYO" },
         });
+      }
+      if (String(url).endsWith("/api/subscription/check")) {
+        return healthySubscriptionCheckResponse();
       }
       return jsonResponse(successfulBriefPayload());
     });
@@ -161,6 +185,9 @@ describe("production smoke check", () => {
           metadata: { dataSource: "unexpected_source" },
         });
       }
+      if (String(url).endsWith("/api/subscription/check")) {
+        return healthySubscriptionCheckResponse();
+      }
       return jsonResponse(successfulBriefPayload());
     });
 
@@ -195,6 +222,9 @@ describe("production smoke check", () => {
           stockData: { ...successfulSearchPayload().stockData, pe: 12.5 },
         });
       }
+      if (String(url).endsWith("/api/subscription/check")) {
+        return healthySubscriptionCheckResponse();
+      }
       return jsonResponse(successfulBriefPayload());
     });
 
@@ -213,6 +243,9 @@ describe("production smoke check", () => {
     const fetchImpl = vi.fn(async (url, init) => {
       if (String(url).endsWith("/api/search")) {
         return jsonResponse(searchPayloadForQuery(init));
+      }
+      if (String(url).endsWith("/api/subscription/check")) {
+        return healthySubscriptionCheckResponse();
       }
       return jsonResponse({
         error: "朝ブリーフ生成に必要な市場シグナルが未取得です",
@@ -240,6 +273,9 @@ describe("production smoke check", () => {
       if (String(url).endsWith("/api/search")) {
         return jsonResponse(searchPayloadForQuery(init));
       }
+      if (String(url).endsWith("/api/subscription/check")) {
+        return healthySubscriptionCheckResponse();
+      }
       return jsonResponse(successfulBriefPayload());
     });
 
@@ -258,5 +294,110 @@ describe("production smoke check", () => {
         message: expect.stringContaining("older than 1h"),
       }),
     ]);
+  });
+
+  describe("firebase-admin-health probe", () => {
+    it("passes when subscription/check rejects an invalid token with 401 (Admin SDK healthy)", async () => {
+      const fetchImpl = vi.fn(async (url, init) => {
+        expect(String(url)).toContain("/api/subscription/check");
+        expect(init.method).toBe("GET");
+        expect(init.headers.Authorization).toBe(
+          "Bearer smoke-check-invalid-token"
+        );
+        return healthySubscriptionCheckResponse();
+      });
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.failed).toEqual([]);
+      expect(result.passed.map((check) => check.name)).toEqual([
+        "firebase-admin-health",
+      ]);
+    });
+
+    it("fails when subscription/check returns 503 (Firebase Admin SDK not initialized)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: "認証サービスが利用できません" }, 503)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failed).toEqual([
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining("FIREBASE_SERVICE_ACCOUNT_KEY"),
+        }),
+      ]);
+    });
+
+    it("fails when subscription/check returns 500 (Firebase Admin SDK not initialized)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: "サブスクリプション状態の確認に失敗しました" }, 500)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failed).toEqual([
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining("FIREBASE_SERVICE_ACCOUNT_KEY"),
+        }),
+      ]);
+    });
+
+    it("fails when subscription/check returns 400 (probe itself is malformed, not a config issue)", async () => {
+      const fetchImpl = vi.fn(async () =>
+        jsonResponse({ error: "idTokenが必要です" }, 400)
+      );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failed).toEqual([
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining("probe malfunction"),
+        }),
+      ]);
+    });
   });
 });

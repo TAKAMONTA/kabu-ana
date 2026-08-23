@@ -1,38 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { initializeApp, getApps, cert, App } from "firebase-admin/app";
 import crypto from "crypto";
+import { getAdminApp } from "@/lib/firebase/admin";
 import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
-
-// Firebase Admin SDKの初期化
-let adminApp: App | null = null;
-
-function getAdminApp() {
-  if (adminApp) {
-    return adminApp;
-  }
-
-  if (getApps().length > 0) {
-    adminApp = getApps()[0];
-    return adminApp;
-  }
-
-  const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
-  if (!serviceAccountKey) {
-    throw new Error("FIREBASE_SERVICE_ACCOUNT_KEY環境変数が設定されていません");
-  }
-
-  try {
-    const serviceAccount = JSON.parse(serviceAccountKey);
-    adminApp = initializeApp({
-      credential: cert(serviceAccount),
-    });
-    return adminApp;
-  } catch (error) {
-    console.error(`Firebase Admin SDK初期化エラー: ${sanitizeError(error)}`);
-    throw new Error("Firebase Admin SDKの初期化に失敗しました");
-  }
-}
 
 /**
  * Webhook署名を検証
