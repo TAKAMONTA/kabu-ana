@@ -349,12 +349,16 @@ describe("production smoke check", () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.failed).toEqual([
+      const [failure] = result.failed;
+      expect(failure).toEqual(
         expect.objectContaining({
           name: "firebase-admin-health",
-          message: expect.stringContaining("FIREBASE_SERVICE_ACCOUNT_KEY"),
-        }),
-      ]);
+          message: expect.stringContaining(
+            "FIREBASE_SERVICE_ACCOUNT_KEY を確認してください"
+          ),
+        })
+      );
+      expect(failure.message).not.toContain("inconclusive");
     });
 
     it("fails when subscription/check returns 500 (Firebase Admin SDK not initialized)", async () => {
@@ -374,12 +378,16 @@ describe("production smoke check", () => {
       });
 
       expect(result.ok).toBe(false);
-      expect(result.failed).toEqual([
+      const [failure] = result.failed;
+      expect(failure).toEqual(
         expect.objectContaining({
           name: "firebase-admin-health",
-          message: expect.stringContaining("FIREBASE_SERVICE_ACCOUNT_KEY"),
-        }),
-      ]);
+          message: expect.stringContaining(
+            "FIREBASE_SERVICE_ACCOUNT_KEY を確認してください"
+          ),
+        })
+      );
+      expect(failure.message).not.toContain("inconclusive");
     });
 
     it("fails when subscription/check returns 400 (probe itself is malformed, not a config issue)", async () => {
@@ -436,6 +444,33 @@ describe("production smoke check", () => {
       const fetchImpl = vi.fn(async () =>
         jsonResponse({ error: "something else" }, 401)
       );
+
+      const options = {
+        baseUrl: "https://kabu-ana.com",
+        fetchImpl,
+        timeoutMs: 1000,
+      };
+      const result = await runProductionSmokeCheck({
+        ...options,
+        checks: firebaseAdminHealthCheckOnly(options),
+        now: new Date("2026-06-17T06:00:00.000Z"),
+      });
+
+      expect(result.ok).toBe(false);
+      const [failure] = result.failed;
+      expect(failure).toEqual(
+        expect.objectContaining({
+          name: "firebase-admin-health",
+          message: expect.stringContaining(
+            "subscription/check の 401 文言"
+          ),
+        })
+      );
+      expect(failure.message).not.toContain("Deployment Protection");
+    });
+
+    it("fails when subscription/check returns 401 with an empty body (probe reached something, but not the app)", async () => {
+      const fetchImpl = vi.fn(async () => textResponse("", 401));
 
       const options = {
         baseUrl: "https://kabu-ana.com",

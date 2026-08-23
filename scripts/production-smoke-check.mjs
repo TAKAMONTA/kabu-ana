@@ -255,6 +255,8 @@ function parseAppErrorBody(text) {
  * 判定はステータスコードだけでなく、本文がアプリ（route.ts）のJSONかどうかも見る。
  * - 401 かつ本文が `{"error":"認証に失敗しました"}`: Admin初期化に成功し、
  *   偽トークンを正しく拒否できている → 健全
+ * - 401 かつ本文はアプリのJSONだが文言が異なる: subscription/check の401文言が
+ *   変わった可能性があり、プローブの期待値更新が必要
  * - 401 だが本文がアプリのJSONでない: Vercel Deployment Protectionなど
  *   別系統が応答しており、プローブがアプリに到達していない疑い
  * - 503/500 かつ本文がアプリのJSON: Admin初期化に失敗している
@@ -269,6 +271,11 @@ function validateFirebaseAdminHealth({ status, text }) {
 
   if (status === 401) {
     if (appError === "認証に失敗しました") return;
+    if (appError !== null) {
+      throw new Error(
+        `Firebase Admin health check inconclusive: HTTP 401 from the app but with an unexpected error message (subscription/check の 401 文言が変わった可能性があります。プローブの期待値を更新してください): ${truncate(text)}`
+      );
+    }
     throw new Error(
       `Firebase Admin health check inconclusive: HTTP 401 but the body is not the app's auth-failure JSON (Deployment Protection など別系統が応答している可能性があります。プローブがアプリに到達していません): ${truncate(text)}`
     );
