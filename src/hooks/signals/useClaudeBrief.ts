@@ -4,16 +4,12 @@ import { useCallback, useState } from "react";
 import { CapacitorHttp } from "@capacitor/core";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { useSignalApi } from "./useSignalApi";
+import { unwrapSignalResponse } from "./unwrapSignalResponse";
 import type { ClaudeDeepDive, ClaudeMorningBrief } from "@/lib/signals/claude";
 
 export interface ClaudeBriefPayload {
   brief: ClaudeMorningBrief;
   generatedAt: string;
-}
-
-interface SignalApiResponse<T> {
-  data: T | null;
-  error?: string;
 }
 
 export function useClaudeBrief() {
@@ -31,15 +27,23 @@ export function useClaudeBrief() {
         headers: await getAuthHeaders(),
         data: signal,
       });
-      const body = response.data as SignalApiResponse<ClaudeDeepDive>;
-      if (body.error) throw new Error(body.error);
-      setDeepDive(body.data);
+      setDeepDive(
+        unwrapSignalResponse<ClaudeDeepDive>(response.status, response.data)
+      );
     } catch (err) {
-      setDeepDiveError(err instanceof Error ? err.message : "深掘り分析に失敗しました");
+      setDeepDiveError(
+        err instanceof Error ? err.message : "深掘り分析に失敗しました"
+      );
     } finally {
       setIsDeepDiveLoading(false);
     }
   }, []);
 
-  return { ...brief, deepDive, deepDiveError, isDeepDiveLoading, requestDeepDive };
+  return {
+    ...brief,
+    deepDive,
+    deepDiveError,
+    isDeepDiveLoading,
+    requestDeepDive,
+  };
 }
