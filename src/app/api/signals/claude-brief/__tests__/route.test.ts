@@ -71,6 +71,9 @@ describe("POST /api/signals/claude-brief", () => {
     expect(JSON.parse(bodyText)).toEqual({
       error: "認証サービスが利用できません",
     });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "verifyAuth: Firebase Admin SDKの設定エラー"
+    );
   });
 
   it("returns 401 when the Authorization header is missing", async () => {

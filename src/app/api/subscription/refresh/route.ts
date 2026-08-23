@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       );
     }
     if (error instanceof PurchaseVerificationError) {
+      console.error(`subscription/refresh: 購入検証エラー: ${sanitizeError(error)}`);
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode }

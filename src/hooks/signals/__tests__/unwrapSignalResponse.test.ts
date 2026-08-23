@@ -45,4 +45,10 @@ describe("unwrapSignalResponse", () => {
       "深掘り分析に失敗しました"
     );
   });
+
+  it("throws a generic message for a 2xx array body", () => {
+    expect(() => unwrapSignalResponse(200, [])).toThrow(
+      "深掘り分析に失敗しました"
+    );
+  });
 });

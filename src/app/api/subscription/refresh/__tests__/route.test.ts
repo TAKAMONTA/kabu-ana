@@ -139,6 +139,9 @@ describe("POST /api/subscription/refresh", () => {
     expect(response.status).toBe(402);
     const body = await response.json();
     expect(body).toEqual({ error: "テスト用の購入検証エラー" });
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect.stringContaining("購入検証エラー")
+    );
 
     consoleErrorSpy.mockRestore();
   });
