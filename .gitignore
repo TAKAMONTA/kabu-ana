@@ -55,3 +55,6 @@ HANDOFF_TO_CURSOR.md
 
 # python bytecode cache (scripts/sync-jpx-stock-master.py)
 __pycache__/
+
+# brainstorming visual companion
+.superpowers/
