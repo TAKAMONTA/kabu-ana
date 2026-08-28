@@ -59,7 +59,6 @@ interface StockPriceHeaderCardProps {
   stockData: StockData | null;
   currency?: string;
   isWatched?: boolean;
-  watchDisabled?: boolean;
   onToggleWatch?: () => void;
 }
 
@@ -68,7 +67,6 @@ export function StockPriceHeaderCard({
   stockData,
   currency = "$",
   isWatched,
-  watchDisabled,
   onToggleWatch,
 }: StockPriceHeaderCardProps) {
   const currencySymbol = companyInfo.market === "TYO" ? "¥" : currency;
@@ -79,13 +77,36 @@ export function StockPriceHeaderCard({
       <Card className="border-0 bg-gradient-to-br from-primary/5 to-primary/10">
         <CardContent className="pt-6">
           <div className="space-y-3">
-            <div>
-              <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
-                {companyInfo.symbol}
-              </h2>
-              <h1 className="text-2xl font-bold text-foreground line-clamp-2">
-                {companyName}
-              </h1>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-sm text-muted-foreground uppercase tracking-wide font-medium">
+                  {companyInfo.symbol}
+                </h2>
+                <h1 className="text-2xl font-bold text-foreground line-clamp-2">
+                  {companyName}
+                </h1>
+              </div>
+              {onToggleWatch && (
+                <button
+                  type="button"
+                  onClick={onToggleWatch}
+                  aria-label={
+                    isWatched
+                      ? "ウォッチリストから削除"
+                      : "ウォッチリストに追加"
+                  }
+                  aria-pressed={isWatched}
+                  className="shrink-0 p-2 rounded-md hover:bg-accent"
+                >
+                  <Star
+                    className={`w-5 h-5 ${
+                      isWatched
+                        ? "fill-current text-yellow-500"
+                        : "text-muted-foreground"
+                    }`}
+                  />
+                </button>
+              )}
             </div>
             <Separator className="my-3" />
             <div className="text-center py-8 text-muted-foreground">
@@ -116,12 +137,11 @@ export function StockPriceHeaderCard({
               <button
                 type="button"
                 onClick={onToggleWatch}
-                disabled={watchDisabled}
                 aria-label={
                   isWatched ? "ウォッチリストから削除" : "ウォッチリストに追加"
                 }
                 aria-pressed={isWatched}
-                className="shrink-0 p-2 rounded-md hover:bg-accent disabled:opacity-40"
+                className="shrink-0 p-2 rounded-md hover:bg-accent"
               >
                 <Star
                   className={`w-5 h-5 ${

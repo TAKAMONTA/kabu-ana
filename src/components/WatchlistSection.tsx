@@ -4,28 +4,33 @@ import { Star, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
-import { useWatchlist } from "@/hooks/useWatchlist";
+import type { useWatchlist } from "@/hooks/useWatchlist";
 import { useWatchlistQuotes } from "@/hooks/useWatchlistQuotes";
+import { normalizeDisplayText } from "@/lib/displayText";
 import { FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 
 interface WatchlistSectionProps {
+  watchlist: ReturnType<typeof useWatchlist>;
   onSelectCode: (code: string) => void;
   onRequestLogin: () => void;
 }
 
+const ASOF_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 /** 2026-08-26 → 8月26日 */
 function formatAsOf(asOf: string): string {
+  if (!ASOF_PATTERN.test(asOf)) return "";
   const [, month, day] = asOf.split("-");
-  if (!month || !day) return asOf;
   return `${Number(month)}月${Number(day)}日`;
 }
 
 export function WatchlistSection({
+  watchlist,
   onSelectCode,
   onRequestLogin,
 }: WatchlistSectionProps) {
   const { user } = useAuth();
-  const { items, loading, error, limit, remove, clearError } = useWatchlist();
+  const { items, loading, error, limit, remove, clearError } = watchlist;
   const codes = items.map(item => item.code);
   const { quotes, failed, refresh } = useWatchlistQuotes(codes);
 
@@ -52,6 +57,7 @@ export function WatchlistSection({
     .filter((value): value is string => Boolean(value))
     .sort();
   const latestAsOf = asOfList[asOfList.length - 1];
+  const formattedAsOf = latestAsOf ? formatAsOf(latestAsOf) : "";
 
   return (
     <Card>
@@ -80,7 +86,7 @@ export function WatchlistSection({
         {items.length > 0 && (
           <p className="text-xs text-muted-foreground">
             終値・前日比（J-Quants は当日16:30更新）
-            {latestAsOf ? ` ・ ${formatAsOf(latestAsOf)} 終値` : ""}
+            {formattedAsOf ? ` ・ ${formattedAsOf} 終値` : ""}
           </p>
         )}
       </CardHeader>
@@ -103,14 +109,16 @@ export function WatchlistSection({
 
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground py-2">
-            検索して★を押すと、ここに並びます（無料プランは
-            {FREE_WATCHLIST_LIMIT}銘柄まで）
+            検索して★を押すと、ここに並びます
+            {Number.isFinite(limit) &&
+              `（無料プランは${FREE_WATCHLIST_LIMIT}銘柄まで）`}
           </p>
         ) : (
           <ul className="divide-y">
             {items.map(item => {
               const quote = quotes[item.code];
               const isUp = (quote?.changePercent ?? 0) >= 0;
+              const displayName = normalizeDisplayText(item.name);
               return (
                 <li
                   key={item.code}
@@ -122,7 +130,7 @@ export function WatchlistSection({
                     className="flex-1 text-left min-w-0"
                   >
                     <span className="block text-sm font-medium truncate">
-                      {item.name}
+                      {displayName}
                     </span>
                     <span className="block text-xs text-muted-foreground tabular-nums">
                       {item.code}
@@ -157,11 +165,11 @@ export function WatchlistSection({
                     variant="ghost"
                     size="sm"
                     onClick={() => {
-                      if (window.confirm(`${item.name} を削除しますか？`)) {
+                      if (window.confirm(`${displayName} を削除しますか？`)) {
                         void remove(item.code);
                       }
                     }}
-                    aria-label={`${item.name} を削除`}
+                    aria-label={`${displayName} を削除`}
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>

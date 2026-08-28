@@ -415,6 +415,7 @@ export default function HomePage() {
 
   const watchlistSection = (
     <WatchlistSection
+      watchlist={watchlist}
       onSelectCode={code => {
         void handlePickSelect(code);
       }}
@@ -567,12 +568,9 @@ export default function HomePage() {
                 stockData={searchResult.stockData}
                 currency={getCurrencySymbol}
                 isWatched={watchlist.has(searchResult.companyInfo.symbol)}
-                watchDisabled={
-                  !watchlist.canAdd &&
-                  !watchlist.has(searchResult.companyInfo.symbol)
-                }
                 onToggleWatch={() => {
                   const { symbol, name } = searchResult.companyInfo;
+                  if (watchlist.isBusy(symbol)) return;
                   if (watchlist.has(symbol)) {
                     void watchlist.remove(symbol);
                   } else {

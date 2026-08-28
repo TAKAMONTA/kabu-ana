@@ -7,7 +7,11 @@ import { db } from "@/lib/firebase";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { useAuth } from "./useAuth";
 import { useSubscription } from "./useSubscription";
-import { canAddMore, watchlistLimit } from "@/lib/watchlist/limits";
+import {
+  canAddMore,
+  watchlistLimit,
+  FREE_WATCHLIST_LIMIT,
+} from "@/lib/watchlist/limits";
 import { normalizeWatchlistCode } from "@/lib/watchlist/codes";
 
 export interface WatchlistItem {
@@ -90,6 +94,11 @@ export function useWatchlist() {
       const normalized = normalizeWatchlistCode(code);
       if (!user || !normalized) return;
 
+      if (!has(normalized) && !canAdd) {
+        setError(`無料プランは${FREE_WATCHLIST_LIMIT}銘柄までです`);
+        return;
+      }
+
       setError(null);
       setPending(prev => [
         { code: normalized, name, addedAt: new Date() },
@@ -112,7 +121,7 @@ export function useWatchlist() {
         setPending(prev => prev.filter(item => item.code !== normalized));
       }
     },
-    [user]
+    [user, has, canAdd]
   );
 
   const remove = useCallback(
@@ -145,6 +154,18 @@ export function useWatchlist() {
 
   const clearError = useCallback(() => setError(null), []);
 
+  const isBusy = useCallback(
+    (code: string) => {
+      const normalized = normalizeWatchlistCode(code);
+      if (!normalized) return false;
+      return (
+        pending.some(item => item.code === normalized) ||
+        removing.includes(normalized)
+      );
+    },
+    [pending, removing]
+  );
+
   return {
     items: visibleItems,
     loading,
@@ -155,5 +176,6 @@ export function useWatchlist() {
     add,
     remove,
     clearError,
+    isBusy,
   };
 }
