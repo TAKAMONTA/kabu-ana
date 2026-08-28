@@ -7,6 +7,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ウォッチリスト: 本人のみ読み取り可。
+    // 書き込みは Admin SDK（/api/watchlist）経由に限定し、
+    // クライアントからの直接書き込みを禁止する
+    // （無料プランの上限をサーバー側でのみ強制するため）。
+    match /users/{userId}/watchlist/{code} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false;
+    }
+
     match /signals_prices/{document=**} {
       allow read: if true;
       allow write: if false;
