@@ -50,7 +50,15 @@ export async function GET(request: NextRequest) {
           QUOTE_TIMEOUT_MS,
           `watchlist quote ${code}`
         );
-        if (!data || typeof data.price !== "number") return [code, null];
+        if (!data || !Number.isFinite(data.price) || data.price <= 0) {
+          // 上流クライアントは例外を投げず null を返すため、ここで出さないと
+          // APIキー失効やレート超過が完全に無音になる（固定文字列のみ。
+          // エラー詳細やURLは出さない — キー漏洩防止）
+          console.warn(
+            `watchlist/quotes: ${code} の株価を取得できませんでした`
+          );
+          return [code, null];
+        }
         const quote: WatchlistQuote = {
           close: data.price,
           changePercent: data.changePercent,

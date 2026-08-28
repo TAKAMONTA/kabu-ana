@@ -44,6 +44,7 @@ describe("GET /api/watchlist/quotes", () => {
     );
     const response = await getQuotes("7203");
     expect(response.status).toBe(503);
+    expect(getStockDataMock).not.toHaveBeenCalled();
   });
 
   it("codes が無ければ空の quotes を返す", async () => {
@@ -119,5 +120,29 @@ describe("GET /api/watchlist/quotes", () => {
     const response = await getQuotes(codes);
     const body = await response.json();
     expect(Object.keys(body.quotes)).toHaveLength(20);
+  });
+
+  it("同じコードの2回目は上流を呼ばない（キャッシュ）", async () => {
+    getStockDataMock.mockResolvedValue({
+      price: 100,
+      changePercent: 0,
+      asOf: "2026-08-26",
+    });
+    await getQuotes("5401");
+    await getQuotes("5401");
+    expect(getStockDataMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("price が 0 の応答は null 扱いになり、キャッシュもされない", async () => {
+    getStockDataMock.mockResolvedValue({
+      price: 0,
+      changePercent: 0,
+      asOf: "2026-08-26",
+    });
+    const first = await getQuotes("9101");
+    expect((await first.json()).quotes["9101"]).toBeNull();
+    // 0円がキャッシュされていれば2回目は上流を呼ばないはず。呼ぶ=キャッシュされていない
+    await getQuotes("9101");
+    expect(getStockDataMock).toHaveBeenCalledTimes(2);
   });
 });
