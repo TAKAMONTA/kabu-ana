@@ -50,6 +50,9 @@ export async function POST(request: NextRequest) {
     // 1. Firestoreからサブスクリプションデータを削除
     try {
       await db.collection("subscriptions").doc(userId).delete();
+      // ウォッチリスト（users/{uid} とその配下）も消す。
+      // recursiveDelete はサブコレクションまで辿って削除する
+      await db.recursiveDelete(db.doc(`users/${userId}`));
       console.info(`Firestore data deleted for user: ${maskId(userId)}`);
     } catch (error) {
       console.error(
