@@ -10,10 +10,16 @@ import type {
   NewsItem,
 } from "./marketDataTypes";
 
-/** 4桁コードを含む → 日本株。それ以外（米国ティッカー）→ 米国株 */
+/**
+ * 4文字（先頭が数字・残りは数字または英大文字）のコードを含む → 日本株。
+ * それ以外（米国ティッカーなど）→ 米国株。
+ * 例: 7203（4桁数字）、130A（グロース市場の英字入りコード）
+ */
+const JP_CODE_PATTERN = /(^|[^A-Z0-9])\d[\dA-Z]{3}([^A-Z0-9]|$)/;
+
 export function isJpCode(symbolOrQuery: string): boolean {
-  const norm = String(symbolOrQuery).normalize("NFKC");
-  return Boolean(norm.match(/\d{4}/)?.[0]);
+  const norm = String(symbolOrQuery).normalize("NFKC").trim().toUpperCase();
+  return JP_CODE_PATTERN.test(norm);
 }
 
 export class MarketDataRouter implements MarketDataClient {
