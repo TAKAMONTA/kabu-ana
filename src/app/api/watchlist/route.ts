@@ -30,7 +30,14 @@ async function isPremiumUser(
     const notExpired =
       !data.expiryDate || data.expiryDate.toDate() > new Date();
     return active && notExpired;
-  } catch {
+  } catch (error) {
+    // 判定できないときは無料扱い（fail-closed）。ただし無言にはしない —
+    // Firestore 障害と実装バグの両方がここに落ちるため、記録が無いと
+    // 「プレミアムなのに上限3件」という症状の原因を追えなくなる
+    console.error(
+      "watchlist: 有料判定に失敗したため無料として扱います",
+      error instanceof Error ? error.message : error
+    );
     return false;
   }
 }
@@ -73,9 +80,14 @@ export async function POST(request: NextRequest) {
 
     // 「存在確認 → 件数 → 書き込み」を1つのトランザクションで行う。
     // 分けて書くと、同時に2回押した無料ユーザーが上限を超えられる。
+    // 読み取りはすべて書き込みより前に行うこと（Firestore の制約）。
+    let updated = false;
     await db.runTransaction(async tx => {
       const docRef = watchlistRef.doc(code);
       const existing = await tx.get(docRef);
+      // 競合時はこのコールバックが再実行される。前回の試行の結果を
+      // 引きずらないよう、毎回の試行で状態を上書きする。
+      updated = existing.exists;
 
       if (existing.exists) {
         // 既存の更新は件数が増えないので上限判定をしない。
@@ -84,9 +96,23 @@ export async function POST(request: NextRequest) {
         return;
       }
 
-      const all = await tx.get(watchlistRef);
-      if (!canAddMore(all.size, premium)) {
-        throw new WatchlistLimitError();
+      if (!premium) {
+        // 上限判定と新規作成の間に他リクエストが割り込めないよう、
+        // 全リクエスト共通の1ドキュメント（users/{uid}）への読み書きで
+        // 直列化を強制する。DB の並行制御モード（悲観/楽観）どちらでも、
+        // 同一ドキュメントへの書き込み競合として検出される。
+        const userRef = db.doc(`users/${authResult.uid}`);
+        await tx.get(userRef);
+        // 読む件数とロック対象を上限ぶんに抑える（全件読みは N に比例して劣化する）
+        const all = await tx.get(watchlistRef.limit(FREE_WATCHLIST_LIMIT));
+        if (!canAddMore(all.size, premium)) {
+          throw new WatchlistLimitError();
+        }
+        tx.set(
+          userRef,
+          { watchlistUpdatedAt: FieldValue.serverTimestamp() },
+          { merge: true }
+        );
       }
       tx.set(docRef, {
         code,
@@ -95,7 +121,7 @@ export async function POST(request: NextRequest) {
       });
     });
 
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true }, { status: updated ? 200 : 201 });
   } catch (error) {
     if (error instanceof WatchlistLimitError) {
       return NextResponse.json(
