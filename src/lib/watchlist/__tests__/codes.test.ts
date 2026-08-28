@@ -38,6 +38,20 @@ describe("normalizeWatchlistCode", () => {
   it("長すぎるものは null", () => {
     expect(normalizeWatchlistCode("A".repeat(21))).toBeNull();
   });
+
+  it("上限ちょうどの長さは通る", () => {
+    expect(normalizeWatchlistCode("A".repeat(20))).toBe("A".repeat(20));
+  });
+
+  it("ドット・ハイフンを含む米国ティッカーはそのまま返す", () => {
+    expect(normalizeWatchlistCode("brk.b")).toBe("BRK.B");
+    expect(normalizeWatchlistCode("bf-b")).toBe("BF-B");
+  });
+
+  it("先頭がドットやアンダースコアのものは null", () => {
+    expect(normalizeWatchlistCode(".AB")).toBeNull();
+    expect(normalizeWatchlistCode("_AB")).toBeNull();
+  });
 });
 
 describe("parseCodesParam", () => {
@@ -53,13 +67,26 @@ describe("parseCodesParam", () => {
     expect(parseCodesParam("7203,7203,6758")).toEqual(["7203", "6758"]);
   });
 
-  it("上限を超えた分は切り捨てる", () => {
+  it("上限を超えた分は切り捨てる（先頭20件を残す）", () => {
     const codes = Array.from({ length: 25 }, (_, i) => `${1000 + i}`).join(",");
-    expect(parseCodesParam(codes, 20)).toHaveLength(20);
+    const result = parseCodesParam(codes, 20);
+    expect(result).toHaveLength(20);
+    expect(result[0]).toBe("1000");
+    expect(result[19]).toBe("1019");
+  });
+
+  it("max を省略した場合は既定で20件に切り詰める", () => {
+    const codes = Array.from({ length: 25 }, (_, i) => `${1000 + i}`).join(",");
+    expect(parseCodesParam(codes)).toHaveLength(20);
   });
 
   it("null や空文字は空配列", () => {
     expect(parseCodesParam(null)).toEqual([]);
     expect(parseCodesParam("")).toEqual([]);
+  });
+
+  it("max が0以下やNaNなら空配列", () => {
+    expect(parseCodesParam("7203", 0)).toEqual([]);
+    expect(parseCodesParam("7203,6758", NaN)).toEqual([]);
   });
 });

@@ -1,13 +1,14 @@
 /** 銘柄コードの最大長。日本株4桁・英数字混在コード・米国ティッカーを収める */
 const MAX_CODE_LENGTH = 20;
 
-/** Firestore の docId として安全な文字だけを許す（英数字のみ） */
-const SAFE_CODE_PATTERN = /^[A-Z0-9]+$/;
+/** Firestore の docId として安全な形。先頭は英数字に限る */
+const SAFE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9.-]*$/;
 
 /**
  * 銘柄コードを正規化する。
  * NFKC で全角を畳み、trim して大文字化する。
  * Firestore の docId に使えない文字を含む場合や長すぎる場合は null を返す。
+ * 銘柄が実在するかは検証しない（形式だけを見る）。
  */
 export function normalizeWatchlistCode(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
@@ -27,11 +28,12 @@ export function parseCodesParam(
   max: number = 20
 ): string[] {
   if (!raw) return [];
+  if (!Number.isFinite(max) || max <= 0) return [];
   const seen = new Set<string>();
   for (const part of raw.split(",")) {
+    if (seen.size >= max) break;
     const code = normalizeWatchlistCode(part);
     if (code) seen.add(code);
-    if (seen.size >= max) break;
   }
   return Array.from(seen);
 }
