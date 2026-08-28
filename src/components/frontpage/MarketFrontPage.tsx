@@ -9,6 +9,7 @@ import { FrontPageMarketGrid } from "./FrontPageMarketGrid";
 
 interface MarketFrontPageProps {
   searchSlot: ReactNode;
+  watchlistSlot?: ReactNode;
   pulseSlot: ReactNode;
   stockIdeasSlot: ReactNode;
   sampleSlot?: ReactNode;
@@ -34,6 +35,7 @@ function formatMarketDate() {
 
 export function MarketFrontPage({
   searchSlot,
+  watchlistSlot,
   pulseSlot,
   stockIdeasSlot,
   sampleSlot,
@@ -77,6 +79,7 @@ export function MarketFrontPage({
             />
 
             <div className="mt-5">{searchSlot}</div>
+            {watchlistSlot && <div className="mt-4">{watchlistSlot}</div>}
           </div>
 
           <aside className="space-y-4">
