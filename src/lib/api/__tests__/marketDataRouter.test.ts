@@ -16,4 +16,10 @@ describe("isJpCode", () => {
     expect(isJpCode("130A")).toBe(true);
     expect(isJpCode("130a")).toBe(true);
   });
+  it("treats alphabet-heavy US tickers as US, not JP", () => {
+    expect(isJpCode("3COM")).toBe(false);
+  });
+  it("treats digit3+alpha1 codes as JP", () => {
+    expect(isJpCode("506A")).toBe(true);
+  });
 });

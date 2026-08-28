@@ -22,7 +22,7 @@ export interface WatchlistItem {
 
 export function useWatchlist() {
   const { user } = useAuth();
-  const { isPremium } = useSubscription();
+  const { isPremium, loading: subscriptionLoading } = useSubscription();
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -94,7 +94,9 @@ export function useWatchlist() {
       const normalized = normalizeWatchlistCode(code);
       if (!user || !normalized) return;
 
-      if (!has(normalized) && !canAdd) {
+      // 課金情報の読み込み中は isPremium が暫定的に false になるため、
+      // ここでの事前判定はスキップしてAPIに進む（サーバー判定が正）。
+      if (!subscriptionLoading && !has(normalized) && !canAdd) {
         setError(`無料プランは${FREE_WATCHLIST_LIMIT}銘柄までです`);
         return;
       }
@@ -121,7 +123,7 @@ export function useWatchlist() {
         setPending(prev => prev.filter(item => item.code !== normalized));
       }
     },
-    [user, has, canAdd]
+    [user, has, canAdd, subscriptionLoading]
   );
 
   const remove = useCallback(

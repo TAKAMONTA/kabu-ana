@@ -3,6 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
 import { normalizeWatchlistCode } from "@/lib/watchlist/codes";
 import { canAddMore, FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 export const dynamic =
   process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
@@ -35,8 +36,7 @@ async function isPremiumUser(
     // Firestore 障害と実装バグの両方がここに落ちるため、記録が無いと
     // 「プレミアムなのに上限3件」という症状の原因を追えなくなる
     console.error(
-      "watchlist: 有料判定に失敗したため無料として扱います",
-      error instanceof Error ? error.message : error
+      `watchlist: 有料判定に失敗したため無料として扱います: ${sanitizeError(error, [uid])}`
     );
     return false;
   }
@@ -133,8 +133,7 @@ export async function POST(request: NextRequest) {
       );
     }
     console.error(
-      "watchlist POST に失敗しました",
-      error instanceof Error ? error.message : error
+      `watchlist POST に失敗しました: ${sanitizeError(error, [authResult.uid])}`
     );
     return NextResponse.json(
       { error: "ウォッチリストの更新に失敗しました" },
@@ -171,8 +170,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error(
-      "watchlist DELETE に失敗しました",
-      error instanceof Error ? error.message : error
+      `watchlist DELETE に失敗しました: ${sanitizeError(error, [authResult.uid])}`
     );
     return NextResponse.json(
       { error: "ウォッチリストの更新に失敗しました" },
