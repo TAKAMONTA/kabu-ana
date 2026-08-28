@@ -65,7 +65,8 @@ export class TwelveDataClient implements MarketDataClient {
       dividend: 0,
       high52: num(fw.high),
       low52: num(fw.low),
-      asOf: typeof q.datetime === "string" ? q.datetime.slice(0, 10) : undefined,
+      asOf:
+        typeof q.datetime === "string" ? q.datetime.slice(0, 10) : undefined,
     };
   }
 

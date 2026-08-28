@@ -22,7 +22,10 @@ export function normalizeWatchlistCode(raw: unknown): string | null {
  * `?codes=7203,6758` の値を配列にする。
  * 不正なコードは捨て、重複を除き、max 件で打ち切る。
  */
-export function parseCodesParam(raw: string | null, max: number = 20): string[] {
+export function parseCodesParam(
+  raw: string | null,
+  max: number = 20
+): string[] {
   if (!raw) return [];
   const seen = new Set<string>();
   for (const part of raw.split(",")) {
