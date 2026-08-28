@@ -22,6 +22,8 @@ export function normalizeWatchlistCode(raw: unknown): string | null {
 /**
  * `?codes=7203,6758` の値を配列にする。
  * 不正なコードは捨て、重複を除き、max 件で打ち切る。
+ * max が有限の正数でない場合（Infinity・NaN・0以下）は空配列を返す。
+ * watchlistLimit() の戻り値（プレミアムは Infinity）をそのまま渡さないこと。
  */
 export function parseCodesParam(
   raw: string | null,

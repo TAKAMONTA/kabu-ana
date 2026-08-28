@@ -48,8 +48,9 @@ describe("normalizeWatchlistCode", () => {
     expect(normalizeWatchlistCode("bf-b")).toBe("BF-B");
   });
 
-  it("先頭がドットやアンダースコアのものは null", () => {
+  it("先頭が英数字以外（ドット・ハイフン・アンダースコア）は null", () => {
     expect(normalizeWatchlistCode(".AB")).toBeNull();
+    expect(normalizeWatchlistCode("-AB")).toBeNull();
     expect(normalizeWatchlistCode("_AB")).toBeNull();
   });
 });
