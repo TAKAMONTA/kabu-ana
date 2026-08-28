@@ -41,9 +41,9 @@ export function useWatchlist() {
 
     const unsubscribe = onSnapshot(
       watchlistQuery,
-      (snapshot) => {
+      snapshot => {
         setItems(
-          snapshot.docs.map((docSnapshot) => {
+          snapshot.docs.map(docSnapshot => {
             const data = docSnapshot.data();
             return {
               code: typeof data.code === "string" ? data.code : docSnapshot.id,
@@ -54,7 +54,7 @@ export function useWatchlist() {
         );
         setLoading(false);
       },
-      (err) => {
+      err => {
         console.error("ウォッチリストの購読に失敗しました", err);
         setError("ウォッチリストを読み込めませんでした");
         setLoading(false);
@@ -68,9 +68,9 @@ export function useWatchlist() {
   const visibleItems = useMemo(() => {
     const merged = [
       ...pending,
-      ...items.filter((item) => !pending.some((p) => p.code === item.code)),
+      ...items.filter(item => !pending.some(p => p.code === item.code)),
     ];
-    return merged.filter((item) => !removing.includes(item.code));
+    return merged.filter(item => !removing.includes(item.code));
   }, [items, pending, removing]);
 
   const limit = watchlistLimit(isPremium);
@@ -80,7 +80,7 @@ export function useWatchlist() {
     (code: string) => {
       const normalized = normalizeWatchlistCode(code);
       if (!normalized) return false;
-      return visibleItems.some((item) => item.code === normalized);
+      return visibleItems.some(item => item.code === normalized);
     },
     [visibleItems]
   );
@@ -91,7 +91,7 @@ export function useWatchlist() {
       if (!user || !normalized) return;
 
       setError(null);
-      setPending((prev) => [
+      setPending(prev => [
         { code: normalized, name, addedAt: new Date() },
         ...prev,
       ]);
@@ -109,7 +109,7 @@ export function useWatchlist() {
         setError(err instanceof Error ? err.message : "登録に失敗しました");
       } finally {
         // 成功時は onSnapshot が items を更新するので、楽観分は必ず外す
-        setPending((prev) => prev.filter((item) => item.code !== normalized));
+        setPending(prev => prev.filter(item => item.code !== normalized));
       }
     },
     [user]
@@ -121,7 +121,7 @@ export function useWatchlist() {
       if (!user || !normalized) return;
 
       setError(null);
-      setRemoving((prev) => [...prev, normalized]);
+      setRemoving(prev => [...prev, normalized]);
 
       try {
         const response = await CapacitorHttp.request({
@@ -137,7 +137,7 @@ export function useWatchlist() {
       } catch (err) {
         setError(err instanceof Error ? err.message : "削除に失敗しました");
       } finally {
-        setRemoving((prev) => prev.filter((c) => c !== normalized));
+        setRemoving(prev => prev.filter(c => c !== normalized));
       }
     },
     [user]
