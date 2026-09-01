@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Star, Trash2, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ export function WatchlistSection({
   const { items, loading, error, limit, remove, clearError } = watchlist;
   const codes = items.map(item => item.code);
   const { quotes, failed, refresh } = useWatchlistQuotes(codes);
+  const [confirmingCode, setConfirmingCode] = useState<string | null>(null);
 
   if (!user) {
     return (
@@ -119,60 +121,88 @@ export function WatchlistSection({
               const quote = quotes[item.code];
               const isUp = (quote?.changePercent ?? 0) >= 0;
               const displayName = normalizeDisplayText(item.name);
+              const isConfirming = confirmingCode === item.code;
               return (
                 <li
                   key={item.code}
                   className="flex items-center justify-between gap-3 py-2"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onSelectCode(item.code)}
-                    className="flex-1 text-left min-w-0"
-                  >
-                    <span className="block text-sm font-medium truncate">
-                      {displayName}
-                    </span>
-                    <span className="block text-xs text-muted-foreground tabular-nums">
-                      {item.code}
-                    </span>
-                  </button>
-
-                  <div className="text-right shrink-0">
-                    {quote ? (
-                      <>
-                        <span className="block text-sm font-semibold tabular-nums">
-                          {quote.close.toLocaleString()}
-                        </span>
-                        <span
-                          className={`block text-xs tabular-nums ${
-                            isUp
-                              ? "text-green-600 dark:text-green-400"
-                              : "text-red-600 dark:text-red-400"
-                          }`}
-                        >
-                          {isUp ? "+" : ""}
-                          {quote.changePercent.toFixed(2)}%
-                        </span>
-                      </>
-                    ) : (
-                      <span className="block text-sm text-muted-foreground">
-                        —
+                  {isConfirming ? (
+                    <>
+                      <span className="flex-1 text-sm min-w-0 truncate">
+                        {displayName} を削除しますか？
                       </span>
-                    )}
-                  </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            void remove(item.code);
+                            setConfirmingCode(null);
+                          }}
+                          aria-label="削除を確定"
+                        >
+                          削除する
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setConfirmingCode(null)}
+                          aria-label="削除をやめる"
+                        >
+                          やめる
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onSelectCode(item.code)}
+                        className="flex-1 text-left min-w-0"
+                      >
+                        <span className="block text-sm font-medium truncate">
+                          {displayName}
+                        </span>
+                        <span className="block text-xs text-muted-foreground tabular-nums">
+                          {item.code}
+                        </span>
+                      </button>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      if (window.confirm(`${displayName} を削除しますか？`)) {
-                        void remove(item.code);
-                      }
-                    }}
-                    aria-label={`${displayName} を削除`}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                      <div className="text-right shrink-0">
+                        {quote ? (
+                          <>
+                            <span className="block text-sm font-semibold tabular-nums">
+                              {quote.close.toLocaleString()}
+                            </span>
+                            <span
+                              className={`block text-xs tabular-nums ${
+                                isUp
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {isUp ? "+" : ""}
+                              {quote.changePercent.toFixed(2)}%
+                            </span>
+                          </>
+                        ) : (
+                          <span className="block text-sm text-muted-foreground">
+                            —
+                          </span>
+                        )}
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmingCode(item.code)}
+                        aria-label={`${displayName} を削除`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </>
+                  )}
                 </li>
               );
             })}
