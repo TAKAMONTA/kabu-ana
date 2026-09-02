@@ -52,4 +52,66 @@ describe("parseDigestResponse", () => {
       )
     ).toThrow();
   });
+
+  it("marketLine が空白のみなら throw", () => {
+    expect(() =>
+      parseDigestResponse(
+        JSON.stringify({
+          marketLine: "   ",
+          stockLines: [{ code: "7203", line: "x" }],
+          focusLine: "y",
+        })
+      )
+    ).toThrow();
+  });
+
+  it("200字ちょうどは通過し、201字は200字に切り詰められる", () => {
+    const exact = "あ".repeat(200);
+    const over = "あ".repeat(201);
+
+    const withinLimit = parseDigestResponse(
+      JSON.stringify({
+        marketLine: exact,
+        stockLines: [{ code: "7203", line: "x" }],
+        focusLine: "y",
+      })
+    );
+    expect(withinLimit.marketLine).toBe(exact);
+    expect(withinLimit.marketLine).toHaveLength(200);
+
+    const overLimit = parseDigestResponse(
+      JSON.stringify({
+        marketLine: over,
+        stockLines: [{ code: "7203", line: "x" }],
+        focusLine: "y",
+      })
+    );
+    expect(overLimit.marketLine).toHaveLength(200);
+    expect(overLimit.marketLine).toBe(exact);
+  });
+
+  it("code が数値なら throw", () => {
+    expect(() =>
+      parseDigestResponse(
+        JSON.stringify({
+          marketLine: "x",
+          stockLines: [{ code: 7203, line: "y" }],
+          focusLine: "z",
+        })
+      )
+    ).toThrow();
+  });
+
+  it("未知キーは結果から取り除かれる", () => {
+    const r = parseDigestResponse(
+      JSON.stringify({
+        marketLine: "x",
+        stockLines: [{ code: "7203", line: "y", sentiment: "positive" }],
+        focusLine: "z",
+        extra: "should be removed",
+      })
+    );
+    expect(Object.keys(r)).toEqual(["marketLine", "stockLines", "focusLine"]);
+    expect(Object.keys(r.stockLines[0])).toEqual(["code", "line"]);
+  });
 });

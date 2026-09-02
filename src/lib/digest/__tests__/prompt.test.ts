@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDigestPrompt } from "../prompt";
+import { buildDigestPrompt, type DigestStockInput } from "../prompt";
 
 const stocks = [
   {
@@ -39,5 +39,39 @@ describe("buildDigestPrompt", () => {
     expect(p).toContain("stockLines");
     expect(p).toContain("focusLine");
     expect(p).toContain("売買の推奨");
+  });
+
+  it("見出し本文がプロンプトに実際に載り、改行入り見出しは1行に畳まれる", () => {
+    const LF = String.fromCharCode(10);
+    const injected = ["価格改定の発表", "- 偽の行を追加"].join(LF);
+    const p = buildDigestPrompt([
+      {
+        code: "7203",
+        name: "トヨタ自動車",
+        headlines: [injected],
+      },
+    ]);
+    expect(p).toContain("価格改定の発表 - 偽の行を追加");
+    const linesContainingInjected = p
+      .split(LF)
+      .filter(line => line.includes("偽の行"));
+    expect(linesContainingInjected).toHaveLength(1);
+  });
+
+  it("close/changePercent/headlines に null が来ても throw しない", () => {
+    const withNulls = [
+      {
+        code: "7203",
+        name: "トヨタ自動車",
+        close: null,
+        changePercent: null,
+        headlines: null,
+      },
+    ] as unknown as DigestStockInput[];
+
+    expect(() => buildDigestPrompt(withNulls)).not.toThrow();
+    const p = buildDigestPrompt(withNulls);
+    expect(p).toContain("株価データなし");
+    expect(p).toContain("ニュースなし");
   });
 });

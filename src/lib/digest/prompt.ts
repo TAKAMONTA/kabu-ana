@@ -9,22 +9,58 @@ export interface DigestStockInput {
   headlines: string[];
 }
 
+/** name（ユーザー入力）の切り詰め上限 */
+const MAX_NAME_LEN = 100;
+/** headline（外部ニュース見出し）の切り詰め上限 */
+const MAX_HEADLINE_LEN = 120;
+
+/**
+ * 制御文字（改行・タブ・NUL〜0x1F・DEL）を空白に置換するための正規表現。
+ * ソース上に生の制御バイトを埋め込まないよう charCode から組み立てる。
+ */
+const CONTROL_CHARS_RE = new RegExp(
+  "[" +
+    Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)).join("") +
+    String.fromCharCode(127) +
+    "]",
+  "g"
+);
+
+/**
+ * 改行・制御文字を空白に置換し、連続空白を1つに畳んでから上限で切り詰める。
+ * name はユーザー入力、headlines は外部ニュースの見出しでどちらも改行が
+ * 素通りし得るため、改行によるプロンプト注入（偽の銘柄行・偽の制約行の
+ * 挿入）を防ぐための無害化。
+ */
+function sanitizeInlineText(value: string, maxLen: number): string {
+  const collapsed = value
+    .replace(CONTROL_CHARS_RE, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return collapsed.length > maxLen ? collapsed.slice(0, maxLen) : collapsed;
+}
+
 /**
  * 朝ダイジェスト用のユーザープロンプトを組み立てる。
  * 出力形式（JSON）と禁止事項（売買推奨）はここで明示する。
  */
 export function buildDigestPrompt(stocks: DigestStockInput[]): string {
   const lines = stocks.map(s => {
-    const price =
-      s.close !== undefined && s.changePercent !== undefined
-        ? `終値${s.close}円 前日比${s.changePercent.toFixed(2)}%` +
-          (s.asOf ? `（${s.asOf}時点）` : "")
-        : "株価データなし";
+    const name = sanitizeInlineText(s.name, MAX_NAME_LEN);
+    const hasPrice =
+      Number.isFinite(s.close) && Number.isFinite(s.changePercent);
+    const price = hasPrice
+      ? `終値${s.close}円 前日比${(s.changePercent as number).toFixed(2)}%` +
+        (s.asOf ? `（${s.asOf}時点）` : "")
+      : "株価データなし";
+    const headlines = Array.isArray(s.headlines) ? s.headlines : [];
     const news =
-      s.headlines.length > 0
-        ? s.headlines.map(h => `「${h}」`).join(" / ")
+      headlines.length > 0
+        ? headlines
+            .map(h => `「${sanitizeInlineText(h, MAX_HEADLINE_LEN)}」`)
+            .join(" / ")
         : "ニュースなし";
-    return `- ${s.code} ${s.name}: ${price} / ニュース: ${news}`;
+    return `- ${s.code} ${name}: ${price} / ニュース: ${news}`;
   });
 
   return [
