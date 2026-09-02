@@ -22,6 +22,7 @@ import {
   StockPriceHeaderCard,
   StockSidePanel,
 } from "@/components/StockSidePanel";
+import { DigestSection } from "@/components/DigestSection";
 import { WatchlistSection } from "@/components/WatchlistSection";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
@@ -423,6 +424,8 @@ export default function HomePage() {
     />
   );
 
+  const digestSection = <DigestSection items={watchlist.items} />;
+
   const sampleStockSlot = !isLoading ? (
     <Card className="border-dashed">
       <CardContent className="py-4">
@@ -547,6 +550,7 @@ export default function HomePage() {
         {!searchResult ? (
           <MarketFrontPage
             searchSlot={searchSection}
+            digestSlot={digestSection}
             watchlistSlot={watchlistSection}
             pulseSlot={<LivePulseStrip />}
             stockIdeasSlot={stockIdeasSection}
