@@ -14,12 +14,7 @@ export interface DigestPayload {
 }
 
 type DigestStatus =
-  | "idle"
-  | "loading"
-  | "generating"
-  | "ready"
-  | "error"
-  | "empty";
+  "idle" | "loading" | "generating" | "ready" | "error" | "empty";
 
 /** generating 中の自動再取得: 3秒間隔・最大5回（設計書どおり） */
 const POLL_INTERVAL_MS = 3000;
