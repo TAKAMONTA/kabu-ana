@@ -73,6 +73,28 @@ export async function POST(request: NextRequest) {
       // データがない場合もあるので、ここでは続行
     }
 
+    // 3. Firestoreから朝ダイジェストを削除（uid フィールドで横断検索）。
+    //    前段と同じく独立の try にし、失敗しても他の削除と Auth 削除は続行する
+    try {
+      const digests = await db
+        .collection("user_digests")
+        .where("uid", "==", userId)
+        .get();
+      if (!digests.empty) {
+        const batch = db.batch();
+        digests.docs.forEach(docSnapshot => batch.delete(docSnapshot.ref));
+        await batch.commit();
+      }
+      console.info(
+        `Digest data deleted for user: ${maskId(userId)} (${digests.size} docs)`
+      );
+    } catch (error) {
+      console.error(
+        `ダイジェスト削除エラー: ${sanitizeError(error, [userId])}`
+      );
+      // 続行
+    }
+
     // 2. Firebase Authからユーザーを削除
     try {
       await auth.deleteUser(userId);
