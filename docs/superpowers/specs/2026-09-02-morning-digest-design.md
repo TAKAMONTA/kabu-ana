@@ -40,7 +40,7 @@ GET /api/digest
   → 生成:
       1. users/{uid}/watchlist を addedAt 降順で読む（一覧の表示順と同じ）。0件なら { status: "empty" }
       2. 先頭10銘柄を要約対象にする（超過分は対象外。カードに「10銘柄まで」注記）
-      3. users/{uid}/digests/{dateId} へ status=generating で create()（既存なら create 失敗＝他リクエストが生成中 → generating 応答）
+      3. **生成権の取得は単一トランザクション**: doc を読み、ready/generating(2分以内)/error(retryなし) なら対応する応答を返す。生成に進む場合は attempts を+1して status=generating を書く（同時リクエストはトランザクション競合で1本に絞られる）。**attempts が1日3回を超えたら error 応答**（AI課金の上限）
       4. 各銘柄の株価（marketDataClient + optionalWithTimeout 8秒）とニュース見出し上位2件（FreeNews + optionalWithTimeout）を並列取得。部分失敗は許容（その銘柄は「データなし」でAIに渡す）
       5. OpenRouter に1回だけ要約を依頼（JSON応答を指定）
       6. パース成功 → status=ready で保存して返す / 失敗 → status=error で保存し「作成できませんでした」を返す
@@ -59,6 +59,7 @@ GET /api/digest
 | `focusLine` | 今日の注目点（1行） |
 | `codes` | 要約対象にした銘柄コード配列 |
 | `asOf` | 株価の基準日（quotes と同じ意味） |
+| `attempts` | その日の生成試行回数（上限3。課金の歯止め） |
 | `createdAt` | serverTimestamp |
 
 - **Firestore ルール変更は不要**。`users/{uid}/digests` に一致するルールは無くデフォルト拒否のままにし、読み書きはすべて Admin SDK（このAPI）経由
@@ -74,7 +75,10 @@ GET /api/digest
 - claude-brief と同じ: OpenRouter / `anthropic/claude-sonnet-4-5` / axios / 日本語システムプロンプトはルート内リテラル
 - 入力: 銘柄ごとの { コード、名前、前日終値、前日比%、ニュース見出し（最大2件、無い銘柄は「ニュースなし」） }
 - 出力は **JSON を指定**（`{"marketLine": "...", "stockLines": [{"code": "...", "line": "..."}], "focusLine": "..."}`）。パース失敗時は再試行せず error 扱い（コスト暴走防止）
-- 再生成は **status=error の doc がある場合のみ**許可（再試行ボタン → 既存 doc を上書きして生成し直す）。ready の再生成手段は作らない
+- 再生成は **status=error の doc がある場合のみ**許可（再試行ボタン → トランザクション経由で生成し直す）。ready の再生成手段は作らない。**1日の生成試行は attempts で最大3回**（超過は error 応答・AI呼び出しなし）
+- `/api/digest` にも `withRateLimit` を適用（OpenRouter を叩く既存ルートすべてと同じ方針）
+- `asOf` が1件も取れない場合はフィールド自体を保存しない（Firestore は undefined を拒否するため）
+- AI が返した銘柄コードはウォッチリストと突き合わせ、捏造行は捨て、欠落銘柄は「要約を生成できませんでした」の行で補う
 - 投資助言にならない文体（事実の整理と注目点の提示。断定的な売買推奨はプロンプトで禁止）
 
 ### UI: `DigestSection`（新規コンポーネント）
@@ -119,6 +123,6 @@ GET /api/digest
 - 認証: `verifyAuth` + `isAuthError`（`src/lib/auth/verifyAuth.ts`）
 - 株価: `src/app/api/watchlist/quotes/route.ts`（marketDataClient + optionalWithTimeout の使い方）
 - ニュース: `FreeNewsClient`（`src/lib/api/freeNews.ts`）。日本語銘柄名クエリは400になる既知事実あり → 既存の呼び出し方を踏襲すること
-- 退会削除: `src/app/api/user/delete/route.ts`（第1弾で recursiveDelete を追加済み。その直後に user_digests のバッチ削除を足す）
+- 退会削除: `src/app/api/user/delete/route.ts` の recursiveDelete がサブコレクションごと自動削除（専用コード不要）
 - ログ: `sanitizeError`（`src/lib/utils/logSanitizer.ts`）
 - UI慣例: `src/components/WatchlistSection.tsx`（Card・tabular-nums・インライン通知・normalizeDisplayText）
