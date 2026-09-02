@@ -31,7 +31,7 @@
 ```
 GET /api/digest
   → verifyAuth（設定エラー503 / トークン不正401。PR #30 の分岐）
-  → Firestore user_digests/{uid}_{JST日付} を読む
+  → Firestore users/{uid}/digests/{JST日付} を読む
       あり(status=ready)   → そのまま返す（2回目以降はここで終わり）
       あり(status=generating かつ 2分以内) → { status: "generating" } を返す（クライアントは数秒後に再取得）
       あり(status=generating かつ 2分超) → 生成が途中で死んだとみなし、上書きで生成し直す
@@ -40,17 +40,18 @@ GET /api/digest
   → 生成:
       1. users/{uid}/watchlist を addedAt 降順で読む（一覧の表示順と同じ）。0件なら { status: "empty" }
       2. 先頭10銘柄を要約対象にする（超過分は対象外。カードに「10銘柄まで」注記）
-      3. user_digests へ status=generating で create()（既存なら create 失敗＝他リクエストが生成中 → generating 応答）
+      3. users/{uid}/digests/{dateId} へ status=generating で create()（既存なら create 失敗＝他リクエストが生成中 → generating 応答）
       4. 各銘柄の株価（marketDataClient + optionalWithTimeout 8秒）とニュース見出し上位2件（FreeNews + optionalWithTimeout）を並列取得。部分失敗は許容（その銘柄は「データなし」でAIに渡す）
       5. OpenRouter に1回だけ要約を依頼（JSON応答を指定）
       6. パース成功 → status=ready で保存して返す / 失敗 → status=error で保存し「作成できませんでした」を返す
 ```
 
-### 保存: Firestore `user_digests/{uid}_{YYYY-MM-DD}`
+### 保存: Firestore `users/{uid}/digests/{YYYY-MM-DD}`（レビューで変更）
+
+> 当初は平坦コレクション `user_digests/{uid}_{date}` だったが、レビュー指摘により **users/{uid} のサブコレクション**へ変更。退会時の `recursiveDelete(users/{uid})` が自動で拾うため、専用の削除経路・uid フィールド・バッチ500件上限の問題が構造的に消える。
 
 | フィールド | 内容 |
 |---|---|
-| `uid` | 所有者（**退会時削除のクエリに必須**） |
 | `dateId` | JST の日付文字列（YYYY-MM-DD） |
 | `status` | `generating` / `ready` / `error` |
 | `marketLine` | 市場全体のひとこと（1行） |
@@ -60,13 +61,13 @@ GET /api/digest
 | `asOf` | 株価の基準日（quotes と同じ意味） |
 | `createdAt` | serverTimestamp |
 
-- **Firestore ルール変更は不要**。`user_digests` はデフォルト拒否のままにし、読み書きはすべて Admin SDK（このAPI）経由
+- **Firestore ルール変更は不要**。`users/{uid}/digests` に一致するルールは無くデフォルト拒否のままにし、読み書きはすべて Admin SDK（このAPI）経由
 - **1日の境界は JST の日付**。「朝」と名乗るが、その日いつ開いても同じ内容（J-Quants の値が1営業日1回しか変わらないため、日中に作り直す意味がない）
 - 古いダイジェストは削除しない（1ユーザー1日1件・数百バイトで、当面の量は無視できる。掃除は将来の課題として明記）
 
 ### 退会時の削除（第1弾の教訓）
 
-`/api/user/delete` に `user_digests` の削除を追加する: `where("uid", "==", userId)` で取得してバッチ削除。第1弾で「退会後にデータが残る」穴を塞いだばかりなので、**新しい個人データを作る本機能は最初から削除経路を含める**。
+サブコレクション化により、**既存の `recursiveDelete(users/{uid})` が退会時にダイジェストも自動削除する**。専用の削除コードは不要（当初計画の Task 3 はレビュー後に取り消し済み）。
 
 ### AI 呼び出し
 
