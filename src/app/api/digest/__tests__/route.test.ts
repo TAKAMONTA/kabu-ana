@@ -38,16 +38,62 @@ vi.mock("@/lib/api/openrouter", () => ({
 /** 擬似 Firestore の状態 */
 const state = {
   digestDoc: undefined as Record<string, unknown> | undefined,
-  createThrows: false,
+  /** トランザクション内の読み取りを失敗させる（取得前の障害の再現） */
+  txGetThrows: false,
   watchlistDocs: [] as Array<{ code: string; name: string }>,
 };
 const setMock = vi.fn();
-const createMock = vi.fn();
+const txSetMock = vi.fn();
 const deleteMock = vi.fn();
 const docPathMock = vi.fn();
 
+/**
+ * 実 Firestore SDK は undefined 値の書き込みを拒否して throw する。
+ * その挙動をモックでも再現し、undefined の混入を回帰として検出する。
+ */
+function assertNoUndefined(data: unknown, path = ""): void {
+  if (data === undefined) {
+    throw new Error(
+      `Cannot use "undefined" as a Firestore value (field: ${path || "root"})`
+    );
+  }
+  if (Array.isArray(data)) {
+    data.forEach((v, i) => assertNoUndefined(v, `${path}[${i}]`));
+    return;
+  }
+  if (data !== null && typeof data === "object") {
+    // Timestamp 等のクラスインスタンスは走査しない（プレーンな値のみ）
+    if (Object.getPrototypeOf(data) !== Object.prototype) return;
+    for (const [key, value] of Object.entries(data)) {
+      assertNoUndefined(value, path ? `${path}.${key}` : key);
+    }
+  }
+}
+
+/**
+ * 実 Firestore は同一ドキュメントに競合したトランザクションを直列化し、
+ * 負けた側を再実行する。モックでは実行を直列化することでそれを再現する。
+ */
+let txChain: Promise<unknown> = Promise.resolve();
+
 vi.mock("firebase-admin/firestore", () => ({
   getFirestore: () => ({
+    runTransaction: async <T>(fn: (tx: unknown) => Promise<T>): Promise<T> => {
+      const tx = {
+        get: async (_ref: unknown) => {
+          if (state.txGetThrows) throw new Error("transaction get failed");
+          return { data: () => state.digestDoc };
+        },
+        set: (ref: { __id?: string } | undefined, data: unknown) => {
+          assertNoUndefined(data);
+          state.digestDoc = data as Record<string, unknown>;
+          txSetMock(ref?.__id, data);
+        },
+      };
+      const run = txChain.then(() => fn(tx));
+      txChain = run.catch(() => undefined);
+      return run;
+    },
     doc: (path: string) => {
       docPathMock(path);
       return {
@@ -72,12 +118,15 @@ vi.mock("firebase-admin/firestore", () => ({
               doc: (id: string) => ({
                 __id: id,
                 get: async () => ({ data: () => state.digestDoc }),
-                set: async (data: unknown) => setMock(id, data),
-                create: async (data: unknown) => {
-                  if (state.createThrows) throw new Error("already exists");
-                  createMock(id, data);
+                set: async (data: unknown) => {
+                  assertNoUndefined(data);
+                  state.digestDoc = data as Record<string, unknown>;
+                  setMock(id, data);
                 },
-                delete: async () => deleteMock(id),
+                delete: async () => {
+                  state.digestDoc = undefined;
+                  deleteMock(id);
+                },
               }),
             };
           }
@@ -86,7 +135,8 @@ vi.mock("firebase-admin/firestore", () => ({
       };
     },
   }),
-  FieldValue: { serverTimestamp: () => "SERVER_TIMESTAMP" },
+  // 書き込み時のセンチネルと読み戻し時の Timestamp を1つのモックで兼ねる
+  FieldValue: { serverTimestamp: () => ({ toMillis: () => Date.now() }) },
 }));
 
 import { GET } from "../route";
@@ -118,11 +168,12 @@ beforeEach(() => {
   getCompanyNewsMock.mockReset();
   axiosPostMock.mockReset();
   setMock.mockReset();
-  createMock.mockReset();
+  txSetMock.mockReset();
   deleteMock.mockReset();
   docPathMock.mockReset();
+  txChain = Promise.resolve();
   state.digestDoc = undefined;
-  state.createThrows = false;
+  state.txGetThrows = false;
   state.watchlistDocs = [{ code: "7203", name: "トヨタ自動車" }];
   verifyAuthMock.mockResolvedValue({ uid: "user-1" });
   getAdminAppMock.mockReturnValue({});
@@ -190,11 +241,14 @@ describe("GET /api/digest", () => {
     expect(axiosPostMock).toHaveBeenCalledTimes(1);
   });
 
-  it("create の衝突（同時オープン）は generating を返す", async () => {
-    state.createThrows = true;
-    const body = await (await getDigest()).json();
-    expect(body.status).toBe("generating");
-    expect(axiosPostMock).not.toHaveBeenCalled();
+  it("同時オープンでもAIは1回だけ。負けた側は generating を返す", async () => {
+    const [resA, resB] = await Promise.all([getDigest(), getDigest()]);
+    const statuses = [
+      (await resA.json()).status,
+      (await resB.json()).status,
+    ].sort();
+    expect(statuses).toEqual(["generating", "ready"]);
+    expect(axiosPostMock).toHaveBeenCalledTimes(1);
   });
 
   it("ウォッチリスト0件は empty を返し、作りかけの doc を消す", async () => {
@@ -266,5 +320,100 @@ describe("GET /api/digest", () => {
     const body = await (await getDigest(true)).json();
     expect(body.status).toBe("ready");
     expect(axiosPostMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("株価が全滅でもニュースがあれば ready。保存に asOf を含めない", async () => {
+    getStockDataMock.mockResolvedValue(null);
+    getCompanyNewsMock.mockResolvedValue([{ title: "新工場の稼働を発表" }]);
+    const body = await (await getDigest()).json();
+    expect(body.status).toBe("ready");
+    expect(body).not.toHaveProperty("asOf");
+    expect(setMock).toHaveBeenCalledTimes(1);
+    const saved = setMock.mock.calls[0][1] as Record<string, unknown>;
+    expect(Object.keys(saved)).not.toContain("asOf");
+    expect(saved.status).toBe("ready");
+  });
+
+  it("株価もニュースも全滅ならAIを呼ばず error", async () => {
+    getStockDataMock.mockResolvedValue(null);
+    getCompanyNewsMock.mockResolvedValue([]);
+    const body = await (await getDigest()).json();
+    expect(body.status).toBe("error");
+    expect(axiosPostMock).not.toHaveBeenCalled();
+    expect(setMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: "error", attempts: 1 })
+    );
+  });
+
+  it("試行が上限(3)に達していれば retry=1 でもAIを呼ばず error", async () => {
+    state.digestDoc = { status: "error", attempts: 3 };
+    const body = await (await getDigest(true)).json();
+    expect(body.status).toBe("error");
+    expect(axiosPostMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
+  it("取得前の読み取り失敗では既存の ready を error で上書きしない", async () => {
+    const readyDoc = {
+      status: "ready",
+      dateId: "2026-09-02",
+      marketLine: "保存済み。",
+      stockLines: [{ code: "7203", name: "トヨタ自動車", line: "x" }],
+      focusLine: "y",
+      codes: ["7203"],
+    };
+    state.digestDoc = { ...readyDoc };
+    state.txGetThrows = true;
+    const body = await (await getDigest()).json();
+    expect(body.status).toBe("error");
+    expect(setMock).not.toHaveBeenCalled();
+    expect(txSetMock).not.toHaveBeenCalled();
+    expect(state.digestDoc).toEqual(readyDoc);
+    expect(axiosPostMock).not.toHaveBeenCalled();
+  });
+
+  it("AIが返した未知のコードは捨て、欠けた銘柄は代替文で補う", async () => {
+    state.watchlistDocs = [
+      { code: "7203", name: "トヨタ自動車" },
+      { code: "9984", name: "ソフトバンクグループ" },
+    ];
+    axiosPostMock.mockResolvedValue(
+      okAi({
+        marketLine: "全体は小幅高。",
+        stockLines: [
+          { code: "0000", line: "存在しない銘柄の行。" },
+          { code: "7203", line: "前日比+1.3%。" },
+        ],
+        focusLine: "決算週。",
+      })
+    );
+    const body = await (await getDigest()).json();
+    expect(body.status).toBe("ready");
+    expect(body.stockLines).toEqual([
+      { code: "7203", name: "トヨタ自動車", line: "前日比+1.3%。" },
+      {
+        code: "9984",
+        name: "ソフトバンクグループ",
+        line: "この銘柄の要約を生成できませんでした",
+      },
+    ]);
+  });
+
+  it("AIの行が1件も対象銘柄に一致しなければ error", async () => {
+    axiosPostMock.mockResolvedValue(
+      okAi({
+        marketLine: "全体は小幅高。",
+        stockLines: [{ code: "0000", line: "存在しない銘柄の行。" }],
+        focusLine: "決算週。",
+      })
+    );
+    const body = await (await getDigest()).json();
+    expect(body.status).toBe("error");
+    expect(setMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ status: "error" })
+    );
   });
 });
