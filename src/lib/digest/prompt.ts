@@ -14,27 +14,46 @@ const MAX_NAME_LEN = 100;
 /** headline（外部ニュース見出し）の切り詰め上限 */
 const MAX_HEADLINE_LEN = 120;
 
+/** from〜to（両端含む）の文字を連結した文字列を作る */
+const charRange = (from: number, to: number): string =>
+  Array.from({ length: to - from + 1 }, (_, i) =>
+    String.fromCharCode(from + i)
+  ).join("");
+
 /**
- * 制御文字（改行・タブ・NUL〜0x1F・DEL）を空白に置換するための正規表現。
+ * 空白へ置換する制御文字・不可視文字の正規表現。
+ * - U+0000〜U+001F（改行・タブを含む C0 制御）/ U+007F（DEL）
+ * - U+0080〜U+009F（C1 制御）
+ * - U+200B〜U+200F（ゼロ幅スペース・方向マーク）
+ * - U+202A〜U+202E（双方向制御。表示上の文字順を偽装できる）
+ * - U+2060（word joiner）/ U+FEFF（BOM・ゼロ幅ノーブレークスペース）
  * ソース上に生の制御バイトを埋め込まないよう charCode から組み立てる。
  */
-const CONTROL_CHARS_RE = new RegExp(
+const UNSAFE_INLINE_CHARS_RE = new RegExp(
   "[" +
-    Array.from({ length: 32 }, (_, i) => String.fromCharCode(i)).join("") +
+    charRange(0, 31) +
     String.fromCharCode(127) +
+    charRange(0x80, 0x9f) +
+    charRange(0x200b, 0x200f) +
+    charRange(0x202a, 0x202e) +
+    String.fromCharCode(0x2060) +
+    String.fromCharCode(0xfeff) +
     "]",
   "g"
 );
 
 /**
- * 改行・制御文字を空白に置換し、連続空白を1つに畳んでから上限で切り詰める。
- * name はユーザー入力、headlines は外部ニュースの見出しでどちらも改行が
- * 素通りし得るため、改行によるプロンプト注入（偽の銘柄行・偽の制約行の
- * 挿入）を防ぐための無害化。
+ * 制御文字・不可視文字を空白に置換し、連続空白を1つに畳んでから上限で
+ * 切り詰める。name はユーザー入力、headlines は外部ニュースの見出しで、
+ * どちらも改行やゼロ幅文字が素通りし得るため、行構造の破壊（偽の銘柄行・
+ * 偽の制約行の挿入）と不可視文字の混入を防ぐための無害化。
+ * 改行を使わないインライン注入（鉤括弧の閉じ開きで指示文を混ぜる等）は
+ * ここでは防げない＝完全な注入対策ではない。出力側の zod 検証・表示時の
+ * エスケープ・システムプロンプトの禁止事項と合わせて守る。
  */
 function sanitizeInlineText(value: string, maxLen: number): string {
   const collapsed = value
-    .replace(CONTROL_CHARS_RE, " ")
+    .replace(UNSAFE_INLINE_CHARS_RE, " ")
     .replace(/\s+/g, " ")
     .trim();
   return collapsed.length > maxLen ? collapsed.slice(0, maxLen) : collapsed;

@@ -58,6 +58,21 @@ describe("buildDigestPrompt", () => {
     expect(linesContainingInjected).toHaveLength(1);
   });
 
+  it("双方向制御文字（U+202E）入りの見出しは除去される", () => {
+    const RLO = String.fromCharCode(0x202e);
+    const ZWSP = String.fromCharCode(0x200b);
+    const p = buildDigestPrompt([
+      {
+        code: "7203",
+        name: "トヨタ自動車",
+        headlines: [`価格${RLO}改定${ZWSP}の発表`],
+      },
+    ]);
+    expect(p).not.toContain(RLO);
+    expect(p).not.toContain(ZWSP);
+    expect(p).toContain("価格 改定 の発表");
+  });
+
   it("close/changePercent/headlines に null が来ても throw しない", () => {
     const withNulls = [
       {
