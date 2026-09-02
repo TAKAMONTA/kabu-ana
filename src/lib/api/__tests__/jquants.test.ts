@@ -167,6 +167,30 @@ describe("JQuantsClient", () => {
     });
   });
 
+  it("getStockData が最終行の日付を asOf として返す", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        { Date: "2026-08-25", C: 2700, Vo: 100 },
+        { Date: "2026-08-26", C: 2768, Vo: 200 },
+      ])
+    );
+    const c = new JQuantsClient("k");
+    const s = await c.getStockData("7203");
+    expect(s?.asOf).toBe("2026-08-26");
+  });
+
+  it("Date が無い場合 asOf は undefined になる", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        { C: 2700, Vo: 100 },
+        { C: 2768, Vo: 200 },
+      ])
+    );
+    const c = new JQuantsClient("k");
+    const s = await c.getStockData("7203");
+    expect(s?.asOf).toBeUndefined();
+  });
+
   it("getFinancialData maps /fins/summary", async () => {
     fetchMock.mockResolvedValueOnce(
       okJson([

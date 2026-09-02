@@ -22,6 +22,8 @@ import {
   StockPriceHeaderCard,
   StockSidePanel,
 } from "@/components/StockSidePanel";
+import { WatchlistSection } from "@/components/WatchlistSection";
+import { useWatchlist } from "@/hooks/useWatchlist";
 import { useNewsAnalysis } from "@/hooks/useNewsAnalysis";
 import { useSearchSuggestions } from "@/hooks/useSearchSuggestions";
 import { useTopTradingValue } from "@/hooks/useTopTradingValue";
@@ -91,6 +93,7 @@ export default function HomePage() {
     retry: retryAnalysis,
   } = useAIAnalysis();
   const { user, logout } = useAuth();
+  const watchlist = useWatchlist();
   const {
     isLoading: isNewsAnalyzing,
     error: newsError,
@@ -410,6 +413,16 @@ export default function HomePage() {
     />
   );
 
+  const watchlistSection = (
+    <WatchlistSection
+      watchlist={watchlist}
+      onSelectCode={code => {
+        void handlePickSelect(code);
+      }}
+      onRequestLogin={() => setShowAuthModal(true)}
+    />
+  );
+
   const sampleStockSlot = !isLoading ? (
     <Card className="border-dashed">
       <CardContent className="py-4">
@@ -534,6 +547,7 @@ export default function HomePage() {
         {!searchResult ? (
           <MarketFrontPage
             searchSlot={searchSection}
+            watchlistSlot={watchlistSection}
             pulseSlot={<LivePulseStrip />}
             stockIdeasSlot={stockIdeasSection}
             sampleSlot={sampleStockSlot}
@@ -553,6 +567,16 @@ export default function HomePage() {
                 companyInfo={searchResult.companyInfo}
                 stockData={searchResult.stockData}
                 currency={getCurrencySymbol}
+                isWatched={watchlist.has(searchResult.companyInfo.symbol)}
+                onToggleWatch={() => {
+                  const { symbol, name } = searchResult.companyInfo;
+                  if (watchlist.isBusy(symbol)) return;
+                  if (watchlist.has(symbol)) {
+                    void watchlist.remove(symbol);
+                  } else {
+                    void watchlist.add(symbol, name);
+                  }
+                }}
               />
             </div>
 
@@ -578,6 +602,7 @@ export default function HomePage() {
             </div>
             <LivePulseStrip />
             {searchSection}
+            {watchlistSection}
           </>
         )}
 

@@ -48,12 +48,27 @@ export async function POST(request: NextRequest) {
     const userId = decodedToken.uid;
 
     // 1. Firestoreからサブスクリプションデータを削除
+    // ウォッチリスト（users/{uid} とその配下）の削除とは独立させる。
+    // 直列で片方の try にまとめると、前段が失敗した場合に後段が
+    // 実行されず、Auth削除後は本人が再試行できないままデータが残る。
     try {
       await db.collection("subscriptions").doc(userId).delete();
-      console.info(`Firestore data deleted for user: ${maskId(userId)}`);
+      console.info(`Subscription data deleted for user: ${maskId(userId)}`);
     } catch (error) {
       console.error(
-        `Firestoreデータ削除エラー: ${sanitizeError(error, [userId])}`
+        `サブスクリプションデータ削除エラー: ${sanitizeError(error, [userId])}`
+      );
+      // データがない場合もあるので、ここでは続行
+    }
+
+    // 2. Firestoreからウォッチリストデータを削除
+    try {
+      // recursiveDelete はサブコレクションまで辿って削除する
+      await db.recursiveDelete(db.doc(`users/${userId}`));
+      console.info(`Watchlist data deleted for user: ${maskId(userId)}`);
+    } catch (error) {
+      console.error(
+        `ウォッチリストデータ削除エラー: ${sanitizeError(error, [userId])}`
       );
       // データがない場合もあるので、ここでは続行
     }

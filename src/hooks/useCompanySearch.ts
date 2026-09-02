@@ -56,6 +56,9 @@ export function useCompanySearch() {
   const mountedRef = useRef(true);
 
   useEffect(() => {
+    // StrictMode の二重マウントや Fast Refresh の再マウント後に
+    // フラグが false のまま残ると、以後の検索結果が永久に捨てられる
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
     };

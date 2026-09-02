@@ -133,6 +133,7 @@ export class JQuantsClient implements MarketDataClient {
       dividend: 0,
       high52: closes.length ? Math.max(...closes) : 0,
       low52: closes.length ? Math.min(...closes) : 0,
+      asOf: typeof last.Date === "string" ? last.Date : undefined,
     };
   }
 

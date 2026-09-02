@@ -26,6 +26,8 @@ export interface StockData {
   dividend: number;
   high52: number;
   low52: number;
+  /** 値の基準日（YYYY-MM-DD）。取得できない場合は undefined */
+  asOf?: string;
 }
 
 export interface ChartDataPoint {

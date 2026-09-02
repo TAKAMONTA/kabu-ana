@@ -14,6 +14,8 @@ const quote = {
   change: "6.05",
   percent_change: "2.19",
   volume: "261244321",
+  // 実 API 検証済み(2026-08-28): /quote は datetime を YYYY-MM-DD で返す
+  datetime: "2026-08-27",
   fifty_two_week: { low: "199.25", high: "317.39" },
 };
 
@@ -31,6 +33,7 @@ describe("TwelveDataClient", () => {
       volume: 261244321,
       high52: 317.39,
       low52: 199.25,
+      asOf: "2026-08-27",
     });
   });
 
