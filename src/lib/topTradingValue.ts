@@ -101,20 +101,163 @@ function sourceLabel(item: MarketNewsItem): string {
   return item.title || source || "ニュース";
 }
 
-function normalizeNewsTitleForIdentity(title: string): string {
-  const withoutSourceSuffix = title
-    .normalize("NFKC")
-    .replace(/\s+[-–—|｜]\s+[^-–—|｜]+$/u, "")
-    .replace(
-      /（[^）]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^）]*）/gu,
-      ""
-    )
-    .replace(
-      /\([^)]*(ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ)[^)]*\)/giu,
-      ""
-    );
+/**
+ * Google News RSS などの見出し末尾に付く配信元表記の語彙。
+ * ここに載っている語だけを根拠に括弧を除去する（無条件除去はしない）。
+ * 「Yahoo」は「Yahoo!ファイナンス」等の部分文字列としてまとめて拾えるため、
+ * それらを個別には列挙していない（MINKABU PRESSも同様に「minkabu」で拾える）。
+ * 「ニュース」「オンライン」は単独の媒体名ではなく、他の媒体名トークンに続く
+ * 汎用サフィックス語として PUBLISHER_SUFFIX_WORDS 側で扱う。
+ */
+const PUBLISHER_NAME_TOKENS = [
+  "フィスコ",
+  "株探",
+  "kabutan",
+  "みんかぶ",
+  "minkabu",
+  "モーニングスター",
+  "ロイター",
+  "ブルームバーグ",
+  "日経",
+  "Yahoo",
+  "note",
+  "QUICK",
+  "ダイヤモンド",
+  "ザイ",
+];
 
-  return withoutSourceSuffix
+// 媒体名トークンの後ろに続きうる汎用語。単独ではこれだけで媒体名とは判定しない。
+const PUBLISHER_SUFFIX_WORDS = [
+  "ニュース",
+  "ファイナンス",
+  "オンライン",
+  "新聞",
+  "PRESS",
+  "プレス",
+  "速報",
+  "NEWS",
+];
+
+function escapeForPublisherRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const PUBLISHER_NAME_ALTERNATION = PUBLISHER_NAME_TOKENS.map(
+  escapeForPublisherRegExp
+).join("|");
+
+const PUBLISHER_SUFFIX_WORD_ALTERNATION = PUBLISHER_SUFFIX_WORDS.map(
+  escapeForPublisherRegExp
+).join("|");
+
+// 括弧の中身「全体」が「媒体名トークンで始まり、その後ろは媒体系の汎用語だけ」
+// である場合に限って除去対象にする（部分一致だと「(日経平均採用銘柄)」のような
+// 正当な括弧まで消えるため）。「(フィスコ)」「(株探ニュース)」「(Yahoo!ファイナンス)」
+// 「(ダイヤモンド・オンライン)」「(日経新聞)」「(MINKABU PRESS)」は除去対象、
+// 「(日経平均採用銘柄)」「(7203)」のような銘柄コード・社名括弧は対象外。
+const PUBLISHER_PAREN_CONTENT_PATTERN = new RegExp(
+  `^(?:${PUBLISHER_NAME_ALTERNATION})(?:[!！・\\s\\-]*(?:${PUBLISHER_SUFFIX_WORD_ALTERNATION}))*$`,
+  "i"
+);
+
+// 末尾に連続する括弧ブロック列（例:「(フィスコ)(3月14日)」）をまとめて捉える。
+// 個々の括弧は PAREN_BLOCK_PATTERN で取り出し、媒体名文法に一致するものだけを
+// 間引く。手前に非媒体名の括弧があっても、その奥の媒体名括弧まで正しく除去できる
+// ようにするための対応（例:「X(フィスコ)(3月14日)」→「X(3月14日)」）。
+// stripPublisherSuffix 内で先に NFKC 正規化しているため、比較時点では全角括弧
+// 「（）」は既に半角 "(" ")" に正規化済み（全角側の分岐は到達不能なので持たない）。
+const TRAILING_PAREN_RUN_PATTERN = /(?:\s*\([^()]*\))+\s*$/u;
+const PAREN_BLOCK_PATTERN = /\s*\(([^()]*)\)/gu;
+
+// Google News RSS の定型「タイトル - 配信元」を落とす。最後の " - " を境目に
+// 区切るため貪欲マッチを使う（例:「トヨタ - ホンダ提携 - 日経」→「トヨタ - ホンダ提携」、
+// 「X-Y - Z」→「X-Y」）。区切り右側（配信元側）自体にハイフンが含まれていても
+// 正しく分割できる（例:「X - J-CASTニュース」→「X」）。左側（本文）が空になる
+// 場合は媒体名の判定に依存せず元の文字列を返す。NFKC正規化後の比較のため全角
+// パイプ「｜」は到達不能なので持たない（全角ハイフン「－」もNFKCで半角化される
+// 一方、em/enダッシュ「–」「—」はNFKCで変換されない別文字なので残す）。
+const TRAILING_DASH_SUFFIX_PATTERN = /^([\s\S]*)\s+[-–—|]\s+\S[\s\S]*$/u;
+
+function stripTrailingPublisherParens(value: string): string {
+  const runMatch = value.match(TRAILING_PAREN_RUN_PATTERN);
+  if (!runMatch) return value;
+
+  const run = runMatch[0];
+  const prefix = value.slice(0, runMatch.index);
+
+  const parens = Array.from(run.matchAll(PAREN_BLOCK_PATTERN)).map(match => ({
+    whole: match[0],
+    content: match[1],
+  }));
+
+  const keptParens = parens.filter(
+    ({ content }) => !PUBLISHER_PAREN_CONTENT_PATTERN.test(content.trim())
+  );
+
+  // 媒体名括弧が1つも無ければ元の文字列をそのまま返す（不要な再構成をしない）。
+  if (keptParens.length === parens.length) return value;
+
+  const rebuiltSuffix = keptParens
+    .map(({ whole }) => whole.trimStart())
+    .join("");
+
+  return `${prefix}${rebuiltSuffix}`.trim();
+}
+
+export function stripPublisherSuffix(title: string): string {
+  const normalized = title.normalize("NFKC").trim();
+  if (!normalized) return normalized;
+
+  let result = normalized;
+
+  const dashMatch = result.match(TRAILING_DASH_SUFFIX_PATTERN);
+  if (dashMatch && dashMatch[1].trim().length > 0) {
+    result = dashMatch[1].trim();
+  }
+
+  return stripTrailingPublisherParens(result);
+}
+
+const NORMALIZED_PUBLISHER_NAME_TOKENS = new Set(
+  PUBLISHER_NAME_TOKENS.map(normalizeStockText)
+);
+
+// dedup（記事の同一性判定）専用: 位置を問わず括弧内に媒体名を含む場合は除去する。
+// 銘柄マッチ側（stripPublisherSuffix）は誤消去回避のため末尾かつ厳格な文法のみを
+// 対象にするが、identityは重複排除の精度を優先し、旧実装と同じ「媒体名を含んで
+// いれば消す」判定を維持する（例:「(ダイヤモンド・ザイ)」）。
+// 語彙は旧実装の7語（ダイヤモンド|Yahoo|ニュース|オンライン|ザイ|株探|フィスコ）
+// のみに絞る。PUBLISHER_NAME_TOKENS / PUBLISHER_SUFFIX_WORDS をそのまま混ぜると
+// S3対応で追加した「日経」「ロイター」「QUICK」「note」等まで部分一致してしまい、
+// 「(日経平均採用銘柄)」「(ロイター調査)」「(QUICK調べ)」「(note参照)」のような
+// 正当な括弧を含む別記事まで同一キーに潰れてしまう。
+const LEGACY_LOOSE_PUBLISHER_TOKENS = [
+  "ダイヤモンド",
+  "Yahoo",
+  "ニュース",
+  "オンライン",
+  "ザイ",
+  "株探",
+  "フィスコ",
+];
+
+const LOOSE_PUBLISHER_TOKEN_ALTERNATION = LEGACY_LOOSE_PUBLISHER_TOKENS.map(
+  escapeForPublisherRegExp
+).join("|");
+
+const ANY_POSITION_PUBLISHER_PAREN_PATTERN = new RegExp(
+  `\\([^()]*(?:${LOOSE_PUBLISHER_TOKEN_ALTERNATION})[^()]*\\)`,
+  "giu"
+);
+
+function normalizeNewsTitleForIdentity(title: string): string {
+  const withoutSourceSuffix = stripPublisherSuffix(title);
+  const withoutAnyPositionPublisherParens = withoutSourceSuffix.replace(
+    ANY_POSITION_PUBLISHER_PAREN_PATTERN,
+    ""
+  );
+
+  return withoutAnyPositionPublisherParens
     .toLowerCase()
     .replace(/[「」『』【】()[\]（）｢｣、。,.!！?？:：;；'"“”‘’\s]/g, "")
     .slice(0, 72);
@@ -392,8 +535,8 @@ export function buildStableTopTradingItems(
 
   const normalizedNews = eligibleNews.map(item => ({
     item,
-    title: normalizeStockText(item.title ?? ""),
-    snippet: normalizeStockText(item.snippet ?? ""),
+    title: normalizeStockText(stripPublisherSuffix(item.title ?? "")),
+    snippet: normalizeStockText(stripPublisherSuffix(item.snippet ?? "")),
   }));
 
   const scored: ScoredStock[] = STOCK_IDEA_UNIVERSE.map(stock => {
@@ -411,8 +554,13 @@ export function buildStableTopTradingItems(
       const titleMatchedTerms = stock.searchTerms.filter(term =>
         containsStockTerm(title, term)
       );
-      const snippetMatchedTerms = stock.searchTerms.filter(term =>
-        containsStockTerm(snippet, term)
+      // フィスコ・noteのように媒体名リストと一致する検索語（銘柄名そのもの）は、
+      // snippetのみの一致（配信元表記の混入など）を根拠に載せない。銘柄コードなど
+      // 他の検索語はsnippetでも通常どおりマッチしてよい。
+      const snippetMatchedTerms = stock.searchTerms.filter(
+        term =>
+          !NORMALIZED_PUBLISHER_NAME_TOKENS.has(term) &&
+          containsStockTerm(snippet, term)
       );
       const matchedTerms = uniqueStrings([
         ...titleMatchedTerms,
