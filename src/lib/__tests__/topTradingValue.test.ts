@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { buildStableTopTradingItems } from "../topTradingValue";
+import {
+  buildStableTopTradingItems,
+  stripPublisherSuffix,
+} from "../topTradingValue";
 import { JPX_STOCK_BY_CODE } from "../jpx/stockMaster";
 
 const RECENT_DATE = new Date().toISOString();
@@ -719,5 +722,189 @@ describe("buildStableTopTradingItems", () => {
         new Set(["7003", "8306"])
       );
     });
+  });
+
+  it("does not mistake a Google News publisher suffix for a stock mention (フィスコ)", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title:
+          "概況からBRICsを知ろう インド株式市場は3日続落…(フィスコ) - Yahoo!ファイナンス",
+        snippet:
+          "概況からBRICsを知ろう インド株式市場は3日続落…(フィスコ) - Yahoo!ファイナンス",
+        source: "Yahoo!ファイナンス",
+        date: RECENT_DATE,
+        link: "https://example.com/brics-fisco",
+      },
+    ]);
+
+    expect(result.items.map(item => item.code)).not.toContain("3807");
+  });
+
+  it("does not mistake a Google News publisher suffix for a stock mention (note)", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "【保存版】ティム・クック退任で…厳選20銘柄 - note",
+        snippet: "【保存版】ティム・クック退任で…厳選20銘柄 - note",
+        source: "note",
+        date: RECENT_DATE,
+        link: "https://example.com/tim-cook-note",
+      },
+    ]);
+
+    expect(result.items.map(item => item.code)).not.toContain("5243");
+  });
+
+  it("still surfaces a publisher-name-clash stock when the company is named in the title body", () => {
+    const fisco = buildStableTopTradingItems([
+      {
+        title: "フィスコ、AI分析サービスを開始 - 株探",
+        snippet: "フィスコ、AI分析サービスを開始 - 株探",
+        source: "株探",
+        date: RECENT_DATE,
+        link: "https://example.com/fisco-ai",
+      },
+    ]);
+    expect(fisco.items.map(item => item.code)).toContain("3807");
+
+    const note = buildStableTopTradingItems([
+      {
+        title: "note、有料会員数が過去最高 - 日経",
+        snippet: "note、有料会員数が過去最高 - 日経",
+        source: "日経",
+        date: RECENT_DATE,
+        link: "https://example.com/note-record",
+      },
+    ]);
+    expect(note.items.map(item => item.code)).toContain("5243");
+  });
+
+  it("does not match a publisher-name-clash stock from a snippet-only mention", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "AI企業の決算まとめ、市場は好感",
+        snippet: "詳細は(フィスコ)の分析記事を参照。",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/ai-earnings-roundup",
+      },
+    ]);
+
+    expect(result.items.map(item => item.code)).not.toContain("3807");
+  });
+
+  // タイトルに社名「トヨタ自動車」自体が含まれていると、括弧除去の有無に関わらず
+  // 7203はマッチしてしまい括弧保持を検証したことにならない。社名を含まない
+  // 見出しにして、コード括弧の有無だけでマッチが決まる形にする（reviewer指摘S2）。
+  it("keeps a trailing stock-code parenthesis such as （7203） intact", () => {
+    const result = buildStableTopTradingItems([
+      {
+        title: "好決算で続伸（7203）",
+        snippet: "好決算で続伸（7203）",
+        source: "Market News",
+        date: RECENT_DATE,
+        link: "https://example.com/toyota-code-paren",
+      },
+    ]);
+
+    expect(result.items.map(item => item.code)).toContain("7203");
+  });
+});
+
+describe("stripPublisherSuffix", () => {
+  it("removes a trailing ' - 配信元' suffix", () => {
+    expect(stripPublisherSuffix("X - Yahoo!ファイナンス")).toBe("X");
+  });
+
+  it("removes a trailing publisher parenthesis left after the dash suffix is stripped", () => {
+    expect(stripPublisherSuffix("X (フィスコ) - Yahoo!ファイナンス")).toBe("X");
+  });
+
+  it("removes a trailing full-width publisher parenthesis with no dash suffix", () => {
+    expect(stripPublisherSuffix("X（株探）")).toBe("X");
+  });
+
+  it("removes a trailing ' - note' suffix", () => {
+    expect(stripPublisherSuffix("X - note")).toBe("X");
+  });
+
+  it("returns the original string when there is no publisher suffix", () => {
+    expect(stripPublisherSuffix("トヨタ自動車、好決算で続伸")).toBe(
+      "トヨタ自動車、好決算で続伸"
+    );
+  });
+
+  it("does not throw on a string that is only a dash", () => {
+    expect(() => stripPublisherSuffix(" - ")).not.toThrow();
+  });
+
+  it("keeps a stock-code parenthesis such as （7203） intact (NFKC normalizes the bracket width, but the content is preserved)", () => {
+    expect(stripPublisherSuffix("トヨタ自動車、好決算で続伸（7203）")).toBe(
+      "トヨタ自動車、好決算で続伸(7203)"
+    );
+  });
+
+  // reviewer指摘S1: 配信元名にハイフンが含まれる場合や、区切りが複数回現れる場合でも
+  // 「最後の ' - '」を境目に正しく分割できること。
+  it("splits at the last ' - ' when the title itself contains a dash-separated clause", () => {
+    expect(stripPublisherSuffix("トヨタ - ホンダ提携 - 日経")).toBe(
+      "トヨタ - ホンダ提携"
+    );
+  });
+
+  it("strips the suffix even when the publisher name itself contains a hyphen (J-CAST)", () => {
+    expect(stripPublisherSuffix("X - J-CASTニュース")).toBe("X");
+  });
+
+  // N5: 末尾ダッシュの除去は媒体名リストに依存せず無条件に行う現仕様の明文化。
+  // 「ソシオネクストは急伸」は媒体名ではないが、末尾の ' - X' 定型として落ちる。
+  it("strips the trailing ' - X' segment unconditionally, even when it is not a publisher name", () => {
+    expect(
+      stripPublisherSuffix("半導体関連が上昇 - ソシオネクストは急伸")
+    ).toBe("半導体関連が上昇");
+  });
+
+  // reviewer指摘S1の再現バグ: 旧実装では配信元名にハイフンが含まれると
+  // ダッシュ除去に失敗し、連鎖して括弧除去も失敗していた。
+  it("strips both the dash suffix and the now-trailing publisher parenthesis when the suffix contains a hyphen", () => {
+    // 「…」(U+2026) はNFKCで「...」(半角3ドット)に変換されるため、期待値もそれに合わせる。
+    expect(
+      stripPublisherSuffix(
+        "概況からBRICsを知ろう インド株式市場は3日続落…(フィスコ) - J-CASTニュース"
+      )
+    ).toBe("概況からBRICsを知ろう インド株式市場は3日続落...");
+  });
+
+  // reviewer指摘S3: 括弧の中身「全体」が媒体名文法に一致する場合のみ除去する。
+  it.each([
+    ["テスト銘柄(フィスコ)", "テスト銘柄"],
+    ["テスト銘柄(株探ニュース)", "テスト銘柄"],
+    ["テスト銘柄(Yahoo!ファイナンス)", "テスト銘柄"],
+    ["テスト銘柄(ダイヤモンド・オンライン)", "テスト銘柄"],
+    ["テスト銘柄(日経新聞)", "テスト銘柄"],
+    ["テスト銘柄(MINKABU PRESS)", "テスト銘柄"],
+  ])("removes the trailing publisher parenthesis in %s", (input, expected) => {
+    expect(stripPublisherSuffix(input)).toBe(expected);
+  });
+
+  it.each([
+    ["テスト銘柄(日経平均採用銘柄)", "テスト銘柄(日経平均採用銘柄)"],
+    ["テスト銘柄(7203)", "テスト銘柄(7203)"],
+  ])(
+    "keeps a legitimate trailing parenthesis intact in %s",
+    (input, expected) => {
+      expect(stripPublisherSuffix(input)).toBe(expected);
+    }
+  );
+
+  // reviewer指摘N-b: 末尾に非媒体名の括弧が続く場合でも、その手前にある
+  // 媒体名括弧だけを間引いて残りは元の順序で保持する。
+  it("removes only the publisher parenthesis when it precedes a non-publisher parenthesis", () => {
+    expect(
+      stripPublisherSuffix("X(フィスコ)(3月14日) - Yahoo!ファイナンス")
+    ).toBe("X(3月14日)");
+  });
+
+  it("removes only the publisher parenthesis when it follows a non-publisher parenthesis", () => {
+    expect(stripPublisherSuffix("X(3月14日)(フィスコ)")).toBe("X(3月14日)");
   });
 });
