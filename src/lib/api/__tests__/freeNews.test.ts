@@ -605,6 +605,40 @@ describe("FreeNewsClient.getNewsFromGoogleRSS", () => {
     expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(2);
   });
 
+  it("pubDateがパースできた場合はpublishedAtをISO(UTC)で設定する", async () => {
+    // buildRss()が付与する固定pubDate "Mon, 10 Aug 2026 09:00:00 GMT" のUTC ISO表現
+    const get = mockSources([], buildRss(["市場サマリー"]));
+
+    const client = new FreeNewsClient();
+    const news = await client.getNewsFromGoogleRSS("市場サマリー", 5);
+
+    expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(1);
+    expect(news[0].publishedAt).toBe("2026-08-10T09:00:00.000Z");
+  });
+
+  it("pubDateが欠落または不正な場合はpublishedAtを設定せずdateを不明にする", async () => {
+    const get = mockSources(
+      [],
+      `<rss><channel>` +
+        `<item><title><![CDATA[pubDate欠落の記事]]></title>` +
+        `<link>https://example.com/rss/no-pubdate</link></item>` +
+        `<item><title><![CDATA[pubDate不正の記事]]></title>` +
+        `<link>https://example.com/rss/bad-pubdate</link>` +
+        `<pubDate>not-a-real-date</pubDate></item>` +
+        `</channel></rss>`
+    );
+
+    const client = new FreeNewsClient();
+    const news = await client.getNewsFromGoogleRSS("欠落記事", 5);
+
+    expect(callsTo(get, GOOGLE_RSS_URL)).toHaveLength(1);
+    expect(news).toHaveLength(2);
+    news.forEach(item => {
+      expect(item.publishedAt).toBeUndefined();
+      expect(item.date).toBe("不明");
+    });
+  });
+
   it("完了後の再リクエストは新たに取得する（TTLキャッシュではない）", async () => {
     const get = mockSources([], buildRss(["市場サマリー"]));
 

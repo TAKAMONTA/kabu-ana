@@ -24,6 +24,8 @@ export interface MarketNewsItem {
   source?: string;
   date?: string;
   link?: string;
+  /** freeNews.tsのNewsItem.publishedAtと同じ：ISO 8601(UTC)の発行時刻。あれば date より優先する */
+  publishedAt?: string;
 }
 
 export interface TradingValueItem {
@@ -245,20 +247,53 @@ function newsTime(date: string | undefined): number | null {
   return Number.isFinite(time) ? time : null;
 }
 
+/** publishedAt（ISO・UTC）があれば優先し、無ければ表示用date文字列にフォールバックする */
+function resolveNewsTime(
+  date: string | undefined,
+  publishedAt: string | undefined
+): number | null {
+  if (publishedAt) {
+    const time = new Date(publishedAt).getTime();
+    if (Number.isFinite(time)) return time;
+  }
+  return newsTime(date);
+}
+
 function isNewsWithinWindow(
   item: MarketNewsItem,
   now: number,
   maxAgeDays: number
 ): boolean {
-  const time = newsTime(item.date);
-  if (time === null) return !item.date;
+  const time = resolveNewsTime(item.date, item.publishedAt);
+  if (time === null) return !item.date && !item.publishedAt;
   return now - time <= maxAgeDays * 24 * 60 * 60 * 1000;
 }
 
-function isFreshNews(date: string | undefined, now = Date.now()): boolean {
-  const time = newsTime(date);
-  if (time === null) return false;
-  return now - time <= 3 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * UTCの絶対ミリ秒をJST暦日のインデックスに変換する。
+ * dateはtoLocaleDateString("ja-JP")由来のローカル日付文字列であり、
+ * これをnew Date(date)で絶対時刻へ変換して単純に86_400_000で日数差を
+ * 取ると、実行環境のタイムゾーン（Vercel=UTC）によって日バケットの境界が
+ * 09:00 JSTにずれ、寄り付き前（07:00-09:00 JST）の当日記事が
+ * 「1日前」扱いになってしまう。+9時間ぶん進めてから日境界で切り捨てることで、
+ * 実行環境のタイムゾーンに関係なくJST暦日で日数差を計算できる。
+ */
+function jstDayIndex(ms: number): number {
+  return Math.floor((ms + JST_OFFSET_MS) / DAY_MS);
+}
+
+// Google Newsは関連度順で返るため、鮮度を一律加点にすると古い強材料が
+// 居座り続ける。経過"暦日"（JST基準）に応じて加点を減衰させ、直近の記事ほど
+// 上位に出やすくする（0日=+9, 1日=+6, 2日=+3, 3日以上=0）。日付不明（latestNewsTime
+// が無い）は0点。マッチ記事ごとに累積すると同じ銘柄が何本もヒットするだけで
+// スコアが際限なく積み上がるため、銘柄あたり1回・最新のマッチ記事の時刻だけで加点する。
+function freshnessBonus(latestNewsTime: number, now: number): number {
+  if (latestNewsTime <= 0) return 0;
+  const ageDays = Math.max(0, jstDayIndex(now) - jstDayIndex(latestNewsTime));
+  return Math.max(0, 9 - 3 * ageDays);
 }
 
 interface ScoredStock {
@@ -271,6 +306,8 @@ interface ScoredStock {
   sourceKeys: string[];
   matchedAliases: string[];
   signalLabel: string;
+  /** マッチした記事の最新時刻（不明なら0）。同点タイブレークに使う */
+  latestNewsTime: number;
 }
 
 function isShadowedScoredStock(
@@ -368,6 +405,7 @@ export function buildStableTopTradingItems(
     const sourceKeys: string[] = [];
     const matchedAliases: string[] = [];
     const materialScores = new Map<string, number>();
+    let latestNewsTime = 0;
 
     normalizedNews.forEach(({ item, title, snippet }) => {
       const titleMatchedTerms = stock.searchTerms.filter(term =>
@@ -397,10 +435,14 @@ export function buildStableTopTradingItems(
       evidences.push(evidenceText(item));
       sourceKeys.push(normalizeMarketNewsIdentity(item));
 
-      if (isFreshNews(item.date, now)) {
-        score += 1;
+      const resolvedTime = resolveNewsTime(item.date, item.publishedAt);
+      if (resolvedTime !== null) {
+        latestNewsTime = Math.max(latestNewsTime, resolvedTime);
       }
     });
+
+    // 鮮度加点は記事ごとに累積せず、銘柄あたり1回だけ（最新のマッチ記事基準）
+    score += freshnessBonus(latestNewsTime, now);
 
     const signalLabel =
       Array.from(materialScores.entries()).sort(
@@ -417,13 +459,14 @@ export function buildStableTopTradingItems(
       sourceKeys: uniqueStrings(sourceKeys),
       matchedAliases: uniqueStrings(matchedAliases),
       signalLabel,
+      latestNewsTime,
     };
   });
 
   const visibleScored = scored
     .filter(item => item.directScore > 0)
     .filter((item, _, entries) => !isShadowedScoredStock(item, entries))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score || b.latestNewsTime - a.latestNewsTime);
 
   const selectedScored = selectDiverseScoredStocks(visibleScored, 5);
   const selectedScores = selectedScored.map(entry => entry.score);
