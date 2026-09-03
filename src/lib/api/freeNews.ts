@@ -6,6 +6,13 @@ export interface NewsItem {
   source: string;
   date: string;
   link: string;
+  /**
+   * pubDateがパース可能だった場合のみ設定するISO 8601(UTC)の発行時刻。
+   * dateは表示用にtoLocaleDateString("ja-JP")でローカル日付化されており、
+   * 実行環境のタイムゾーンによって日付境界が変わってしまう。JST基準の
+   * 日次バケット計算（topTradingValue.tsのfreshnessBonus）はこちらを優先する。
+   */
+  publishedAt?: string;
 }
 
 // getComprehensiveNewsの並列取得用。
@@ -361,14 +368,24 @@ export class FreeNewsClient {
           // 非CDATAのtitleはHTMLエンティティでエスケープされているためデコードする。
           // linkはデコードしない（dedupeByLinkのキーとtop-trading-valueの出力が変わるため）
           const title = this.decodeHtmlEntities(titleMatch[1]);
+          const parsedPubDate = pubDateMatch ? new Date(pubDateMatch[1]) : null;
+          // pubDateタグはあってもテキストがパース不能なら"Invalid Date"になりうる。
+          // dateにその文字列を混入させないよう、有効な場合のみ使う
+          const validPubDate =
+            parsedPubDate && Number.isFinite(parsedPubDate.getTime())
+              ? parsedPubDate
+              : null;
           items.push({
             title,
             snippet: title,
             source: "Google News",
-            date: pubDateMatch
-              ? new Date(pubDateMatch[1]).toLocaleDateString("ja-JP")
+            date: validPubDate
+              ? validPubDate.toLocaleDateString("ja-JP")
               : "不明",
             link: linkMatch[1],
+            ...(validPubDate
+              ? { publishedAt: validPubDate.toISOString() }
+              : {}),
           });
         }
       }

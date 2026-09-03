@@ -17,7 +17,8 @@ describe("buildStableTopTradingItems", () => {
       },
       {
         title: "生成AI投資で半導体製造装置関連に買い",
-        snippet: "東京エレクトロンやアドバンテストなどAI半導体関連が物色されています。",
+        snippet:
+          "東京エレクトロンやアドバンテストなどAI半導体関連が物色されています。",
         source: "Market News",
         date: RECENT_DATE,
         link: "https://example.com/semiconductor",
@@ -33,7 +34,9 @@ describe("buildStableTopTradingItems", () => {
     expect(result.items.every(item => item.reason.length > 0)).toBe(true);
     expect(
       result.items.some(item =>
-        item.sources.includes("ソニーグループ、イメージセンサーとゲーム事業が好調")
+        item.sources.includes(
+          "ソニーグループ、イメージセンサーとゲーム事業が好調"
+        )
       )
     ).toBe(true);
   });
@@ -82,7 +85,9 @@ describe("buildStableTopTradingItems", () => {
     ]);
 
     expect(result.items[0].code).toBe("7011");
-    expect(result.items[0].sources[0]).toBe("三菱重工、防衛関連の大型受注で注目");
+    expect(result.items[0].sources[0]).toBe(
+      "三菱重工、防衛関連の大型受注で注目"
+    );
   });
 
   it("keeps multiple themes represented when news mentions different sectors", () => {
@@ -308,16 +313,14 @@ describe("buildStableTopTradingItems", () => {
   it("prefers distinct evidence sources before adding a second stock from the same article", () => {
     const result = buildStableTopTradingItems([
       {
-        title:
-          "日本高純度化学、オービーシステムに注目 好業績と増配が材料",
+        title: "日本高純度化学、オービーシステムに注目 好業績と増配が材料",
         snippet: "高配当と好業績を背景に2銘柄が取り上げられています。",
         source: "Market News",
         date: RECENT_DATE,
         link: "https://example.com/dividend-two",
       },
       {
-        title:
-          "ローツェ、積水ハウスに注目 AI需要と米国事業の成長期待",
+        title: "ローツェ、積水ハウスに注目 AI需要と米国事業の成長期待",
         snippet: "出遅れ感のある2銘柄として市場の関心を集めています。",
         source: "Market News",
         date: RECENT_DATE,
@@ -350,8 +353,12 @@ describe("buildStableTopTradingItems", () => {
 
     expect(result.items).toHaveLength(5);
     expect(codes).toEqual(expect.arrayContaining(["3350", "5253", "7003"]));
-    expect(codes.filter(code => ["4973", "5576"].includes(code))).toHaveLength(1);
-    expect(codes.filter(code => ["6323", "1928"].includes(code))).toHaveLength(1);
+    expect(codes.filter(code => ["4973", "5576"].includes(code))).toHaveLength(
+      1
+    );
+    expect(codes.filter(code => ["6323", "1928"].includes(code))).toHaveLength(
+      1
+    );
   });
 
   it("returns fewer than five items instead of padding with repeated article evidence", () => {
@@ -391,8 +398,12 @@ describe("buildStableTopTradingItems", () => {
     expect(result.items).toHaveLength(4);
     expect(codes).toContain("7794");
     expect(codes).toContain("6997");
-    expect(codes.filter(code => ["4973", "5576"].includes(code))).toHaveLength(1);
-    expect(codes.filter(code => ["6323", "1928"].includes(code))).toHaveLength(1);
+    expect(codes.filter(code => ["4973", "5576"].includes(code))).toHaveLength(
+      1
+    );
+    expect(codes.filter(code => ["6323", "1928"].includes(code))).toHaveLength(
+      1
+    );
   });
 
   it("derives varied attention scores from relative news signal strength", () => {
@@ -424,7 +435,9 @@ describe("buildStableTopTradingItems", () => {
 
     expect(result.items[0].code).toBe("7003");
     expect(new Set(confidences).size).toBeGreaterThan(1);
-    expect(result.items[0].confidence).toBeGreaterThan(result.items[1].confidence);
+    expect(result.items[0].confidence).toBeGreaterThan(
+      result.items[1].confidence
+    );
     expect(Math.max(...confidences)).toBeLessThanOrEqual(0.94);
   });
 
@@ -469,5 +482,242 @@ describe("buildStableTopTradingItems", () => {
     expect(result.items.map(item => item.code)).not.toContain("1306");
     expect(result.items.map(item => item.code)).not.toContain("2555");
     expect(result.items.map(item => item.code)).toContain("7203");
+  });
+
+  describe("freshness decay", () => {
+    const NOW = new Date("2026-09-03T09:00:00.000Z").getTime();
+    const daysAgo = (days: number) =>
+      new Date(NOW - days * 24 * 60 * 60 * 1000).toISOString();
+
+    it("ranks todays news above equally-strong three-day-old news", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            title: "ソニーグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(3),
+            link: "https://example.com/sony-old",
+          },
+          {
+            title: "トヨタ自動車、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(0),
+            link: "https://example.com/toyota-today",
+          },
+        ],
+        { now: NOW }
+      );
+
+      expect(result.items[0].code).toBe("7203");
+      expect(result.items[1].code).toBe("6758");
+      expect(result.items[0].confidence).toBeGreaterThan(
+        result.items[1].confidence
+      );
+    });
+
+    it("gives no additional freshness bonus once news is three days old or older", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            title: "ソニーグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(3),
+            link: "https://example.com/sony-3d",
+          },
+          {
+            title: "トヨタ自動車、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(6),
+            link: "https://example.com/toyota-6d",
+          },
+        ],
+        { now: NOW }
+      );
+
+      expect(result.items[0].confidence).toBe(result.items[1].confidence);
+    });
+
+    it("applies decaying freshness bonuses of 9/6/3/0 for 0/1/2/3-day-old news of equal material strength", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            title: "ソニーグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(0),
+            link: "https://example.com/sony-0d",
+          },
+          {
+            title: "トヨタ自動車、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(1),
+            link: "https://example.com/toyota-1d",
+          },
+          {
+            title: "任天堂、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(2),
+            link: "https://example.com/nintendo-2d",
+          },
+          {
+            title: "三菱UFJ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: daysAgo(3),
+            link: "https://example.com/mufg-3d",
+          },
+        ],
+        { now: NOW }
+      );
+
+      // 同じ材料強度（タイトル一致+決算・業績）なので、順位とconfidenceの差は
+      // 経過日数に応じた鮮度加点（+9/+6/+3/+0）だけに由来する。
+      expect(result.items.map(item => item.code)).toEqual([
+        "6758",
+        "7203",
+        "7974",
+        "8306",
+      ]);
+      expect(result.items.map(item => item.confidence)).toEqual([
+        0.94, 0.83, 0.73, 0.62,
+      ]);
+    });
+
+    it("treats an article published at JST 07:00 as day 0 even though it falls on the previous UTC calendar day", () => {
+      // NOW = 2026-09-03T10:00:00+09:00 (= 2026-09-03T01:00:00Z)
+      const NOW_JST_1000 = new Date("2026-09-03T10:00:00+09:00").getTime();
+
+      const result = buildStableTopTradingItems(
+        [
+          {
+            // 2026-09-02T22:00:00Z = JST 2026-09-03 07:00（NOWと同じJST暦日）→ ageDays=0
+            title: "INPEX、原油高とLNG需要で決算上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            publishedAt: "2026-09-02T22:00:00.000Z",
+            link: "https://example.com/inpex-day0",
+          },
+          {
+            // 2026-09-02T14:00:00Z = JST 2026-09-02 23:00（NOWの前日）→ ageDays=1
+            title: "ソフトバンクグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            publishedAt: "2026-09-02T14:00:00.000Z",
+            link: "https://example.com/softbank-day1",
+          },
+        ],
+        { now: NOW_JST_1000 }
+      );
+
+      // 両記事とも同じ材料強度（タイトル一致+決算・業績）なので、
+      // 順位・スコア差は鮮度加点（day0=+9 vs day1=+6）だけに由来する。
+      expect(result.items[0].code).toBe("1605");
+      expect(result.items[1].code).toBe("9984");
+      expect(result.items[0].confidence).toBeGreaterThan(
+        result.items[1].confidence
+      );
+    });
+
+    it("falls back to the display date string as todays news when publishedAt is absent", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            title: "ソニーグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            date: "2026/9/3",
+            link: "https://example.com/sony-date-only-today",
+          },
+          {
+            title: "任天堂、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            publishedAt: daysAgo(3),
+            link: "https://example.com/nintendo-3d",
+          },
+        ],
+        { now: NOW }
+      );
+
+      expect(result.items[0].code).toBe("6758");
+      expect(result.items[1].code).toBe("7974");
+      expect(result.items[0].confidence).toBe(0.94);
+      expect(result.items[1].confidence).toBe(0.62);
+    });
+
+    it("breaks ties in favor of the stock with the more recently published matching article", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            title: "ソニーグループ、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            publishedAt: new Date(NOW).toISOString(),
+            link: "https://example.com/sony-tie-newer",
+          },
+          {
+            title: "トヨタ自動車、決算で上方修正",
+            snippet: "業績上振れが材料視されています。",
+            source: "Market News",
+            publishedAt: new Date(NOW - 2 * 60 * 60 * 1000).toISOString(),
+            link: "https://example.com/toyota-tie-older",
+          },
+        ],
+        { now: NOW }
+      );
+
+      // 同じ日バケット（ageDays=0）で材料強度も同じなのでスコアは同点。
+      // タイブレークで、より新しい時刻の記事を持つ銘柄が上位に来る。
+      expect(result.items[0].confidence).toBe(result.items[1].confidence);
+      expect(result.items[0].code).toBe("6758");
+      expect(result.items[1].code).toBe("7203");
+    });
+
+    it("does not accumulate the freshness bonus when a stock is matched by multiple same-day articles", () => {
+      const result = buildStableTopTradingItems(
+        [
+          {
+            // 三井E&S: スニペットのみ一致(directHit=6) x 2本、両方とも同日(ageDays=0)
+            title: "港湾クレーン関連銘柄に新技術発表の思惑",
+            snippet: "三井E&Sが新技術領域に参入するとの観測が出ています。",
+            source: "Market News",
+            publishedAt: new Date(NOW).toISOString(),
+            link: "https://example.com/mitsui-es-a",
+          },
+          {
+            title: "港湾物流関連で新事業立ち上げの報道",
+            snippet: "三井E&Sの新事業計画が話題になっています。",
+            source: "Market News",
+            publishedAt: new Date(NOW).toISOString(),
+            link: "https://example.com/mitsui-es-b",
+          },
+          {
+            // 三菱UFJ: タイトル一致(directHit=12) x 1本、同日(ageDays=0)
+            title: "三菱UFJ、大型受注を発表",
+            snippet: "金利上昇観測も相まって関心を集めています。",
+            source: "Market News",
+            publishedAt: new Date(NOW).toISOString(),
+            link: "https://example.com/mufg-order",
+          },
+        ],
+        { now: NOW }
+      );
+
+      // 材料・タイトル一致由来のスコアは三井E&S(6+3)x2=18、三菱UFJ(12+6)=18で
+      // 意図的に一致させてある。鮮度加点が記事ごとに累積するなら三井E&Sが
+      // +9ぶん上振れて同点は崩れるはずだが、銘柄あたり1回しか加点されない
+      // ため両者は同点になる。
+      expect(result.items).toHaveLength(2);
+      expect(result.items[0].confidence).toBe(result.items[1].confidence);
+      expect(new Set(result.items.map(item => item.code))).toEqual(
+        new Set(["7003", "8306"])
+      );
+    });
   });
 });

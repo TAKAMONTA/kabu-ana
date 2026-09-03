@@ -8,6 +8,11 @@ export default defineConfig({
     },
   },
   test: {
+    // 本番(Vercel)のランタイムTZ=UTCと揃える。JST日バケット計算のTZ非依存性を
+    // 開発者のローカルTZに関係なく検証できるようにする
+    env: {
+      TZ: "UTC",
+    },
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
       "scripts/**/*.{test,spec}.{js,mjs,cjs,ts}",
