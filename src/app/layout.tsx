@@ -59,27 +59,8 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        {/* ServiceWorkerは一時的に無効化
-            理由: Next.jsの動的ビルド構造と互換性の問題、株式分析アプリは常に最新データが必要なため
-            将来的にPWAが必要になった場合は、next-pwaプラグインの使用を推奨
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('SW registered: ', registration);
-                    })
-                    .catch(function(registrationError) {
-                      console.log('SW registration failed: ', registrationError);
-                    });
-                });
-              }
-            `,
-          }}
-        />
-        */}
+        {/* Service Worker は登録しない。株価は常に最新が必要なため。
+            public/sw.js は過去に登録された端末の後始末（自己登録解除）専用。 */}
       </head>
       <body className="font-sans antialiased">
         <ThemeProvider

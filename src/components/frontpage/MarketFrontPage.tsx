@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { shouldShowAttentionScore } from "@/lib/attentionScore";
 import { APP_NAME } from "@/lib/constants";
+import { FirstVisitGuide } from "./FirstVisitGuide";
 import { FrontPageLeadStory } from "./FrontPageLeadStory";
 import { FrontPageMarketGrid } from "./FrontPageMarketGrid";
 
@@ -72,15 +73,21 @@ export function MarketFrontPage({
               <p className="text-xs text-muted-foreground">{marketDate}</p>
             </div>
 
-            <FrontPageLeadStory
-              idea={topIdea}
-              isLoading={isStockIdeasLoading}
-              warning={warning}
-              showAttentionScore={showAttentionScore}
-              onSelectIdea={onSelectIdea}
-            />
+            {/* 初見でも迷わないよう、検索とサンプル銘柄を一面の最上部に置く */}
+            <FirstVisitGuide />
+            <div className="mt-4">{searchSlot}</div>
+            {sampleSlot && <div className="mt-3">{sampleSlot}</div>}
 
-            <div className="mt-5">{searchSlot}</div>
+            <div className="mt-5">
+              <FrontPageLeadStory
+                idea={topIdea}
+                isLoading={isStockIdeasLoading}
+                warning={warning}
+                showAttentionScore={showAttentionScore}
+                onSelectIdea={onSelectIdea}
+              />
+            </div>
+
             {digestSlot && <div className="mt-4">{digestSlot}</div>}
             {watchlistSlot && <div className="mt-4">{watchlistSlot}</div>}
           </div>
@@ -93,7 +100,6 @@ export function MarketFrontPage({
               dailyLimit={dailyLimit}
               isPremium={isPremium}
             />
-            {sampleSlot}
           </aside>
         </div>
       </section>

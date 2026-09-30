@@ -12,7 +12,13 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  TrendingUp,
+  AlertCircle,
+  ChevronDown,
+  ChevronUp,
+  Crown,
+} from "lucide-react";
 import { useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
@@ -42,10 +48,41 @@ import { SignalsNav } from "@/components/signals/SignalsNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LivePulseStrip } from "@/components/LivePulseStrip";
 import { MarketFrontPage } from "@/components/frontpage/MarketFrontPage";
+import { markFirstVisitGuideSeen } from "@/components/frontpage/FirstVisitGuide";
+import { DataStatusCard } from "@/components/DataStatusCard";
+import { buildAiReferenceLabels, buildDataStatus } from "@/lib/dataStatus";
+import { FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { isNative } from "@/lib/utils/platformDetect";
 import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
 import { APP_NAME } from "@/lib/constants";
+
+const SAMPLE_STOCKS = [
+  {
+    symbol: "7203",
+    name: "トヨタ自動車",
+    display: "7203 トヨタ",
+    dotColor: "bg-emerald-500",
+  },
+  {
+    symbol: "AAPL",
+    name: "Apple",
+    display: "AAPL Apple",
+    dotColor: "bg-sky-500",
+  },
+  {
+    symbol: "9984",
+    name: "ソフトバンクグループ",
+    display: "9984 SBG",
+    dotColor: "bg-purple-500",
+  },
+  {
+    symbol: "5020",
+    name: "ENEOSホールディングス",
+    display: "5020 ENEOS",
+    dotColor: "bg-amber-500",
+  },
+];
 
 function PurchaseSuccessHandler() {
   const searchParams = useSearchParams();
@@ -82,11 +119,18 @@ export default function HomePage() {
   const [chartPeriod, setChartPeriod] = useState("1M");
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isNativeApp, setIsNativeApp] = useState(true);
-  const { isLoading, error, searchResult, searchCompany } = useCompanySearch();
+  const {
+    isLoading,
+    error,
+    searchResult,
+    searchCompany,
+    retry: retrySearch,
+  } = useCompanySearch();
   const {
     isAnalyzing,
     error: analysisError,
     analysisResult,
+    analyzedAt,
     streamingText,
     bundleTokens,
     analyzeStock,
@@ -142,6 +186,18 @@ export default function HomePage() {
   useEffect(() => {
     setIsNativeApp(isNative());
   }, []);
+
+  useEffect(() => {
+    if (searchResult) markFirstVisitGuideSeen();
+  }, [searchResult]);
+
+  const dataStatusItems = useMemo(
+    () => (searchResult ? buildDataStatus(searchResult) : []),
+    [searchResult]
+  );
+  // 再取得やチャート期間変更で検索結果が差し替わっても、表示するのは
+  // 「分析を実行した時点で AI に渡したデータ」にする
+  const [aiReferenceLabels, setAiReferenceLabels] = useState<string[]>([]);
 
   const handleSearchAndAnalyze = useCallback(async () => {
     const queryToUse = searchQuery.trim();
@@ -240,6 +296,7 @@ export default function HomePage() {
       if (!searchResult) return;
       if (!canUseFeature) return;
       incrementUsage();
+      setAiReferenceLabels(buildAiReferenceLabels(searchResult));
       const edinetExtras =
         searchResult.ratios != null || searchResult.financialHistory != null
           ? {
@@ -427,55 +484,28 @@ export default function HomePage() {
   const digestSection = <DigestSection items={watchlist.items} />;
 
   const sampleStockSlot = !isLoading ? (
-    <Card className="border-dashed">
-      <CardContent className="py-4">
-        <div className="space-y-3">
-          <div className="text-sm font-medium">サンプル銘柄</div>
-          <div className="flex flex-wrap gap-2">
-            {[
-              {
-                symbol: "7203",
-                name: "トヨタ自動車",
-                display: "7203 トヨタ",
-                dotColor: "bg-emerald-500",
-              },
-              {
-                symbol: "AAPL",
-                name: "Apple",
-                display: "AAPL Apple",
-                dotColor: "bg-sky-500",
-              },
-              {
-                symbol: "9984",
-                name: "ソフトバンクグループ",
-                display: "9984 SBG",
-                dotColor: "bg-purple-500",
-              },
-              {
-                symbol: "5020",
-                name: "ENEOSホールディングス",
-                display: "5020 ENEOS",
-                dotColor: "bg-amber-500",
-              },
-            ].map(stock => (
-              <Button
-                key={stock.symbol}
-                variant="outline"
-                size="sm"
-                onClick={() => handleSelectSuggestion(stock.symbol, stock.name)}
-                className="font-medium gap-2 transition-all hover:-translate-y-0.5 hover:shadow-md hover:border-primary/50"
-              >
-                <span
-                  className={`size-2 rounded-full ${stock.dotColor}`}
-                  aria-hidden="true"
-                />
-                {stock.display}
-              </Button>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="space-y-2">
+      <p className="text-xs text-muted-foreground">
+        迷ったら、サンプル銘柄をタップして体験できます
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        {SAMPLE_STOCKS.map(stock => (
+          <Button
+            key={stock.symbol}
+            variant="outline"
+            size="sm"
+            onClick={() => handleSelectSuggestion(stock.symbol, stock.name)}
+            className="h-10 gap-2 font-medium transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
+          >
+            <span
+              className={`size-2 rounded-full ${stock.dotColor}`}
+              aria-hidden="true"
+            />
+            {stock.display}
+          </Button>
+        ))}
+      </div>
+    </div>
   ) : null;
 
   const stockIdeasSection = (
@@ -494,7 +524,7 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center space-x-3">
+            <div className="order-1 flex items-center space-x-3">
               <div className="relative">
                 <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
               </div>
@@ -507,8 +537,11 @@ export default function HomePage() {
                 </p>
               </div>
             </div>
-            <SignalsNav active="home" />
-            <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* スマホではロゴと操作ボタンを1行目、ナビを2行目に置いてヘッダーの高さを抑える */}
+            <div className="order-3 w-full sm:order-2 sm:w-auto">
+              <SignalsNav active="home" />
+            </div>
+            <div className="order-2 flex items-center space-x-2 sm:order-3 sm:space-x-4">
               <ThemeToggle />
               {user ? (
                 <div className="flex items-center space-x-2">
@@ -584,16 +617,22 @@ export default function HomePage() {
               />
             </div>
 
-            {/* 無料プラン案内 */}
-            <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-              <div className="flex items-center justify-between">
-                <span>
-                  無料プランではAI機能を1日{dailyLimit}
-                  回までご利用いただけます。
-                </span>
-                {!isPremium && (
+            <DataStatusCard
+              items={dataStatusItems}
+              fetchedAt={searchResult.metadata?.fetchedAt}
+              isRetrying={isLoading}
+              onRetry={() =>
+                void searchCompany(searchResult.companyInfo.symbol, chartPeriod)
+              }
+            />
+
+            {/* 無料プラン案内：残り回数と、プレミアムで何が増えるかを具体的に示す */}
+            {!isPremium && (
+              <div className="mb-6 rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>無料プラン: AI分析は1日{dailyLimit}回まで</span>
                   <span
-                    className={`ml-3 flex-shrink-0 px-3 py-1 rounded-full text-xs font-bold ${
+                    className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
                       canUseFeature
                         ? "bg-green-200 text-green-800 dark:bg-green-900 dark:text-green-200"
                         : "bg-red-200 text-red-800 dark:bg-red-900 dark:text-red-200"
@@ -601,9 +640,17 @@ export default function HomePage() {
                   >
                     残り{remainingUses}/{dailyLimit}回
                   </span>
-                )}
+                </div>
+                <p className="mt-2 flex items-start gap-1.5 text-xs text-green-900/80 dark:text-green-200/80">
+                  <Crown className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    プレミアムならAI分析が回数無制限、ウォッチリストも無制限（無料は
+                    {FREE_WATCHLIST_LIMIT}
+                    銘柄）で、朝ダイジェストの対象を増やせます。
+                  </span>
+                </p>
               </div>
-            </div>
+            )}
             <LivePulseStrip />
             {searchSection}
             {watchlistSection}
@@ -617,13 +664,25 @@ export default function HomePage() {
               <div className="flex items-start gap-3 text-destructive">
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold">エラーが発生しました</p>
+                  <p className="font-semibold">
+                    {error
+                      ? "検索できませんでした"
+                      : "AI分析を完了できませんでした"}
+                  </p>
                   <p className="text-sm mt-1">{error || analysisError}</p>
                   <div className="flex gap-2 mt-3">
+                    {error && (
+                      <button
+                        onClick={() => void retrySearch()}
+                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                      >
+                        もう一度検索
+                      </button>
+                    )}
                     {analysisError && (
                       <button
                         onClick={retryAnalysis}
-                        className="text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
                       >
                         AI分析を再試行
                       </button>
@@ -710,6 +769,8 @@ export default function HomePage() {
                   dailyLimit={dailyLimit}
                   isPremium={isPremium}
                   currencySymbol={getCurrencySymbol}
+                  referenceLabels={aiReferenceLabels}
+                  analyzedAt={analyzedAt}
                 />
 
                 {/* 財務健全性（BS/PL/CF）評価 */}

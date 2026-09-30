@@ -1,48 +1,22 @@
-// Service Worker for kabuana PWA
-const CACHE_NAME = 'kabuana-v1.0.0';
-const urlsToCache = [
-  '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png'
-];
-
-// Install event
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('Opened cache');
-        return cache.addAll(urlsToCache);
-      })
-  );
+// 旧PWA用 Service Worker の後始末専用スクリプト。
+// 以前このファイルを登録した端末では、古いキャッシュ（kabuana-*）が
+// 最新の株価・画面を上書きし続ける恐れがあるため、更新時に
+// キャッシュを削除して自身を登録解除する。新規登録は行っていない。
+// ファイルを消すと更新チェックが 404 になり旧 SW が残り続けるので、削除しないこと。
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
-// Fetch event
-self.addEventListener('fetch', (event) => {
-  event.respondWith(
-    caches.match(event.request)
-      .then((response) => {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
-      })
-  );
-});
-
-// Activate event
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter(key => key.startsWith("kabuana-"))
+          .map(key => caches.delete(key))
       );
-    })
+      await self.registration.unregister();
+    })()
   );
 });

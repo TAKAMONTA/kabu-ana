@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDigest } from "@/hooks/useDigest";
 import type { WatchlistItem } from "@/hooks/useWatchlist";
 import { normalizeDisplayText } from "@/lib/displayText";
+import { AI_DISCLAIMER_SHORT } from "@/lib/constants";
 
 interface DigestSectionProps {
   items: WatchlistItem[];
@@ -86,7 +87,7 @@ export function DigestSection({ items }: DigestSectionProps) {
             </ul>
             <p className="text-sm">{digest.focusLine}</p>
             <p className="text-xs text-muted-foreground">
-              AIによる情報整理であり、投資助言ではありません
+              {AI_DISCLAIMER_SHORT}
               {digest.asOf ? ` ・ 株価は${digest.asOf}時点` : ""}
             </p>
           </div>

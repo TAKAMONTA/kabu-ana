@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Brain } from "lucide-react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
+import { AI_DISCLAIMER_SHORT } from "@/lib/constants";
 
 interface FinancialEvaluationSectionProps {
   financialEval: FinancialEvaluationResult | null;
@@ -141,6 +142,9 @@ export function FinancialEvaluationSection({
                 </ul>
               )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              {AI_DISCLAIMER_SHORT}
+            </p>
           </div>
         ) : (
           <div className="text-center py-6 text-sm text-muted-foreground">

@@ -9,9 +9,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Brain, ChevronDown, ChevronUp, Lock } from "lucide-react";
+import { Brain, ChevronDown, ChevronUp, Database, Lock } from "lucide-react";
 import { AnalysisResult } from "@/lib/api/openrouter";
 import { splitNarrativeAndJson } from "@/lib/api/analysisStream";
+import { AI_DISCLAIMER } from "@/lib/constants";
 
 interface AskSectionProps {
   isAnalyzing: boolean;
@@ -22,6 +23,23 @@ interface AskSectionProps {
   dailyLimit?: number;
   isPremium?: boolean;
   currencySymbol?: string;
+  /** AIに渡したデータの一覧（例: 「ニュース3件」）。根拠の見える化に使う */
+  referenceLabels?: string[];
+  /** 分析結果を受け取った時刻（ISO 8601） */
+  analyzedAt?: string | null;
+}
+
+function formatAnalyzedAt(iso?: string | null): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 const COMMENT_PREVIEW_LENGTH = 260;
@@ -197,7 +215,10 @@ export function AskSection({
   remainingUses = 5,
   isPremium = false,
   currencySymbol = "¥",
+  referenceLabels = [],
+  analyzedAt = null,
 }: AskSectionProps) {
+  const analyzedAtLabel = formatAnalyzedAt(analyzedAt);
   const [showDetails, setShowDetails] = useState(false);
   const [showFullComment, setShowFullComment] = useState(false);
 
@@ -329,8 +350,38 @@ export function AskSection({
                   </div>
                 </div>
 
+                <div className="rounded-lg border bg-muted/30 p-3">
+                  <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Database className="h-3.5 w-3.5 text-primary" />
+                      AIが参照したデータ
+                    </p>
+                    {analyzedAtLabel && (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {analyzedAtLabel} 生成
+                      </span>
+                    )}
+                  </div>
+                  {referenceLabels.length > 0 ? (
+                    <ul className="flex flex-wrap gap-1.5">
+                      {referenceLabels.map(label => (
+                        <li
+                          key={label}
+                          className="rounded-full border bg-background px-2.5 py-1 text-xs text-muted-foreground"
+                        >
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      参照できたデータが少ないため、一般的な内容にとどまる可能性があります。
+                    </p>
+                  )}
+                </div>
+
                 <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-                  本分析は情報提供を目的とした参考情報であり、投資助言・売買推奨ではありません。最終的な判断はご自身で行ってください。
+                  {AI_DISCLAIMER}
                 </div>
 
                 {hasMoreDetails && (
