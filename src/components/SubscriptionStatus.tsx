@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePurchase } from "@/hooks/usePurchase";
 import { useIOSPurchase } from "@/hooks/useIOSPurchase";
 import { isAndroidNative, isIOSNative } from "@/lib/utils/platformDetect";
+import { FREE_DAILY_LIMIT } from "@/hooks/useDailyUsage";
+import { FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -369,18 +371,18 @@ export function SubscriptionStatus() {
             </p>
 
             {/* 機能一覧 */}
+            {/* 無料プランとの実際の差分だけを書く（無料でも使える機能を特典として書かない） */}
             <ul className="list-disc space-y-1 pl-4 text-xs text-premium-muted">
-              <li>無制限のAI株式分析</li>
-              <li>詳細な財務評価レポート</li>
-              <li>リアルタイムニュース分析</li>
-              <li>広告なしの快適な利用体験</li>
+              <li>
+                AI分析（業績・ニュース・財務の要点整理）が回数無制限（無料は1日
+                {FREE_DAILY_LIMIT}回）
+              </li>
+              <li>
+                ウォッチリスト登録が無制限（無料は{FREE_WATCHLIST_LIMIT}銘柄）
+              </li>
+              <li>朝ダイジェストで最大10銘柄をまとめて確認</li>
+              {!usesNativeBilling && <li>広告の非表示</li>}
             </ul>
-
-            <div className="rounded-md border border-primary/25 bg-primary/10 p-3">
-              <p className="text-xs text-premium-foreground">
-                無料プランではAI機能を1日5回までご利用いただけます。プレミアムプランで無制限に！
-              </p>
-            </div>
 
             {/* プラン選択 */}
             <div className="space-y-2">

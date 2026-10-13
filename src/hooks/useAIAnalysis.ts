@@ -3,6 +3,10 @@ import { AnalysisResult } from "@/lib/api/openrouter";
 import { parseSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const ANALYSIS_ERROR_FALLBACK =
+  "AI分析を完了できませんでした。少し待ってから再試行してください。";
 
 function isCapacitorNative(): boolean {
   if (typeof window === "undefined") return false;
@@ -19,6 +23,8 @@ export function useAIAnalysis() {
     null
   );
   const [streamingText, setStreamingText] = useState("");
+  // 構造化結果を受け取った時刻。画面に「いつ生成した分析か」を出すために使う
+  const [analyzedAt, setAnalyzedAt] = useState<string | null>(null);
   const [bundleTokens, setBundleTokens] = useState<{
     financial: string;
     news: string;
@@ -63,6 +69,7 @@ export function useAIAnalysis() {
       };
       setStreamingText("");
       setAnalysisResult(null);
+      setAnalyzedAt(null);
       setBundleTokens(null);
       setError(null);
       setIsAnalyzing(true);
@@ -85,7 +92,12 @@ export function useAIAnalysis() {
 
           if (response.status !== 200) {
             if (!mountedRef.current) return;
-            setError(response.data?.error || "分析に失敗しました");
+            setError(
+              toFriendlyErrorMessage(
+                response.data?.error,
+                ANALYSIS_ERROR_FALLBACK
+              )
+            );
             return;
           }
 
@@ -102,6 +114,7 @@ export function useAIAnalysis() {
               try {
                 if (!mountedRef.current) return;
                 setAnalysisResult(JSON.parse(ev.data));
+                setAnalyzedAt(prev => prev ?? new Date().toISOString());
               } catch {
                 // ignore parse errors on result
               }
@@ -114,7 +127,9 @@ export function useAIAnalysis() {
               }
             } else if (ev.event === "error") {
               if (!mountedRef.current) return;
-              setError(ev.data);
+              setError(
+                toFriendlyErrorMessage(ev.data, ANALYSIS_ERROR_FALLBACK)
+              );
               return;
             }
           }
@@ -139,13 +154,15 @@ export function useAIAnalysis() {
           ) {
             const json = await res.json();
             if (!mountedRef.current) return;
-            setError(json.error || "分析に失敗しました");
+            setError(
+              toFriendlyErrorMessage(json.error, ANALYSIS_ERROR_FALLBACK)
+            );
             return;
           }
 
           if (!res.body) {
             if (!mountedRef.current) return;
-            setError("AI分析中にエラーが発生しました");
+            setError(ANALYSIS_ERROR_FALLBACK);
             return;
           }
 
@@ -167,6 +184,7 @@ export function useAIAnalysis() {
                 try {
                   if (!mountedRef.current) return;
                   setAnalysisResult(JSON.parse(ev.data));
+                  setAnalyzedAt(prev => prev ?? new Date().toISOString());
                 } catch {
                   // ignore parse errors on result
                 }
@@ -179,7 +197,9 @@ export function useAIAnalysis() {
                 }
               } else if (ev.event === "error") {
                 if (!mountedRef.current) return;
-                setError(ev.data);
+                setError(
+                  toFriendlyErrorMessage(ev.data, ANALYSIS_ERROR_FALLBACK)
+                );
                 return;
               }
             }
@@ -190,7 +210,10 @@ export function useAIAnalysis() {
       } catch (err) {
         if (!mountedRef.current) return;
         setError(
-          err instanceof Error ? err.message : "分析中にエラーが発生しました"
+          toFriendlyErrorMessage(
+            err instanceof Error ? err.message : null,
+            ANALYSIS_ERROR_FALLBACK
+          )
         );
       } finally {
         if (mountedRef.current) setIsAnalyzing(false);
@@ -209,6 +232,7 @@ export function useAIAnalysis() {
 
   const clearAnalysis = useCallback(() => {
     setAnalysisResult(null);
+    setAnalyzedAt(null);
     setStreamingText("");
     setBundleTokens(null);
     setError(null);
@@ -218,6 +242,7 @@ export function useAIAnalysis() {
     isAnalyzing,
     error,
     analysisResult,
+    analyzedAt,
     streamingText,
     bundleTokens,
     analyzeStock,

@@ -22,12 +22,15 @@ export function ChartPeriodSelector({
   onPeriodChange,
 }: ChartPeriodSelectorProps) {
   return (
-    <div className="flex space-x-2 mb-4">
+    // スマホ幅で「5年」「全期間」が画面外に切れて押せなかったため折り返す
+    <div className="mb-4 flex flex-wrap gap-2">
       {PERIODS.map(period => (
         <Button
           key={period.value}
           variant={selectedPeriod === period.value ? "default" : "outline"}
           size="sm"
+          className="h-9 px-3"
+          aria-pressed={selectedPeriod === period.value}
           onClick={() => onPeriodChange(period.value)}
         >
           {period.label}

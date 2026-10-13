@@ -96,7 +96,7 @@ export function SearchSection({
               </Label>
               <Input
                 id="search"
-                placeholder="証券コード、ティッカーシンボル、または企業名で検索（例: 7203, AAPL, トヨタ自動車）"
+                placeholder="企業名・証券コードで検索（例: トヨタ, 7203, AAPL）"
                 value={searchQuery}
                 onChange={e => onInputChange(e.target.value)}
                 onKeyDown={handleKeyDown}

@@ -498,6 +498,7 @@ async function searchHandler(request: NextRequest) {
         dataSource,
         edinetStatus,
         timings,
+        fetchedAt: new Date().toISOString(),
       },
     });
   } catch (error) {

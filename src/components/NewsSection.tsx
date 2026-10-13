@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Brain, TrendingUp, ExternalLink } from "lucide-react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { normalizeDisplayText } from "@/lib/displayText";
+import { AI_DISCLAIMER_SHORT } from "@/lib/constants";
 
 interface NewsItem {
   title?: string;
@@ -104,7 +105,9 @@ export function NewsSection({
         )}
         {newsAnalysis?.parseFailed ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
-            <p className="font-semibold">ニュース影響分析を表示できませんでした</p>
+            <p className="font-semibold">
+              ニュース影響分析を表示できませんでした
+            </p>
             <p className="mt-1 text-muted-foreground">
               {newsAnalysis.analysis ||
                 "AIの応答形式を読み取れませんでした。しばらくしてから再度お試しください。"}
@@ -130,7 +133,7 @@ export function NewsSection({
                   <TrendingUp className="h-5 w-5 text-purple-800 dark:text-purple-200" />
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
                     <h4 className="font-bold text-purple-950 text-lg dark:text-purple-100">
                       📈 ニュース影響分析
                     </h4>
@@ -213,6 +216,9 @@ export function NewsSection({
                 </div>
               </div>
             )}
+            <p className="text-xs text-muted-foreground">
+              {AI_DISCLAIMER_SHORT}
+            </p>
           </div>
         ) : newsEmpty ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-muted-foreground dark:border-slate-800 dark:bg-slate-900">
