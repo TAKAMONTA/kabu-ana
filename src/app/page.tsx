@@ -599,6 +599,8 @@ export default function HomePage() {
           />
         ) : (
           <>
+            {/* 別の銘柄をすぐ調べられるよう、検索欄は結果の上に置く */}
+            {searchSection}
             <div className="mb-6">
               <StockPriceHeaderCard
                 companyInfo={searchResult.companyInfo}
@@ -606,6 +608,11 @@ export default function HomePage() {
                 currency={getCurrencySymbol}
                 isWatched={watchlist.has(searchResult.companyInfo.symbol)}
                 onToggleWatch={() => {
+                  // 未ログインで★を押しても無反応にならないよう、ログインを促す
+                  if (!user) {
+                    setShowAuthModal(true);
+                    return;
+                  }
                   const { symbol, name } = searchResult.companyInfo;
                   if (watchlist.isBusy(symbol)) return;
                   if (watchlist.has(symbol)) {
@@ -651,9 +658,6 @@ export default function HomePage() {
                 </p>
               </div>
             )}
-            <LivePulseStrip />
-            {searchSection}
-            {watchlistSection}
           </>
         )}
 
@@ -699,6 +703,20 @@ export default function HomePage() {
             {/* チャート部分（左側 - 3カラム） */}
             <div className="lg:col-span-3">
               <div className="space-y-6">
+                {/* アプリの売りであるAI要約をスマホでも最初に見せる */}
+                <AskSection
+                  isAnalyzing={isAnalyzing}
+                  streamingText={streamingText}
+                  analysisResult={analysisResult}
+                  canUseFeature={canUseFeature}
+                  remainingUses={remainingUses}
+                  dailyLimit={dailyLimit}
+                  isPremium={isPremium}
+                  currencySymbol={getCurrencySymbol}
+                  referenceLabels={aiReferenceLabels}
+                  analyzedAt={analyzedAt}
+                />
+
                 {/* チャートセクション */}
                 <StockChart
                   symbol={searchResult.companyInfo.symbol}
@@ -759,20 +777,6 @@ export default function HomePage() {
                   }
                 />
 
-                {/* AIに質問するセクション（会話型UI） */}
-                <AskSection
-                  isAnalyzing={isAnalyzing}
-                  streamingText={streamingText}
-                  analysisResult={analysisResult}
-                  canUseFeature={canUseFeature}
-                  remainingUses={remainingUses}
-                  dailyLimit={dailyLimit}
-                  isPremium={isPremium}
-                  currencySymbol={getCurrencySymbol}
-                  referenceLabels={aiReferenceLabels}
-                  analyzedAt={analyzedAt}
-                />
-
                 {/* 財務健全性（BS/PL/CF）評価 */}
                 <FinancialEvaluationSection
                   financialEval={financialEval}
@@ -804,8 +808,17 @@ export default function HomePage() {
                 financialData={searchResult.financialData}
                 currency={getCurrencySymbol}
                 showPriceHeader={false}
+                dividendYield={searchResult.ratios?.dividendYield ?? null}
               />
             </div>
+          </div>
+        )}
+
+        {/* 市場全体の情報とウォッチリストは、銘柄の分析結果より後ろに置く */}
+        {searchResult && (
+          <div className="mt-6 space-y-6">
+            {watchlistSection}
+            <LivePulseStrip />
           </div>
         )}
 

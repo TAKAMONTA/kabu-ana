@@ -28,13 +28,13 @@ export interface TradingValueItem {
 const translateWarningCode = (code: string): string | null => {
   switch (code) {
     case "news_unavailable":
-      return "現在、候補にできるニュース材料を取得できていません。";
+      return "今はニュースを取得できていません。時間をおいて再度ご確認ください。";
     case "news_low_signal":
-      return "ニュースは取得できましたが、企業名を確認できる材料が少ないため、候補を無理に増やしていません。";
+      return "今日は名前が挙がった銘柄が少ないため、無理に候補を増やしていません。";
     case "news_partial_signal":
-      return "ニュース内で企業名を確認できた銘柄だけを表示しています。";
+      return "ニュースで名前が挙がった銘柄だけを表示しています。";
     case "stale_signal":
-      return "最新取得に失敗したため、直近に取得できた候補を表示しています。";
+      return "最新のニュースを取得できなかったため、少し前の候補を表示しています。";
     default:
       return null;
   }
@@ -91,7 +91,7 @@ export function useTopTradingValue() {
 
       const options = {
         url: requestUrl,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       };
 
       const response = await CapacitorHttp.get(options);
@@ -102,7 +102,10 @@ export function useTopTradingValue() {
         const errorData = data;
         const errorCode = errorData?.error || "ranking_fetch_failed";
         const friendlyMessage = translateErrorCode(errorCode);
-        throw new Error(friendlyMessage || `ランキングの取得に失敗しました（ステータス: ${status}）`);
+        throw new Error(
+          friendlyMessage ||
+            `ランキングの取得に失敗しました（ステータス: ${status}）`
+        );
       }
 
       if (!mountedRef.current) return;
@@ -138,7 +141,9 @@ export function useTopTradingValue() {
   useEffect(() => {
     mountedRef.current = true;
     fetchRanking();
-    return () => { mountedRef.current = false; };
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchRanking]);
 
   return { items, isLoading, error, warning, refresh: fetchRanking };

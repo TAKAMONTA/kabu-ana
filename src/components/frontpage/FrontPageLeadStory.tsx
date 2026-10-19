@@ -50,14 +50,14 @@ export function FrontPageLeadStory({
   if (!idea) {
     return (
       <article className="border-y border-border py-5">
-        <p className="text-xs font-semibold uppercase text-muted-foreground">
-          Market Lead
+        <p className="text-xs font-semibold text-muted-foreground">
+          今日の注目銘柄
         </p>
-        <h2 className="mt-2 text-2xl font-bold tracking-tight">
-          企業名を確認できるニュース材料を待機中
+        <h2 className="mt-2 text-xl font-bold tracking-tight">
+          今日の注目銘柄はまだありません
         </h2>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          ニュース内で銘柄名を確認できたものだけを注目材料として扱います。
+          ニュースで名前が挙がった銘柄が見つかると、ここに表示します。
           {warning ? ` ${warning}` : ""}
         </p>
       </article>
@@ -67,7 +67,7 @@ export function FrontPageLeadStory({
   return (
     <article className="border-y border-border py-5">
       <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="font-semibold uppercase">Market Lead</span>
+        <span className="font-semibold">今日の注目銘柄</span>
         <span className="h-1 w-1 rounded-full bg-muted-foreground/60" />
         <span>{idea.code}</span>
         {idea.signalLabel && (

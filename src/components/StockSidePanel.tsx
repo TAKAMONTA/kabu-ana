@@ -52,6 +52,8 @@ interface StockSidePanelProps {
   financialData?: FinancialData | null;
   currency?: string;
   showPriceHeader?: boolean;
+  /** 有価証券報告書ベースの配当利回り（0.034 = 3.4%）。株価APIからは配当が取れないため */
+  dividendYield?: number | null;
 }
 
 interface StockPriceHeaderCardProps {
@@ -200,7 +202,15 @@ export function StockSidePanel({
   financialData,
   currency = "$",
   showPriceHeader = true,
+  dividendYield = null,
 }: StockSidePanelProps) {
+  // 株価APIは配当を返さず常に 0 になるため、0 を「0%」と表示しない
+  const dividendYieldPercent =
+    dividendYield != null && Number.isFinite(dividendYield)
+      ? dividendYield * 100
+      : stockData && stockData.dividend > 0
+        ? stockData.dividend
+        : null;
   const getCurrencySymbol = () => {
     return companyInfo.market === "TYO" ? "¥" : currency;
   };
@@ -270,17 +280,30 @@ export function StockSidePanel({
                   : "N/A"
                 : stockData.pe || "N/A"
             }
-            description="益利回り指標"
+            description="株価収益率（株価 ÷ 1株あたり利益）"
           />
           <StatsCard
             label="配当利回り"
-            value={formatPercentage(stockData.dividend)}
-            trend={
-              stockData.dividend >= 2
-                ? "up"
-                : stockData.dividend > 0
-                  ? "neutral"
+            value={
+              dividendYieldPercent != null
+                ? formatPercentage(dividendYieldPercent)
+                : "—"
+            }
+            description={
+              dividendYieldPercent != null
+                ? dividendYield != null
+                  ? "有価証券報告書ベース"
                   : undefined
+                : "データなし"
+            }
+            trend={
+              dividendYieldPercent == null
+                ? undefined
+                : dividendYieldPercent >= 2
+                  ? "up"
+                  : dividendYieldPercent > 0
+                    ? "neutral"
+                    : undefined
             }
           />
           <StatsCard
