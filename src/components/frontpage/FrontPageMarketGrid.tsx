@@ -23,26 +23,28 @@ export function FrontPageMarketGrid({
   const items = [
     {
       icon: Newspaper,
-      label: "個別材料",
+      label: "注目銘柄",
       value: isLoading
         ? "確認中"
         : topIdea
           ? `${normalizeDisplayText(topIdea.name)} ${topIdea.code}`
-          : "待機中",
-      sub: topIdea?.signalLabel || "ニュース銘柄を抽出",
+          : "まだありません",
+      sub: topIdea?.signalLabel || "ニュースで話題の銘柄",
     },
     {
       icon: Radio,
-      label: "外部環境",
-      value: "Signals",
-      sub: "原油・金利・地政学",
+      label: "市場全体",
+      value: "マーケット・シグナル",
+      sub: "原油・金利・世界情勢を見る",
       href: "/signals",
     },
     {
       icon: Search,
-      label: "分析枠",
-      value: isPremium ? "Premium" : `${remainingUses}/${dailyLimit}`,
-      sub: isPremium ? "AI分析利用中" : "本日の残り回数",
+      label: "AI分析",
+      value: isPremium ? "回数無制限" : `今日あと${remainingUses}回`,
+      sub: isPremium
+        ? "プレミアム利用中"
+        : `無料プランは1日${dailyLimit}回まで`,
     },
   ];
 

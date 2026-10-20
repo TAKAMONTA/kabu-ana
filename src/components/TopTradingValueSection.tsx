@@ -75,9 +75,9 @@ export function TopTradingValueSection({
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base">注目の日本株（ニュース材料）</CardTitle>
+            <CardTitle className="text-base">ニュースで話題の日本株</CardTitle>
             <span className="text-xs text-muted-foreground">
-              {isLoading ? "更新中..." : "取得済み"}
+              {isLoading ? "更新中..." : ""}
             </span>
           </div>
           {error && !isLoading && (
@@ -170,7 +170,7 @@ export function TopTradingValueSection({
                 })}
             {!isLoading && items.length === 0 && !error && (
               <li className="rounded-md border p-4 text-center text-sm text-muted-foreground">
-                企業名を確認できるニュース材料がまだありません。
+                今日はまだ話題の銘柄が見つかっていません。
               </li>
             )}
           </ul>

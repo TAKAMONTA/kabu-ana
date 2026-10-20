@@ -63,8 +63,8 @@ export function MarketFrontPage({
           <div className="min-w-0">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-muted-foreground">
-                  {APP_NAME} market desk
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-muted-foreground">
+                  {APP_NAME}
                 </p>
                 <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
                   今日の市場一面
