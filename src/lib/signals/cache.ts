@@ -1,4 +1,5 @@
 import { getAdminApp } from "@/lib/auth/verifyAuth";
+import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
 
 export interface SignalApiResponse<T> {
   data: T | null;
@@ -12,7 +13,12 @@ export async function getSignalsDb() {
   try {
     const { getFirestore } = await import("firebase-admin/firestore");
     return getFirestore(getAdminApp());
-  } catch {
+  } catch (error) {
+    if (error instanceof FirebaseAdminConfigError) {
+      console.error(
+        "getSignalsDb: Firebase Admin SDKの設定エラーのためシグナルキャッシュを無効化します"
+      );
+    }
     return null;
   }
 }

@@ -230,19 +230,65 @@ function validateMorningBrief(payload, { now, briefMaxAgeHours }) {
 }
 
 /**
+ * レスポンス本文がアプリ（/api/subscription/check）のエラーJSON
+ * （`{"error": "<string>"}`）かどうかを判定し、そうであれば`error`の値を返す。
+ * JSONとしてparseできない、配列、`error`がobject/undefinedの場合はnullを返す。
+ * これによりVercelプラットフォーム由来のエラー本文（HTML/プレーンテキスト等）と
+ * アプリ自身が返したエラーを区別する。
+ */
+function parseAppErrorBody(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (isRecord(parsed) && typeof parsed.error === "string") {
+    return parsed.error;
+  }
+  return null;
+}
+
+/**
  * Firebase Admin SDK が本番で正しく初期化されているかを検証する。
  * 偽トークンでGETするだけで書き込みは発生しないため、本番に副作用を起こさない。
- * - 401: Admin初期化に成功し、偽トークンを正しく拒否できている → 健全
- * - 503/500: Admin初期化に失敗している（FIREBASE_SERVICE_ACCOUNT_KEY未設定/不正の疑い）
+ * 判定はステータスコードだけでなく、本文がアプリ（route.ts）のJSONかどうかも見る。
+ * - 401 かつ本文が `{"error":"認証に失敗しました"}`: Admin初期化に成功し、
+ *   偽トークンを正しく拒否できている → 健全
+ * - 401 かつ本文はアプリのJSONだが文言が異なる: subscription/check の401文言が
+ *   変わった可能性があり、プローブの期待値更新が必要
+ * - 401 だが本文がアプリのJSONでない: Vercel Deployment Protectionなど
+ *   別系統が応答しており、プローブがアプリに到達していない疑い
+ * - 503/500 かつ本文がアプリのJSON: Admin初期化に失敗している
+ *   （FIREBASE_SERVICE_ACCOUNT_KEY未設定/不正の疑い）
+ * - 503/500 だが本文がアプリのJSONでない: Vercelプラットフォーム側のエラー
+ *   の可能性があり、FIREBASE_SERVICE_ACCOUNT_KEYの問題とは断定できない
  * - 400: idTokenがルートに届いていない＝プローブ自体の不備
  * - それ以外: 想定外のレスポンス
  */
 function validateFirebaseAdminHealth({ status, text }) {
-  if (status === 401) return;
+  const appError = parseAppErrorBody(text);
+
+  if (status === 401) {
+    if (appError === "認証に失敗しました") return;
+    if (appError !== null) {
+      throw new Error(
+        `Firebase Admin health check inconclusive: HTTP 401 from the app but with an unexpected error message (subscription/check の 401 文言が変わった可能性があります。プローブの期待値を更新してください): ${truncate(text)}`
+      );
+    }
+    throw new Error(
+      `Firebase Admin health check inconclusive: HTTP 401 but the body is not the app's auth-failure JSON (Deployment Protection など別系統が応答している可能性があります。プローブがアプリに到達していません): ${truncate(text)}`
+    );
+  }
 
   if (status === 503 || status === 500) {
+    if (appError !== null) {
+      throw new Error(
+        `Firebase Admin health check failed: HTTP ${status} (Firebase Admin が初期化できていない可能性があります。FIREBASE_SERVICE_ACCOUNT_KEY を確認してください): ${truncate(text)}`
+      );
+    }
     throw new Error(
-      `Firebase Admin health check failed: HTTP ${status} (Firebase Admin が初期化できていない可能性があります。FIREBASE_SERVICE_ACCOUNT_KEY を確認してください): ${truncate(text)}`
+      `Firebase Admin health check inconclusive: HTTP ${status} with a non-app response body (Vercel プラットフォーム側のエラーの可能性があります。FIREBASE_SERVICE_ACCOUNT_KEY の問題とは断定できません): ${truncate(text)}`
     );
   }
 
