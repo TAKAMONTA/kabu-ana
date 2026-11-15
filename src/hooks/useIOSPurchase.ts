@@ -93,7 +93,6 @@ export function useIOSPurchase() {
             }
 
             setIsInitialized(true);
-            console.log("ネイティブ課金初期化完了:", storeProducts);
         } catch (err: any) {
             console.error("ネイティブ課金初期化エラー:", err);
             setError("ストアの初期化に失敗しました。アプリを再起動してお試しください。");
@@ -141,7 +140,7 @@ export function useIOSPurchase() {
                     quantity: 1,
                 });
 
-                console.log("ネイティブ購入成功:", result);
+                // 購入結果（トランザクション情報）はログに残さない
 
                 // Firebase Auth トークンを取得
                 const idToken = await auth.currentUser!.getIdToken();
@@ -223,7 +222,6 @@ export function useIOSPurchase() {
                 );
             }
 
-            console.log("購入の復元が完了しました");
             setIsLoading(false);
             return true;
         } catch (err: any) {
