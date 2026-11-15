@@ -104,35 +104,6 @@ export interface EdinetRatios {
   capex_to_depreciation?: number;
 }
 
-export interface EdinetAnalysis {
-  credit_score?: number;
-  credit_rating?: string;
-  summary?: string;
-  strengths?: string[];
-  risks?: string[];
-  [key: string]: unknown;
-}
-
-export interface EdinetTextBlock {
-  section?: string;
-  title?: string;
-  content?: string;
-}
-
-export interface EdinetRankingItem {
-  edinet_code: string;
-  name: string;
-  sec_code?: string;
-  value: number;
-  industry?: string;
-}
-
-export interface EdinetIndustry {
-  slug: string;
-  name: string;
-  company_count?: number;
-}
-
 type EdinetEnvelope<T> = {
   data?: T | null;
   [key: string]: unknown;
@@ -263,57 +234,4 @@ export class EdinetDBClient {
     }
     return data;
   }
-
-  /** AI財務健全性スコア */
-  async getAnalysis(edinetCode: string): Promise<EdinetAnalysis | null> {
-    const path = `/companies/${edinetCode}/analysis`;
-    const response = await this.request<EdinetEnvelope<EdinetAnalysis>>(path);
-    return this.readDataEnvelope(path, response);
-  }
-
-  /** 有報テキストブロック */
-  async getTextBlocks(edinetCode: string): Promise<EdinetTextBlock[]> {
-    const path = `/companies/${edinetCode}/text-blocks`;
-    const response =
-      await this.request<EdinetEnvelope<EdinetTextBlock[]>>(path);
-    return this.readDataEnvelope(path, response) ?? [];
-  }
-
-  /** ランキング */
-  async getRanking(metric: string, limit = 20): Promise<EdinetRankingItem[]> {
-    const path = `/rankings/${metric}`;
-    const response = await this.request<EdinetEnvelope<EdinetRankingItem[]>>(
-      path,
-      { limit }
-    );
-    return this.readDataEnvelope(path, response) ?? [];
-  }
-
-  /** 業種一覧 */
-  async getIndustries(): Promise<EdinetIndustry[]> {
-    const path = "/industries";
-    const response = await this.request<EdinetEnvelope<EdinetIndustry[]>>(path);
-    return this.readDataEnvelope(path, response) ?? [];
-  }
-
-  /** 業種別企業一覧 */
-  async getIndustry(
-    slug: string
-  ): Promise<{ industry: EdinetIndustry; companies: EdinetCompany[] } | null> {
-    const path = `/industries/${slug}`;
-    const response =
-      await this.request<
-        EdinetEnvelope<{ industry: EdinetIndustry; companies: EdinetCompany[] }>
-      >(path);
-    return this.readDataEnvelope(path, response);
-  }
-}
-
-/** クエリが日本企業（EDINET DB 検索対象）かどうかを事前判定 */
-export function isJapaneseQuery(query: string): boolean {
-  // 4桁の数字は日本の証券コード
-  if (/^\d{4}$/.test(query.trim())) return true;
-  // 日本語文字（ひらがな・カタカナ・漢字）を含む
-  if (/[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf]/.test(query)) return true;
-  return false;
 }

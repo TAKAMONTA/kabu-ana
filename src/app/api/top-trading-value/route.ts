@@ -6,9 +6,8 @@ import {
   type TradingValueItem,
 } from "@/lib/topTradingValue";
 
-// export const dynamic = "force-dynamic";
-export const revalidate = 1800; // 30分ごとに更新（segment config は数値リテラル必須）
-
+// force-dynamic のルートでは segment の revalidate は効かない（毎リクエスト実行される）。
+// 更新間隔はこのファイル内のメモリキャッシュ（CACHE_TTL_MS）で制御している。
 export const dynamic = "force-dynamic";
 
 const NEWS_TOPICS = [
