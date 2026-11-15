@@ -21,7 +21,11 @@ export function ClaudeBriefCard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <PanelLoading rows={4} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : brief && (
+        {isLoading ? <PanelLoading rows={4} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : !brief ? (
+          <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            今日のブリーフはまだ作成されていません。時間をおいて再度ご確認ください。
+          </p>
+        ) : (
           <div className="space-y-4">
             <div className="rounded-md border bg-background p-4">
               <div className="text-lg font-semibold">{brief.headline_jp}</div>

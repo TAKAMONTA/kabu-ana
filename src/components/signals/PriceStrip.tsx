@@ -18,7 +18,11 @@ export function PriceStrip() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <PanelLoading rows={2} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : (
+        {isLoading ? <PanelLoading rows={2} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : prices.length === 0 ? (
+          <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            価格データはまだありません。時間をおいて再度ご確認ください。
+          </p>
+        ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {prices.map((price) => {
               const change = price.change24h;

@@ -679,6 +679,8 @@ export default function HomePage() {
             stockIdeas={tradingRanking}
             isStockIdeasLoading={isRankingLoading}
             warning={rankingWarning}
+            stockIdeasError={rankingError}
+            onRetryStockIdeas={() => void refreshRanking()}
             remainingUses={remainingUses}
             dailyLimit={dailyLimit}
             isPremium={isPremium}
