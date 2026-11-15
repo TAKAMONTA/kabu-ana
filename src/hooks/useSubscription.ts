@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Subscription } from "@/lib/types/subscription";
+import {
+  isSubscriptionPremium,
+  type Subscription,
+} from "@/lib/types/subscription";
 import { useAuth } from "./useAuth";
 
 /**
@@ -60,13 +63,15 @@ export function useSubscription() {
   }, [user]);
 
   /**
-   * 購入状態が有効かどうかを判定
+   * 購入状態が有効かどうかを判定。
+   * サーバー（/api/subscription/check 等）と同じ isSubscriptionPremium を使い、
+   * Web版で解約予約した人も支払い済みの期限までプレミアムとして扱う。
    */
   const isActive = subscription?.status === "active" || subscription?.status === "trial";
-  const hasExpired = subscription?.expiryDate 
-    ? new Date() > subscription.expiryDate 
+  const hasExpired = subscription?.expiryDate
+    ? new Date() > subscription.expiryDate
     : false;
-  const isPremium = isActive && !hasExpired;
+  const isPremium = isSubscriptionPremium(subscription);
 
   return {
     subscription,
