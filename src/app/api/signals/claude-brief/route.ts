@@ -176,9 +176,7 @@ async function postHandler(request: NextRequest) {
 
   const authResult = await verifyAuth(request);
   if (isAuthError(authResult)) {
-    return NextResponse.json(
-      fail<ClaudeDeepDive>("深掘り分析にはログインが必要です")
-    );
+    return authResult;
   }
 
   try {
