@@ -336,7 +336,7 @@ describe("POST /api/watchlist", () => {
   it("期限切れの購読は無料プランとして上限を適用する", async () => {
     state.subscription = {
       status: "active",
-      expiryDate: { toDate: () => new Date(Date.now() - 86_400_000) },
+      expiryDate: { toDate: () => new Date(Date.now() - 3 * 86_400_000) /* Web は48時間の猶予があるため3日前 */ },
     };
     state.watchlistSize = FREE_WATCHLIST_LIMIT;
     const response = await postWatchlist({

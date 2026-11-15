@@ -23,6 +23,7 @@ export interface Subscription {
   isTrial: boolean;                   // トライアルかどうか
   createdAt: Date;                    // レコード作成日時
   updatedAt: Date;                    // 最終更新日時
+  storeValidatedAt?: Date;            // ストアでの最終検証日時（ネイティブ購入のみ）
 }
 
 /**
@@ -52,6 +53,9 @@ export interface SubscriptionEntitlementInput {
   platform?: unknown;
   expiryDate?: unknown;
 }
+
+/** Web の継続中の購読に与える、更新日（renews_at）からの猶予 */
+export const WEB_RENEWAL_GRACE_MS = 48 * 60 * 60 * 1000;
 
 /** 解釈できない値を表す番兵（「期限なし」と区別するため） */
 const INVALID_DATE = Symbol("invalid-date");
@@ -88,6 +92,8 @@ function normalizeExpiry(value: unknown): Date | null | typeof INVALID_DATE {
  * サーバー側のプレミアム判定（全エンドポイント共通）。
  *
  * - status が active / trial: 期限なし、または期限が未来ならプレミアム
+ *   （Web は renews_at から 48 時間の猶予。更新通知の到着待ちで失効させない）
+ * - 返金済みの Web 購読は status を expired にして保存する（＝無効）
  * - status が cancelled かつ Web（Lemon Squeezy）購入: 期限（ends_at）が未来なら
  *   プレミアム。Lemon Squeezy の cancelled は「自動更新の停止」で、支払い済みの
  *   期間が終わるまでは利用できる（grace period）ため。
@@ -105,14 +111,20 @@ export function isSubscriptionPremium(
   if (expiry === INVALID_DATE) return false;
 
   const status = subscription.status;
+  const isNative =
+    subscription.platform === "ios" || subscription.platform === "android";
   if (status === "active" || status === "trial") {
-    return expiry === null || now.getTime() < expiry.getTime();
+    if (expiry === null) return true;
+    // Web（Lemon Squeezy）の継続中の購読は expiryDate = renews_at（次回更新日）。
+    // 更新の subscription_updated が届くまでの間に失効しないよう 48 時間の猶予を置く。
+    // ネイティブはストアの期限そのもの（猶予期間はストア側の状態で表す）なので猶予なし。
+    const grace = isNative ? 0 : WEB_RENEWAL_GRACE_MS;
+    return now.getTime() < expiry.getTime() + grace;
   }
 
   if (status === "cancelled") {
-    const isNative =
-      subscription.platform === "ios" || subscription.platform === "android";
     if (isNative) return false;
+    // 解約済み（ends_at まで）には猶予を足さない
     return expiry !== null && now.getTime() < expiry.getTime();
   }
 

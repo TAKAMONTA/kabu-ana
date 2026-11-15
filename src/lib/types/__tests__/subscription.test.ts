@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSubscriptionPremium } from "../subscription";
+import { isSubscriptionPremium, WEB_RENEWAL_GRACE_MS } from "../subscription";
 
 const NOW = new Date("2026-11-15T00:00:00.000Z");
 const FUTURE = new Date("2026-12-01T00:00:00.000Z");
@@ -108,6 +108,32 @@ describe("isSubscriptionPremium", () => {
     ).toBe(false);
     expect(
       isSubscriptionPremium({ status: "active", expiryDate: { foo: 1 } }, NOW)
+    ).toBe(false);
+  });
+
+  it("gives active/trial web subscriptions a 48h grace after renews_at (renewal webhook may lag)", () => {
+    const justRenewed = new Date(NOW.getTime() - 60 * 60 * 1000); // 1時間前が更新日
+    expect(
+      isSubscriptionPremium({ status: "active", platform: "web", expiryDate: justRenewed }, NOW)
+    ).toBe(true);
+    expect(
+      isSubscriptionPremium({ status: "trial", platform: "web", expiryDate: justRenewed }, NOW)
+    ).toBe(true);
+    const beyondGrace = new Date(NOW.getTime() - WEB_RENEWAL_GRACE_MS - 1);
+    expect(
+      isSubscriptionPremium({ status: "active", platform: "web", expiryDate: beyondGrace }, NOW)
+    ).toBe(false);
+  });
+
+  it("does not add the grace to native subscriptions or to cancelled web subscriptions", () => {
+    const justPassed = new Date(NOW.getTime() - 60 * 60 * 1000);
+    for (const platform of ["ios", "android"]) {
+      expect(
+        isSubscriptionPremium({ status: "active", platform, expiryDate: justPassed }, NOW)
+      ).toBe(false);
+    }
+    expect(
+      isSubscriptionPremium({ status: "cancelled", platform: "web", expiryDate: justPassed }, NOW)
     ).toBe(false);
   });
 });

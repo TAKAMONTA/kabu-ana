@@ -105,7 +105,7 @@ describe("checkPremiumStatus with a subscription document", () => {
   it("treats an expired active subscription as free", async () => {
     subscriptionDataMock.mockReturnValue({
       status: "active",
-      expiryDate: { toDate: () => new Date(Date.now() - 86_400_000) },
+      expiryDate: { toDate: () => new Date(Date.now() - 3 * 86_400_000) /* Web は48時間の猶予があるため3日前 */ },
     });
     await expect(
       checkPremiumStatus(makeRequest({ authorization: "Bearer token" }))
