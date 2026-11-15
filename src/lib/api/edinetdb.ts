@@ -1,4 +1,6 @@
 const EDINETDB_BASE_URL = "https://edinetdb.jp/v1";
+/** 1リクエストあたりのタイムアウト */
+export const EDINETDB_FETCH_TIMEOUT_MS = 8_000;
 
 // ---- 型定義 ----
 
@@ -184,7 +186,10 @@ export class EdinetDBClient {
           url.searchParams.set(k, String(v))
         );
       }
-      const res = await fetch(url.toString(), { headers: this.headers });
+      const res = await fetch(url.toString(), {
+        headers: this.headers,
+        signal: AbortSignal.timeout(EDINETDB_FETCH_TIMEOUT_MS),
+      });
       if (!res.ok) {
         const text = await res.text();
         console.error(

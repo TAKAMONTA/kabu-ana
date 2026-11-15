@@ -10,6 +10,8 @@ import type {
 } from "./marketDataTypes";
 
 const BASE = "https://api.twelvedata.com";
+/** 1リクエストあたりのタイムアウト */
+export const TWELVE_DATA_FETCH_TIMEOUT_MS = 10_000;
 
 /** アプリの window 値 → Twelve Data {interval, outputsize} */
 export function tdWindow(window: string = "1M"): {
@@ -19,7 +21,9 @@ export function tdWindow(window: string = "1M"): {
   const table: Record<string, { interval: string; outputsize: number }> = {
     "1D": { interval: "5min", outputsize: 78 },
     "5D": { interval: "30min", outputsize: 65 },
+    "1W": { interval: "1h", outputsize: 35 },
     "1M": { interval: "1day", outputsize: 23 },
+    "3M": { interval: "1day", outputsize: 65 },
     "6M": { interval: "1day", outputsize: 130 },
     "1Y": { interval: "1day", outputsize: 252 },
     "5Y": { interval: "1week", outputsize: 260 },
@@ -39,9 +43,9 @@ export class TwelveDataClient implements MarketDataClient {
 
   private async get(path: string): Promise<any> {
     const sep = path.includes("?") ? "&" : "?";
-    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`).catch(
-      () => null
-    );
+    const res = await fetch(`${BASE}${path}${sep}apikey=${this.apiKey}`, {
+      signal: AbortSignal.timeout(TWELVE_DATA_FETCH_TIMEOUT_MS),
+    }).catch(() => null);
     if (!res) return null;
     const body = await res.json().catch(() => ({}));
     if (body && (body.status === "error" || Number(body.code) >= 400))

@@ -6,7 +6,12 @@ import { JPX_STOCK_BY_CODE } from "@/lib/jpx/stockMaster";
 import { normalizeDisplayText } from "@/lib/displayText";
 import { FreeNewsClient } from "../freeNews";
 
-const okJson = (data: any) => ({ json: async () => ({ data }) });
+// 実物の fetch と同じく ok / status を持たせる（getData が res.ok を確認するようになったため）
+const okJson = (data: any) => ({
+  ok: true,
+  status: 200,
+  json: async () => ({ data }),
+});
 
 beforeEach(() => fetchMock.mockReset());
 // getCompanyNews のテストが張る vi.spyOn(FreeNewsClient.prototype, ...) は、
@@ -244,5 +249,74 @@ describe("JQuantsClient", () => {
       expect(spy).toHaveBeenCalledWith("トヨタ自動車", "7203", 5);
       spy.mockRestore();
     });
+  });
+});
+
+describe("JQuantsClient data correctness", () => {
+  it("computes change and 52-week range from adjusted closes (no fake -50% on a split day)", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        // 2:1 分割。生の終値は半分になるが調整後終値は連続している
+        { Date: "2026-06-24", C: 3000, AdjC: 1500, Vo: 100 },
+        { Date: "2026-06-25", C: 2000, AdjC: 1000, Vo: 100 },
+        { Date: "2026-06-26", C: 1010, AdjC: 1010, Vo: 200 },
+      ])
+    );
+    const s = await new JQuantsClient("k").getStockData("7203");
+    expect(s?.price).toBe(1010);
+    expect(s?.change).toBe(10);
+    expect(s?.changePercent).toBeCloseTo(1, 5);
+    expect(s?.high52).toBe(1500);
+    expect(s?.low52).toBe(1000);
+  });
+
+  it("labels the latest annual (FY) statement, not whatever row came last", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        { DiscDate: "2026-05-10", CurPerType: "FY", CurPerEn: "2026-03-31", Sales: "45000000", OP: "5000000", NP: "4000000", EPS: "300" },
+        { DiscDate: "2026-08-01", CurPerType: "1Q", CurPerEn: "2026-06-30", Sales: "11000000", OP: "1200000", NP: "900000", EPS: "70" },
+        // 業績予想の修正（売上なし）
+        { DiscDate: "2026-09-01", CurPerType: "FY", CurPerEn: "2027-03-31", Sales: "" },
+      ])
+    );
+    const f = await new JQuantsClient("k").getFinancialData("7203");
+    expect(f).toMatchObject({ revenue: "45000000", period: "2026 (FY)" });
+  });
+
+  it("labels the actual period type when no annual statement exists", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson([
+        { DiscDate: "2026-08-01", CurPerType: "1Q", CurPerEn: "2026-06-30", Sales: "11000000" },
+      ])
+    );
+    const f = await new JQuantsClient("k").getFinancialData("7203");
+    expect(f?.period).toBe("2026 (1Q)");
+  });
+
+  it("does not treat an error response as data and passes a timeout signal", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ data: [{ Date: "2026-06-26", C: 9999 }] }),
+    });
+    const s = await new JQuantsClient("k").getStockData("7203");
+    expect(s).toBeNull();
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("status=401"));
+  });
+
+  it("maps the 1W and 3M chart periods instead of silently using 1M", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-15T00:00:00.000Z"));
+    try {
+      fetchMock.mockResolvedValue(okJson([]));
+      await new JQuantsClient("k").getChartData("7203", "1W");
+      await new JQuantsClient("k").getChartData("7203", "3M");
+      expect(fetchMock.mock.calls[0][0]).toContain("from=2026-11-05");
+      expect(fetchMock.mock.calls[1][0]).toContain("from=2026-08-15");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
