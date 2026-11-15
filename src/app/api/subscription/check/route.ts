@@ -3,7 +3,10 @@ import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
-import type { Subscription } from "@/lib/types/subscription";
+import {
+  isSubscriptionPremium,
+  type Subscription,
+} from "@/lib/types/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -69,13 +72,14 @@ export async function GET(request: NextRequest) {
     }
 
     const data = subscriptionDoc.data()!;
-    const subscription: Subscription = {
+    // purchaseToken / orderId（ストアの購入識別子）は応答に含めない。
+    // クライアントは使っておらず（useSubscription は Firestore を直接購読）、
+    // 識別子が他アカウントへ渡ると購入の付け替えに悪用され得るため。
+    const subscription: Omit<Subscription, "purchaseToken" | "orderId"> = {
       userId: data.userId,
       status: data.status,
       platform: data.platform,
       productId: data.productId,
-      purchaseToken: data.purchaseToken,
-      orderId: data.orderId,
       purchaseDate: data.purchaseDate?.toDate() || new Date(data.purchaseDate),
       expiryDate:
         data.expiryDate?.toDate() ||
@@ -85,13 +89,7 @@ export async function GET(request: NextRequest) {
       updatedAt: data.updatedAt?.toDate() || new Date(data.updatedAt),
     };
 
-    // 有効期限をチェック
-    const isActive =
-      subscription.status === "active" || subscription.status === "trial";
-    const hasExpired = subscription.expiryDate
-      ? new Date() > subscription.expiryDate
-      : false;
-    const isPremium = isActive && !hasExpired;
+    const isPremium = isSubscriptionPremium(data);
 
     return NextResponse.json({
       hasSubscription: true,

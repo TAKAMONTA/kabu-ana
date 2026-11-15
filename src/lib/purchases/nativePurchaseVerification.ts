@@ -3,6 +3,7 @@ import type {
   SubscriptionPlatform,
   SubscriptionStatus,
 } from "@/lib/types/subscription";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 type NativePlatform = Extract<SubscriptionPlatform, "ios" | "android">;
 
@@ -161,15 +162,76 @@ function normalizePrivateKey(value: string): string {
   return value.replace(/\\n/g, "\n");
 }
 
+/** 設定不備（環境変数の未設定・不正）時にクライアントへ返す固定文言 */
+export const PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE =
+  "購入検証サービスが現在利用できません。時間をおいて再度お試しください。";
+/** ストアとの通信失敗・想定外の応答時にクライアントへ返す固定文言 */
+export const STORE_COMMUNICATION_FAILED_MESSAGE =
+  "ストアとの通信に失敗しました。時間をおいて再度お試しください。";
+
+/** ストアAPI呼び出しのタイムアウト */
+const STORE_FETCH_TIMEOUT_MS = 10_000;
+
+/**
+ * 設定不備を 503 の固定文言で表す。環境変数名などの詳細はサーバーログにだけ残す
+ * （2026-08-16 の設定エラー漏えい障害と同じ轍を踏まないため）。
+ */
+function configError(detail: string): PurchaseVerificationError {
+  console.error(`購入検証の設定エラー: ${detail}`);
+  return new PurchaseVerificationError(
+    PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE,
+    503
+  );
+}
+
 function requiredEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
-    throw new PurchaseVerificationError(`${name} が設定されていません`, 503);
+    throw configError(`${name} が設定されていません`);
   }
   return value;
 }
 
+/**
+ * ストアAPIの失敗ステータスを、クライアントへ返すステータスに変換する。
+ * - 401/403: こちらの認証情報（鍵・権限）の問題なので設定エラー扱い（503）
+ * - 429/5xx/その他: 一時的な障害として 502
+ * - 400: 送られた購入情報が不正（400）
+ * 上流のステータスをそのまま返すと、401 が「再ログインが必要」と誤解される。
+ */
+function storeFailure(
+  store: string,
+  status: number,
+  body: unknown
+): PurchaseVerificationError {
+  console.error(
+    `${store} 購入検証APIエラー: status=${status}, body=${sanitizeError(
+      JSON.stringify(body ?? null)
+    )}`
+  );
+  if (status === 401 || status === 403) {
+    return new PurchaseVerificationError(
+      PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE,
+      503
+    );
+  }
+  if (status === 400) {
+    return new PurchaseVerificationError("購入情報を確認できませんでした", 400);
+  }
+  return new PurchaseVerificationError(STORE_COMMUNICATION_FAILED_MESSAGE, 502);
+}
+
 function createAppStoreServerJwt(): string {
+  try {
+    return signAppStoreServerJwt();
+  } catch (error) {
+    if (error instanceof PurchaseVerificationError) throw error;
+    // 秘密鍵の形式不正など。詳細（鍵の断片を含み得る）はログにも出さない
+    throw configError("App Store Server API の JWT 署名に失敗しました");
+  }
+}
+
+function signAppStoreServerJwt(): string {
   const keyId = requiredEnv("APP_STORE_CONNECT_KEY_ID");
   const issuerId = requiredEnv("APP_STORE_CONNECT_ISSUER_ID");
   const bundleId = process.env.IOS_BUNDLE_ID || "com.takaapps.kabunavi";
@@ -201,7 +263,16 @@ async function fetchJson(url: string, init?: RequestInit): Promise<{
   status: number;
   body: any;
 }> {
-  const response = await fetch(url, init);
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(STORE_FETCH_TIMEOUT_MS),
+    });
+  } catch (error) {
+    console.error(`ストアAPIへの接続に失敗しました: ${sanitizeError(error)}`);
+    throw new PurchaseVerificationError(STORE_COMMUNICATION_FAILED_MESSAGE, 502);
+  }
   const body = await response.json().catch(() => null);
   return { ok: response.ok, status: response.status, body };
 }
@@ -212,13 +283,22 @@ function statusFromExpiry(expiryDate?: string, revoked?: boolean): SubscriptionS
   return new Date(expiryDate).getTime() > Date.now() ? "active" : "expired";
 }
 
-function appleSubscriptionStatusToSubscriptionStatus(
+/**
+ * App Store Server API のサブスクリプション状態（Get All Subscription Statuses の
+ * lastTransactions[].status）を内部状態に変換する。
+ *   1 = Active / 2 = Expired / 3 = Billing retry / 4 = Billing grace period / 5 = Revoked
+ * 4（請求猶予期間）は Apple の仕様上「利用を継続させる」期間なので active。
+ * この間は取引の expiresDate が過ぎているため、期限は gracePeriodExpiresDate を使う
+ * （呼び出し側で expiryDate に反映する）。
+ */
+export function appleSubscriptionStatusToSubscriptionStatus(
   status: number | undefined,
   expiryDate?: string,
   revoked?: boolean
 ): SubscriptionStatus {
   if (revoked || status === 5) return "cancelled";
-  if (status === 1 || status === 4) return statusFromExpiry(expiryDate, false);
+  if (status === 4) return "active";
+  if (status === 1) return statusFromExpiry(expiryDate, false);
   if (status === 2) return "expired";
   if (status === 3) return "pending";
   return statusFromExpiry(expiryDate, false);
@@ -229,14 +309,22 @@ async function fetchLatestAppleSubscriptionTransaction(
   headers: Record<string, string>,
   originalTransactionId: string,
   productId: string
-): Promise<{ payload: Record<string, any>; status?: number } | null> {
+): Promise<{
+  payload: Record<string, any>;
+  status?: number;
+  renewalInfo?: Record<string, any>;
+} | null> {
   const response = await fetchJson(
     `${baseUrl}/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`,
     { headers }
   );
   if (!response.ok) return null;
 
-  const candidates: Array<{ payload: Record<string, any>; status?: number }> = [];
+  const candidates: Array<{
+    payload: Record<string, any>;
+    status?: number;
+    renewalInfo?: Record<string, any>;
+  }> = [];
   for (const group of response.body?.data || []) {
     for (const transaction of group?.lastTransactions || []) {
       if (!transaction?.signedTransactionInfo) continue;
@@ -244,7 +332,21 @@ async function fetchLatestAppleSubscriptionTransaction(
         transaction.signedTransactionInfo
       );
       if (payload.productId === productId) {
-        candidates.push({ payload, status: Number(transaction.status) });
+        let renewalInfo: Record<string, any> | undefined;
+        if (transaction.signedRenewalInfo) {
+          try {
+            renewalInfo = decodeJwtPayload<Record<string, any>>(
+              transaction.signedRenewalInfo
+            );
+          } catch {
+            renewalInfo = undefined;
+          }
+        }
+        candidates.push({
+          payload,
+          status: Number(transaction.status),
+          renewalInfo,
+        });
       }
     }
   }
@@ -283,7 +385,7 @@ async function verifyApplePurchase(
     if (!result.ok) {
       lastError = result.body;
       if (result.status === 404) continue;
-      throw new PurchaseVerificationError("App Store購入検証に失敗しました", result.status);
+      throw storeFailure("App Store", result.status, result.body);
     }
 
     const signedTransactionInfo = result.body?.signedTransactionInfo;
@@ -315,9 +417,15 @@ async function verifyApplePurchase(
         )
       : null;
     const payload = latest?.payload || initialPayload;
-    const expiresDate = payload.expiresDate
+    const transactionExpiresDate = payload.expiresDate
       ? new Date(Number(payload.expiresDate)).toISOString()
       : undefined;
+    // 請求猶予期間（status 4）は取引の期限が過ぎていても猶予の終わりまで有効
+    const gracePeriodExpiresDate =
+      latest?.status === 4 && latest.renewalInfo?.gracePeriodExpiresDate
+        ? new Date(Number(latest.renewalInfo.gracePeriodExpiresDate)).toISOString()
+        : undefined;
+    const expiresDate = gracePeriodExpiresDate || transactionExpiresDate;
     const purchaseDate = payload.purchaseDate
       ? new Date(Number(payload.purchaseDate)).toISOString()
       : undefined;
@@ -342,8 +450,13 @@ async function verifyApplePurchase(
     };
   }
 
+  console.error(
+    `App Storeトランザクションが見つかりません: ${sanitizeError(
+      JSON.stringify(lastError ?? null)
+    )}`
+  );
   throw new PurchaseVerificationError(
-    `App Storeトランザクションが見つかりません: ${JSON.stringify(lastError)}`,
+    "App Storeトランザクションが見つかりません",
     404
   );
 }
@@ -370,8 +483,16 @@ function createGoogleServiceJwt(serviceAccount: any): string {
 }
 
 async function getGoogleAccessToken(): Promise<string> {
-  const serviceAccount = JSON.parse(requiredEnv("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY"));
-  const assertion = createGoogleServiceJwt(serviceAccount);
+  const rawServiceAccount = requiredEnv("GOOGLE_PLAY_SERVICE_ACCOUNT_KEY");
+  let assertion: string;
+  try {
+    assertion = createGoogleServiceJwt(JSON.parse(rawServiceAccount));
+  } catch {
+    // JSON.parse のエラー文には値の断片が含まれ得るため、詳細は出さない
+    throw configError(
+      "GOOGLE_PLAY_SERVICE_ACCOUNT_KEY の形式が不正か、JWT 署名に失敗しました"
+    );
+  }
   const response = await fetchJson("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -382,7 +503,14 @@ async function getGoogleAccessToken(): Promise<string> {
   });
 
   if (!response.ok || !response.body?.access_token) {
-    throw new PurchaseVerificationError("Google Play認証に失敗しました", response.status || 502);
+    // トークン発行の失敗はこちらのサービスアカウント設定の問題
+    console.error(
+      `Google Play 認証トークンの取得に失敗しました: status=${response.status}`
+    );
+    throw new PurchaseVerificationError(
+      PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE,
+      503
+    );
   }
   return response.body.access_token;
 }
@@ -430,7 +558,13 @@ async function verifyGooglePurchase(
   });
 
   if (!response.ok) {
-    throw new PurchaseVerificationError("Google Play購入検証に失敗しました", response.status);
+    if (response.status === 404 || response.status === 410) {
+      console.error(
+        `Google Play 購入が見つかりません: status=${response.status}`
+      );
+      throw new PurchaseVerificationError("Google Playの購入が見つかりません", 404);
+    }
+    throw storeFailure("Google Play", response.status, response.body);
   }
 
   const body = response.body;

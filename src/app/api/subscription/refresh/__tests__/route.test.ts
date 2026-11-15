@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 const getAdminAppMock = vi.fn();
 const getFirestoreMock = vi.fn();
+const verifyNativePurchaseMock = vi.fn();
 
 vi.mock("@/lib/firebase/admin", async () => {
   const actual =
@@ -43,15 +44,20 @@ vi.mock("@/lib/purchases/nativePurchaseVerification", async () => {
       productId: "com.takaapps.kabunavi.Monthly",
       purchaseToken: "token-1",
     }),
-    verifyNativePurchase: () =>
-      Promise.reject(
-        new actual.PurchaseVerificationError("テスト用の購入検証エラー", 402)
-      ),
+    verifyNativePurchase: (...args: unknown[]) =>
+      verifyNativePurchaseMock(...args),
   };
 });
 
 import { POST } from "../route";
 import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
+import { PurchaseVerificationError } from "@/lib/purchases/nativePurchaseVerification";
+import {
+  PURCHASE_OWNED_BY_OTHER_MESSAGE,
+  PURCHASE_OWNERS_COLLECTION,
+  purchaseOwnerKey,
+} from "@/lib/purchases/purchaseOwnership";
+import { FakeFirestore } from "@/lib/__tests__/fakeFirestore";
 
 function postRefresh() {
   const request = new NextRequest("http://localhost/api/subscription/refresh", {
@@ -76,6 +82,10 @@ describe("POST /api/subscription/refresh", () => {
   beforeEach(() => {
     getAdminAppMock.mockReset();
     getFirestoreMock.mockReset();
+    verifyNativePurchaseMock.mockReset();
+    verifyNativePurchaseMock.mockRejectedValue(
+      new PurchaseVerificationError("テスト用の購入検証エラー", 402)
+    );
   });
 
   it("returns 503 without leaking the config error detail when Firebase Admin SDK is misconfigured", async () => {
@@ -144,5 +154,44 @@ describe("POST /api/subscription/refresh", () => {
     );
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it("returns 409 and does not restore a purchase owned by another account", async () => {
+    const consoleWarnSpy = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => {});
+    const verified = {
+      platform: "ios" as const,
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "token-1",
+      originalTransactionId: "original-1",
+      status: "active" as const,
+      expiryDate: "2099-01-01T00:00:00.000Z",
+      isTrial: false,
+      raw: {},
+    };
+    verifyNativePurchaseMock.mockResolvedValue(verified);
+    const db = new FakeFirestore();
+    db.seed("subscriptions/user-1", {
+      platform: "ios",
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "token-1",
+      status: "expired",
+    });
+    db.seed(`${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(verified)}`, {
+      uid: "someone-else",
+    });
+    getAdminAppMock.mockReturnValue({});
+    getFirestoreMock.mockReturnValue(db);
+
+    const response = await postRefresh();
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: PURCHASE_OWNED_BY_OTHER_MESSAGE,
+    });
+    expect(db.docs.get("subscriptions/user-1")?.status).toBe("expired");
+
+    consoleWarnSpy.mockRestore();
   });
 });

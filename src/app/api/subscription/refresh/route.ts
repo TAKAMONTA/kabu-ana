@@ -2,13 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
 import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
-import { sanitizeError } from "@/lib/utils/logSanitizer";
+import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 import {
   buildSubscriptionDocumentFromVerification,
   parseNativePurchaseUpdateRequest,
   PurchaseVerificationError,
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
+import {
+  PurchaseOwnedByOtherAccountError,
+  writeSubscriptionWithOwnership,
+} from "@/lib/purchases/purchaseOwnership";
 
 export const dynamic = "force-dynamic";
 
@@ -61,16 +65,21 @@ export async function POST(request: NextRequest) {
       orderId: current.orderId,
     });
     const verifiedPurchase = await verifyNativePurchase(purchaseRequest);
-    const subscriptionData = {
-      ...buildSubscriptionDocumentFromVerification(
-        authResult.uid,
-        purchaseRequest,
-        verifiedPurchase
-      ),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    await subscriptionRef.set(subscriptionData, { merge: true });
+    // update と同じく、別アカウントが所有する購入には紐付けない（409）
+    const subscriptionData = (await writeSubscriptionWithOwnership(
+      db,
+      authResult.uid,
+      verifiedPurchase,
+      () => ({
+        ...buildSubscriptionDocumentFromVerification(
+          authResult.uid,
+          purchaseRequest,
+          verifiedPurchase
+        ),
+        updatedAt: FieldValue.serverTimestamp(),
+      }),
+      () => FieldValue.serverTimestamp()
+    )) as ReturnType<typeof buildSubscriptionDocumentFromVerification>;
 
     return NextResponse.json({
       success: true,
@@ -90,8 +99,19 @@ export async function POST(request: NextRequest) {
         { status: 503 }
       );
     }
+    if (error instanceof PurchaseOwnedByOtherAccountError) {
+      console.warn(
+        `subscription/refresh: 別アカウント所有の購入の再検証を拒否しました: user=${maskId(authResult.uid)}`
+      );
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
     if (error instanceof PurchaseVerificationError) {
-      console.error(`subscription/refresh: 購入検証エラー: ${sanitizeError(error)}`);
+      console.error(
+        `subscription/refresh: 購入検証エラー: ${sanitizeError(error, [authResult.uid])}`
+      );
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode }
