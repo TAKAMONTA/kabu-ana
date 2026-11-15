@@ -9,6 +9,7 @@ import {
   Suspense,
 } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,7 +27,6 @@ import {
 } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
-import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
 import {
   StockPriceHeaderCard,
@@ -61,6 +61,25 @@ import { isNative } from "@/lib/utils/platformDetect";
 import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
 import { APP_NAME } from "@/lib/constants";
 import { getCompanyProfileView } from "@/lib/companyProfile";
+
+// チャート（recharts）は検索後にしか使わないため、一面の初回読み込みから外す
+const StockChart = dynamic(
+  () => import("@/components/StockChart").then(mod => mod.StockChart),
+  {
+    ssr: false,
+    loading: () => (
+      <Card>
+        <CardContent className="pt-6">
+          <div
+            role="status"
+            aria-label="チャートを読み込み中"
+            className="h-80 rounded-md shimmer"
+          />
+        </CardContent>
+      </Card>
+    ),
+  }
+);
 
 const SAMPLE_STOCKS = [
   {
@@ -819,6 +838,8 @@ export default function HomePage() {
                   data={searchResult.chartData}
                   isLoading={isLoading}
                   currency={getCurrencySymbol}
+                  period={chartPeriod}
+                  isJapanStock={isJapanStock}
                   onPeriodChange={handleChartPeriodChange}
                 />
 
