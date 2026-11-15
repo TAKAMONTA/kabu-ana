@@ -19,7 +19,7 @@ import {
   ChevronUp,
   Crown,
 } from "lucide-react";
-import { useCompanySearch } from "@/hooks/useCompanySearch";
+import { NOT_FOUND_MESSAGE, useCompanySearch } from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
 import { StockChart } from "@/components/StockChart";
@@ -480,6 +480,13 @@ export default function HomePage() {
       onInputChange={handleInputChange}
       onSelectSuggestion={handleSelectSuggestion}
       renderHighlighted={renderHighlighted}
+      error={error}
+      // 「見つかりませんでした」は同じ語で再検索しても結果が変わらないため出さない
+      onRetry={
+        error && error !== NOT_FOUND_MESSAGE
+          ? () => void retrySearch()
+          : undefined
+      }
     />
   );
 
@@ -674,36 +681,26 @@ export default function HomePage() {
           </>
         )}
 
-        {/* エラー表示（検索・メインAI分析のみ） */}
-        {(error || analysisError) && (
+        {/* メインAI分析のエラー（検索のエラーは検索欄の直下に出す） */}
+        {searchResult && analysisError && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
-              <div className="flex items-start gap-3 text-destructive">
+              <div
+                role="alert"
+                className="flex items-start gap-3 text-destructive"
+              >
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold">
-                    {error
-                      ? "検索できませんでした"
-                      : "AI分析を完了できませんでした"}
-                  </p>
-                  <p className="text-sm mt-1">{error || analysisError}</p>
+                  <p className="font-semibold">AI分析を完了できませんでした</p>
+                  <p className="text-sm mt-1">{analysisError}</p>
                   <div className="flex gap-2 mt-3">
-                    {error && (
-                      <button
-                        onClick={() => void retrySearch()}
-                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        もう一度検索
-                      </button>
-                    )}
-                    {analysisError && (
-                      <button
-                        onClick={retryAnalysis}
-                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        AI分析を再試行
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={retryAnalysis}
+                      className="min-h-11 text-sm px-4 py-2 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                    >
+                      AI分析を再試行
+                    </button>
                   </div>
                 </div>
               </div>

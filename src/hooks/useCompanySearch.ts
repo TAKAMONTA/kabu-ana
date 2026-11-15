@@ -12,7 +12,7 @@ import { toFriendlyErrorMessage } from "@/lib/friendlyError";
 
 const SEARCH_ERROR_FALLBACK =
   "検索中にエラーが発生しました。もう一度お試しください。";
-const NOT_FOUND_MESSAGE =
+export const NOT_FOUND_MESSAGE =
   "該当する銘柄が見つかりませんでした。証券コード（例: 7203）やティッカー（例: AAPL）でもお試しください。";
 
 export interface SearchResultRatios {
