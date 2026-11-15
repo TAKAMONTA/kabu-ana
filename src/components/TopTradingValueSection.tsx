@@ -144,7 +144,7 @@ export function TopTradingValueSection({
                             </span>
                           )}
                           {item.signalLabel && (
-                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                               {item.signalLabel}
                             </span>
                           )}
@@ -162,7 +162,7 @@ export function TopTradingValueSection({
                             href={item.sourceLinks[0]}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-1 inline-block text-[11px] text-blue-600 hover:underline"
+                            className="-my-2 inline-flex min-h-11 items-center text-[11px] text-blue-600 hover:underline dark:text-blue-400"
                           >
                             根拠を見る
                           </a>
@@ -180,6 +180,7 @@ export function TopTradingValueSection({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="min-h-11"
                         onClick={() => handleSelect(item)}
                       >
                         分析

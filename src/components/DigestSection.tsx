@@ -56,10 +56,11 @@ export function DigestSection({ items }: DigestSectionProps) {
           <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
             <div className="flex items-center justify-between gap-2">
               <span>今日は作成できませんでした</span>
+              {/* 文字は小さいままタップ領域を 44px 確保する */}
               <button
                 type="button"
                 onClick={retry}
-                className="text-xs underline"
+                className="-my-2 min-h-11 shrink-0 px-3 text-xs underline"
               >
                 再試行
               </button>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import * as Dialog from "@radix-ui/react-dialog";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/hooks/useAuth";
 import { usePurchase } from "@/hooks/usePurchase";
@@ -11,6 +12,148 @@ import { FREE_DAILY_LIMIT } from "@/hooks/useDailyUsage";
 import { FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const PURCHASE_ERROR_FALLBACK =
+  "購入処理を完了できませんでした。時間をおいて、もう一度お試しください。";
+
+// 以下の小さな部品は、描画のたびに作り直されて状態が消えないよう
+// （react-hooks/static-components）コンポーネントの外で定義する
+
+/** アカウント削除ボタン（削除に失敗したときの理由もここに出す） */
+function DeleteAccountButton({
+  isDeleting,
+  error,
+  onClick,
+}: {
+  isDeleting: boolean;
+  error: string | null;
+  onClick: () => void;
+}) {
+  return (
+    <div className="pt-4 border-t border-border mt-4">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onClick}
+        disabled={isDeleting}
+        className="min-h-11 w-full text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+      >
+        {isDeleting ? "削除中..." : "アカウントを削除する"}
+      </Button>
+      {error && (
+        <p role="alert" className="mt-2 text-center text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** 利用規約・プライバシーポリシーと自動更新の説明 */
+function LegalLinks({
+  billingAccountLabel,
+  billingManagementLabel,
+  isiOS,
+}: {
+  billingAccountLabel: string;
+  billingManagementLabel: string;
+  isiOS: boolean;
+}) {
+  return (
+    <div className="space-y-3 mt-4 border-t border-border pt-4">
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-[10px] text-muted-foreground text-center leading-relaxed max-w-[300px]">
+          プレミアム月額プラン: ¥700/月（1ヶ月ごとに自動更新）
+          プレミアム年額プラン: ¥7,000/年（1年ごとに自動更新）
+          サブスクリプションは期間終了の少なくとも24時間前に自動更新をオフにしない限り自動的に更新されます。
+          お支払いは{billingAccountLabel}に請求されます。
+          購入後の管理・キャンセルは{billingManagementLabel}から行えます。
+        </p>
+        <div className="flex items-center justify-center gap-3 text-xs">
+          <Link
+            href="/terms-of-use"
+            className="inline-flex min-h-11 items-center text-primary hover:underline font-medium"
+          >
+            利用規約
+          </Link>
+          <span className="text-muted-foreground">|</span>
+          <Link
+            href="/privacy-policy"
+            className="inline-flex min-h-11 items-center text-primary hover:underline font-medium"
+          >
+            プライバシーポリシー
+          </Link>
+          {isiOS && (
+            <>
+              <span className="text-muted-foreground">|</span>
+              <a
+                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-11 items-center text-primary hover:underline font-medium"
+              >
+                EULA
+              </a>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 削除確認ダイアログ。Radix Dialog を使い、見出し・説明の読み上げ、
+ * フォーカスの閉じ込め、Esc・背景タップでのキャンセルに対応する
+ */
+function DeleteConfirmDialog({
+  open,
+  isDeleting,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  isDeleting: boolean;
+  onOpenChange: (open: boolean) => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/50" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border bg-card p-6 shadow-lg focus:outline-none">
+          <Dialog.Title className="text-lg font-semibold text-destructive">
+            アカウント削除の確認
+          </Dialog.Title>
+          <Dialog.Description className="mt-3 text-sm text-muted-foreground">
+            本当にアカウントを削除しますか？この操作は取り消せません。
+          </Dialog.Description>
+          <ul className="mt-3 text-xs text-muted-foreground space-y-1">
+            <li>• すべてのアカウント情報が削除されます</li>
+            <li>• サブスクリプション情報が削除されます</li>
+            <li>• この操作は元に戻すことができません</li>
+          </ul>
+          <div className="mt-4 flex gap-2">
+            <Dialog.Close asChild>
+              <Button variant="outline" className="min-h-11 flex-1">
+                キャンセル
+              </Button>
+            </Dialog.Close>
+            <Button
+              variant="destructive"
+              onClick={onConfirm}
+              disabled={isDeleting}
+              className="min-h-11 flex-1"
+            >
+              {isDeleting ? "削除中..." : "削除する"}
+            </Button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
 
 export function SubscriptionStatus() {
   const { user } = useAuth();
@@ -32,12 +175,19 @@ export function SubscriptionStatus() {
   );
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isiOS = isIOSNative();
   const isAndroid = isAndroidNative();
   const usesNativeBilling = isiOS || isAndroid;
-  const currentlyPurchasing = usesNativeBilling ? isIOSPurchasing : isPurchasing;
-  const currentError = usesNativeBilling ? iosError : purchaseError;
+  const currentlyPurchasing = usesNativeBilling
+    ? isIOSPurchasing
+    : isPurchasing;
+  const rawError = usesNativeBilling ? iosError : purchaseError;
+  // ストアや決済サービスの英語・技術的なメッセージは画面に出さない
+  const currentError = rawError
+    ? toFriendlyErrorMessage(rawError, PURCHASE_ERROR_FALLBACK)
+    : null;
   const billingAccountLabel = isAndroid
     ? "Google Playアカウント"
     : isiOS
@@ -64,7 +214,8 @@ export function SubscriptionStatus() {
         : "border-primary/20 bg-premium text-premium-muted hover:border-primary/40 hover:bg-primary/10 hover:text-premium-foreground"
     }`;
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = () => {
+    setDeleteError(null);
     setShowDeleteConfirm(true);
   };
 
@@ -73,113 +224,39 @@ export function SubscriptionStatus() {
     setShowDeleteConfirm(false);
     const result = await deleteAccount();
     if (!result.success) {
-      alert(result.error || "アカウントの削除に失敗しました");
+      // alert() は読みにくく、アプリでは英語のタイトルが付くため画面内に出す
+      setDeleteError(
+        toFriendlyErrorMessage(
+          result.error,
+          "アカウントを削除できませんでした。時間をおいてもう一度お試しください。"
+        )
+      );
       setIsDeleting(false);
     }
   };
 
-  // 共通のアカウント削除ボタンコンポーネント
-  const DeleteAccountButton = () => (
-    <div className="pt-4 border-t border-border mt-4">
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={handleDeleteAccount}
-        disabled={isDeleting}
-        className="w-full text-destructive hover:text-destructive hover:bg-destructive/10 text-[10px]"
-      >
-        {isDeleting ? "削除中..." : "アカウントを削除する"}
-      </Button>
-    </div>
+  const legalLinks = (
+    <LegalLinks
+      billingAccountLabel={billingAccountLabel}
+      billingManagementLabel={billingManagementLabel}
+      isiOS={isiOS}
+    />
   );
-
-  // 共通の利用規約・プライバシーポリシーリンク
-  const LegalLinks = () => (
-    <div className="space-y-3 mt-4 border-t border-border pt-4">
-      <div className="flex flex-col items-center gap-2">
-        <p className="text-[10px] text-muted-foreground text-center leading-relaxed max-w-[300px]">
-          プレミアム月額プラン: ¥700/月（1ヶ月ごとに自動更新）
-          プレミアム年額プラン: ¥7,000/年（1年ごとに自動更新）
-          サブスクリプションは期間終了の少なくとも24時間前に自動更新をオフにしない限り自動的に更新されます。
-          お支払いは{billingAccountLabel}に請求されます。
-          購入後の管理・キャンセルは{billingManagementLabel}から行えます。
-        </p>
-        <div className="flex items-center justify-center gap-3 text-xs">
-          <Link
-            href="/terms-of-use"
-            className="text-primary hover:underline font-medium"
-          >
-            利用規約
-          </Link>
-          <span className="text-muted-foreground">|</span>
-          <Link
-            href="/privacy-policy"
-            className="text-primary hover:underline font-medium"
-          >
-            プライバシーポリシー
-          </Link>
-          {isiOS && (
-            <>
-              <span className="text-muted-foreground">|</span>
-              <a
-                href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline font-medium"
-              >
-                EULA
-              </a>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+  const deleteAccountButton = (
+    <DeleteAccountButton
+      isDeleting={isDeleting}
+      error={deleteError}
+      onClick={handleDeleteAccount}
+    />
   );
-
-  // 削除確認ダイアログ
-  const DeleteConfirmDialog = () => {
-    if (!showDeleteConfirm) return null;
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle className="text-lg text-destructive">
-              アカウント削除の確認
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              本当にアカウントを削除しますか？この操作は取り消せません。
-            </p>
-            <ul className="text-xs text-muted-foreground space-y-1">
-              <li>• すべてのアカウント情報が削除されます</li>
-              <li>• サブスクリプション情報が削除されます</li>
-              <li>• この操作は元に戻すことができません</li>
-            </ul>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1"
-              >
-                キャンセル
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={confirmDeleteAccount}
-                disabled={isDeleting}
-                className="flex-1"
-              >
-                {isDeleting ? "削除中..." : "削除する"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  };
+  const deleteConfirmDialog = (
+    <DeleteConfirmDialog
+      open={showDeleteConfirm}
+      isDeleting={isDeleting}
+      onOpenChange={setShowDeleteConfirm}
+      onConfirm={() => void confirmDeleteAccount()}
+    />
+  );
 
   if (!user) {
     return (
@@ -226,7 +303,7 @@ export function SubscriptionStatus() {
   if (isPremium) {
     return (
       <>
-        <DeleteConfirmDialog />
+        {deleteConfirmDialog}
         <Card className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950">
           <CardHeader>
             <CardTitle className="text-green-800 dark:text-green-200">
@@ -261,8 +338,8 @@ export function SubscriptionStatus() {
                   ⚠️ トライアル期間中です
                 </p>
               )}
-              <LegalLinks />
-              <DeleteAccountButton />
+              {legalLinks}
+              {deleteAccountButton}
             </div>
           </CardContent>
         </Card>
@@ -273,7 +350,7 @@ export function SubscriptionStatus() {
   if (hasExpired) {
     return (
       <>
-        <DeleteConfirmDialog />
+        {deleteConfirmDialog}
         <Card className="border-primary/30 bg-premium text-premium-foreground">
           <CardHeader>
             <CardTitle className="text-premium-foreground">
@@ -342,12 +419,15 @@ export function SubscriptionStatus() {
                 )}
               </div>
               {currentError && (
-                <p className="text-xs text-red-600 dark:text-red-300">
+                <p
+                  role="alert"
+                  className="text-xs text-red-600 dark:text-red-300"
+                >
                   {currentError}
                 </p>
               )}
-              <LegalLinks />
-              <DeleteAccountButton />
+              {legalLinks}
+              {deleteAccountButton}
             </div>
           </CardContent>
         </Card>
@@ -357,7 +437,7 @@ export function SubscriptionStatus() {
 
   return (
     <>
-      <DeleteConfirmDialog />
+      {deleteConfirmDialog}
       <Card className="border-primary/30 bg-premium text-premium-foreground shadow-md shadow-primary/10">
         <CardHeader>
           <CardTitle className="text-premium-foreground">
@@ -445,13 +525,16 @@ export function SubscriptionStatus() {
             </div>
 
             {currentError && (
-              <p className="text-xs text-red-600 dark:text-red-300 font-medium text-center">
+              <p
+                role="alert"
+                className="text-xs text-red-600 dark:text-red-300 font-medium text-center"
+              >
                 {currentError}
               </p>
             )}
 
-            <LegalLinks />
-            <DeleteAccountButton />
+            {legalLinks}
+            {deleteAccountButton}
           </div>
         </CardContent>
       </Card>

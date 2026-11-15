@@ -311,7 +311,8 @@ export function AskSection({
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="mt-2 h-auto px-0 text-primary hover:bg-transparent hover:text-primary/80"
+                    className="mt-2 min-h-11 px-0 text-primary hover:bg-transparent hover:text-primary/80"
+                    aria-expanded={showFullComment}
                     onClick={() => setShowFullComment(prev => !prev)}
                   >
                     {showFullComment ? "短く表示" : "全文を読む"}
@@ -390,7 +391,9 @@ export function AskSection({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                    className="min-h-11 w-full border-primary/30 text-primary hover:bg-primary/10 hover:text-primary"
+                    aria-expanded={showDetails}
+                    aria-controls="ai-analysis-details"
                     onClick={() => setShowDetails(prev => !prev)}
                   >
                     {showDetails ? (
@@ -408,7 +411,10 @@ export function AskSection({
                 )}
 
                 {showDetails && analysisResult && (
-                  <div className="space-y-4 border-t pt-4">
+                  <div
+                    id="ai-analysis-details"
+                    className="space-y-4 border-t pt-4"
+                  >
                     {keyFactors.length > 0 && (
                       <div>
                         <h4 className="mb-2 text-sm font-semibold">
