@@ -103,7 +103,9 @@ export function useWatchlist() {
       // 課金情報の読み込み中は isPremium が暫定的に false になるため、
       // ここでの事前判定はスキップしてAPIに進む（サーバー判定が正）。
       if (!subscriptionLoading && !has(normalized) && !canAdd) {
-        setError(`無料プランは${FREE_WATCHLIST_LIMIT}銘柄までです`);
+        setError(
+          `無料プランのウォッチリストは${FREE_WATCHLIST_LIMIT}銘柄までです。登録済みの銘柄を外すか、プレミアムプランで無制限に登録できます。`
+        );
         return;
       }
 

@@ -22,6 +22,8 @@ interface NewsSectionProps {
   isNewsAnalyzing: boolean;
   newsError?: string | null;
   newsEmpty?: boolean;
+  /** メインAI分析が失敗・上限到達などで、自動分析が始まらない理由 */
+  unavailableMessage?: string | null;
   onRetryNews?: () => void;
 }
 
@@ -32,6 +34,7 @@ export function NewsSection({
   isNewsAnalyzing,
   newsError,
   newsEmpty = false,
+  unavailableMessage,
   onRetryNews,
 }: NewsSectionProps) {
   const renderNewsCard = (news: NewsItem, idx: number) => {
@@ -229,12 +232,18 @@ export function NewsSection({
           </div>
         ) : newsData && newsData.length > 0 ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground mb-4">
-              総合AI分析の完了後、関連ニュースの材料整理を自動表示します。
-            </p>
+            {/* エラー時は上のエラー表示だけにし、「完了後に表示します」を重ねない */}
+            {!newsError && (
+              <p className="text-sm text-muted-foreground mb-4">
+                {isNewsAnalyzing
+                  ? "関連ニュースをAIが自動分析しています。"
+                  : unavailableMessage ||
+                    "総合AI分析の完了後、関連ニュースの材料整理を自動表示します。"}
+              </p>
+            )}
             {newsData.slice(0, 3).map(renderNewsCard)}
           </div>
-        ) : (
+        ) : newsError && !isNewsAnalyzing ? null : (
           <div className="text-center py-8">
             <Brain
               className={`h-12 w-12 mx-auto mb-3 ${
@@ -246,7 +255,8 @@ export function NewsSection({
             <p className="text-sm text-muted-foreground mb-4">
               {isNewsAnalyzing
                 ? "関連ニュースをAIが自動分析しています。"
-                : "総合AI分析の完了後、関連ニュース分析を自動表示します。"}
+                : unavailableMessage ||
+                  "総合AI分析の完了後、関連ニュース分析を自動表示します。"}
             </p>
           </div>
         )}

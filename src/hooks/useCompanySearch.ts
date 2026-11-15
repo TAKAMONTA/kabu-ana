@@ -62,14 +62,27 @@ export interface SearchResult {
   } | null;
 }
 
+export interface SearchOptions {
+  /**
+   * 失敗したら表示中の結果も消す。別の銘柄を探す検索で使い、
+   * 失敗後に前の銘柄の画面（分析は破棄済み）が中途半端に残らないようにする。
+   * チャート期間の切替では使わない
+   */
+  clearOnError?: boolean;
+}
+
 export function useCompanySearch() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
   const mountedRef = useRef(true);
-  const lastRequestRef = useRef<{ query: string; chartPeriod: string } | null>(
-    null
-  );
+  const lastRequestRef = useRef<{
+    query: string;
+    chartPeriod: string;
+    options?: SearchOptions;
+  } | null>(null);
+  // 連続で検索したとき、先に投げた検索の応答が後から届いても反映しない
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     // StrictMode の二重マウントや Fast Refresh の再マウント後に
@@ -80,10 +93,18 @@ export function useCompanySearch() {
     };
   }, []);
 
-  const searchCompany = async (query: string, chartPeriod: string = "1M") => {
-    if (!query.trim()) return;
+  /** 検索する。結果を反映できたら true */
+  const searchCompany = async (
+    query: string,
+    chartPeriod: string = "1M",
+    options?: SearchOptions
+  ): Promise<boolean> => {
+    if (!query.trim()) return false;
 
-    lastRequestRef.current = { query, chartPeriod };
+    const requestId = ++requestIdRef.current;
+    const isCurrent = () =>
+      mountedRef.current && requestIdRef.current === requestId;
+    lastRequestRef.current = { query, chartPeriod, options };
     setIsLoading(true);
     setError(null);
 
@@ -109,29 +130,36 @@ export function useCompanySearch() {
         );
       }
 
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return false;
       setSearchResult(response.data);
+      return true;
     } catch (err) {
-      if (!mountedRef.current) return;
+      if (!isCurrent()) return false;
+      if (options?.clearOnError) setSearchResult(null);
       setError(
         toFriendlyErrorMessage(
           err instanceof Error ? err.message : null,
           SEARCH_ERROR_FALLBACK
         )
       );
+      return false;
     } finally {
-      if (mountedRef.current) setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   };
 
   const retry = () => {
     const last = lastRequestRef.current;
-    if (last) return searchCompany(last.query, last.chartPeriod);
+    if (last) return searchCompany(last.query, last.chartPeriod, last.options);
   };
 
+  /** 検索結果とエラーを消し、実行中の検索の応答も反映しないようにする */
   const clearSearch = () => {
+    requestIdRef.current++;
+    lastRequestRef.current = null;
     setSearchResult(null);
     setError(null);
+    setIsLoading(false);
   };
 
   return {

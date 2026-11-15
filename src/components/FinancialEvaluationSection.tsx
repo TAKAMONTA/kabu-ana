@@ -10,6 +10,8 @@ interface FinancialEvaluationSectionProps {
   financialEval: FinancialEvaluationResult | null;
   isFinancialLoading: boolean;
   financialError?: string | null;
+  /** メインAI分析が失敗・上限到達などで、自動評価が始まらない理由 */
+  unavailableMessage?: string | null;
   onRetry?: () => void;
   getScoreLabel: (score: number) => string;
   getScoreColor: (score: number) => string;
@@ -19,6 +21,7 @@ export function FinancialEvaluationSection({
   financialEval,
   isFinancialLoading,
   financialError,
+  unavailableMessage,
   onRetry,
   getScoreLabel,
   getScoreColor,
@@ -146,13 +149,15 @@ export function FinancialEvaluationSection({
               {AI_DISCLAIMER_SHORT}
             </p>
           </div>
-        ) : (
+        ) : isFinancialLoading || !financialError ? (
+          // エラー時は上のエラー表示だけにし、「完了後に表示します」を重ねて出さない
           <div className="text-center py-6 text-sm text-muted-foreground">
             {isFinancialLoading
               ? "財務三表（BS/PL/CF）をAIが自動評価しています。"
-              : "総合AI分析の完了後、財務三表（BS/PL/CF）の評価を自動表示します。"}
+              : unavailableMessage ||
+                "総合AI分析の完了後、財務三表（BS/PL/CF）の評価を自動表示します。"}
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   );
