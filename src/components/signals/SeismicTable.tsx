@@ -31,7 +31,7 @@ export function SeismicTable() {
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2">時刻</th>
-                  <th className="py-2">M</th>
+                  <th className="py-2">マグニチュード</th>
                   <th className="py-2">震源</th>
                   <th className="py-2">深さ</th>
                 </tr>

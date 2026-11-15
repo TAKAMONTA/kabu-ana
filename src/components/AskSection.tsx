@@ -249,7 +249,8 @@ export function AskSection({
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Brain className="h-5 w-5 text-primary" />
-              無料AI分析レポート
+              {/* プレミアム会員にも「無料」と出ていたため、プランに依らない見出しにする */}
+              AI分析レポート
             </CardTitle>
             <CardDescription>
               検索だけで、業績・材料・リスクをAIが自動整理します。
