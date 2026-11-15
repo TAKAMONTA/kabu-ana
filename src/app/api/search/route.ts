@@ -36,18 +36,13 @@ async function searchHandler(request: NextRequest) {
   }
   try {
     // 入力データの検証
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const validationResult = searchSchema.safeParse(body);
 
     if (!validationResult.success) {
+      // zod の issues（英語の型エラー文など）はそのまま返さない
       return NextResponse.json(
-        {
-          error: "入力データが無効です",
-          details: validationResult.error.issues.map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        },
+        { error: "入力データが無効です" },
         { status: 400 }
       );
     }
