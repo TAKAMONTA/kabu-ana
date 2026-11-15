@@ -3,7 +3,10 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
-import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import {
+  markNotCountable,
+  withDailyLimit,
+} from "@/lib/utils/dailyUsageLimiter";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
 
@@ -102,11 +105,14 @@ async function newsAnalysisHandler(request: NextRequest) {
     }
 
     if (!newsData || newsData.length === 0) {
-      return NextResponse.json({
-        newsData: [],
-        analysis: null,
-        empty: true,
-      });
+      // ニュースが無くAIを呼んでいないので、無料枠を消費させない
+      return markNotCountable(
+        NextResponse.json({
+          newsData: [],
+          analysis: null,
+          empty: true,
+        })
+      );
     }
 
     // AIによるニュース分析
@@ -116,10 +122,12 @@ async function newsAnalysisHandler(request: NextRequest) {
       newsData
     );
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       newsData,
       analysis: analysisResult,
     });
+    // AI応答を読み取れなかった（呼び出し失敗を含む）結果は無料枠を消費させない
+    return analysisResult.parseFailed ? markNotCountable(response) : response;
   } catch (error: any) {
     console.error("ニュース分析エラー:", error.message || "Unknown error");
     return NextResponse.json(

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
-import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import {
+  markNotCountable,
+  withDailyLimit,
+} from "@/lib/utils/dailyUsageLimiter";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 export const dynamic = "force-dynamic";
 
@@ -35,7 +38,9 @@ async function financialEvaluationHandler(request: NextRequest) {
       edinetExtras ?? undefined
     );
 
-    return NextResponse.json({ analysis: result });
+    const response = NextResponse.json({ analysis: result });
+    // AI応答を読み取れなかった（呼び出し失敗を含む）結果は無料枠を消費させない
+    return result.parseFailed ? markNotCountable(response) : response;
   } catch (error: any) {
     console.error("財務評価APIエラー:", error.message || "Unknown error");
     return NextResponse.json(
