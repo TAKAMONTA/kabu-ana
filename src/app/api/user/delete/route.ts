@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
-import { cancelSubscription, LemonSqueezyApiError } from "@/lib/lemon-squeezy";
+import {
+  cancelSubscription,
+  getSubscriptionStatus,
+  LemonSqueezyApiError,
+} from "@/lib/lemon-squeezy";
 import { releasePurchaseOwnership } from "@/lib/purchases/purchaseOwnership";
 import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 
@@ -17,13 +21,15 @@ const LEMON_SQUEEZY_STOPPED_STATUSES = new Set(["cancelled", "expired"]);
 
 /**
  * 解約が必要な Lemon Squeezy のサブスクリプションIDを返す（不要なら null）。
- * ネイティブ（App Store / Google Play）の購読はサーバーから解約できないため対象外
+ * platform に関係なく、Lemon Squeezy の購読IDが残っていて請求が止まっていなければ対象
+ * （Web で購読したあとネイティブ購入で文書の platform が変わっても、LS の請求は続くため）。
+ * ネイティブ（App Store / Google Play）の購読はサーバーから解約できないので対象外
  * （アプリのUIでストアでの解約を案内している）。
  */
 function lemonSqueezySubscriptionToCancel(
   data: Record<string, unknown> | undefined
 ): string | null {
-  if (!data || data.platform !== "web") return null;
+  if (!data) return null;
   const ls = data.lemonSqueezyData as Record<string, unknown> | undefined;
   const rawId = ls?.subscriptionId;
   const subscriptionId =
@@ -40,14 +46,54 @@ function lemonSqueezySubscriptionToCancel(
   return subscriptionId;
 }
 
+type CancelOutcome = "cancelled" | "already_stopped" | "unavailable" | "failed";
+
+/**
+ * Lemon Squeezy の購読を解約する。退会（App Store 審査ガイドライン 5.1.1(v)）を
+ * 不当に妨げないよう、解約APIが 4xx を返した場合は状態を取り直し、既に止まって
+ * いれば続行する。
+ * - cancelled / already_stopped: 退会を続けてよい
+ * - unavailable: こちらの設定不備（APIキー未設定・401/403）。運用で直すまで 503
+ * - failed: 通信失敗・5xx・まだ有効なことを確認できた → 502
+ */
+async function cancelLemonSqueezySubscription(
+  subscriptionId: string
+): Promise<CancelOutcome> {
+  const isConfigProblem = (error: unknown) =>
+    error instanceof LemonSqueezyApiError &&
+    (error.kind === "config" || error.status === 401 || error.status === 403);
+  try {
+    await cancelSubscription(subscriptionId);
+    return "cancelled";
+  } catch (error) {
+    if (isConfigProblem(error)) return "unavailable";
+    if (!(error instanceof LemonSqueezyApiError) || error.kind !== "http") {
+      return "failed"; // 通信失敗
+    }
+    const status = error.status ?? 0;
+    if (status === 404) return "already_stopped";
+    if (status >= 500 || status < 400) return "failed";
+    // その他の 4xx（期限切れの購読への解約など）は現在の状態を確かめる
+    try {
+      const current = await getSubscriptionStatus(subscriptionId);
+      if (current === null || LEMON_SQUEEZY_STOPPED_STATUSES.has(current)) {
+        return "already_stopped";
+      }
+      return "failed";
+    } catch (statusError) {
+      return isConfigProblem(statusError) ? "unavailable" : "failed";
+    }
+  }
+}
+
 /**
  * ユーザーアカウントとそのデータを削除するAPI
  * POST /api/user/delete
  *
- * 1. Lemon Squeezy の有効な購読があれば先に解約する（失敗したら削除を中断 → 502）。
- *    解約せずに消すと課金だけが続き、次の Webhook で subscriptions/{uid} が復活する。
- * 2. Firestore の本人データ（subscriptions / purchase_owners / signals_claude_usage /
- *    users/{uid} 配下）を削除
+ * 1. Lemon Squeezy の有効な購読があれば先に解約する（止まったことを確認できなければ
+ *    中断 → 502/503）。解約せずに消すと課金だけが続く。
+ * 2. ネイティブ購入の所有記録（purchase_owners）を解放（失敗したら中断 → 503）
+ * 3. Firestore の本人データ（subscriptions / signals_claude_usage / users/{uid} 配下）を削除
  * 3. Firebase Auth のユーザーを削除
  */
 export async function POST(request: NextRequest) {
@@ -112,27 +158,44 @@ export async function POST(request: NextRequest) {
     const lemonSqueezySubscriptionId =
       lemonSqueezySubscriptionToCancel(subscriptionData);
     if (lemonSqueezySubscriptionId) {
-      try {
-        await cancelSubscription(lemonSqueezySubscriptionId);
-        console.info(
-          `退会: Lemon Squeezy の購読を解約しました: user=${maskId(userId)}, subscription=${lemonSqueezySubscriptionId}`
+      const outcome = await cancelLemonSqueezySubscription(
+        lemonSqueezySubscriptionId
+      );
+      if (outcome === "unavailable" || outcome === "failed") {
+        console.error(
+          `退会: Lemon Squeezy の解約を確認できないため削除を中断: user=${maskId(userId)}, subscription=${lemonSqueezySubscriptionId}, outcome=${outcome}`
         );
-      } catch (error) {
-        const alreadyGone =
-          error instanceof LemonSqueezyApiError && error.status === 404;
-        if (!alreadyGone) {
-          console.error(
-            `退会: Lemon Squeezy の解約に失敗したため削除を中断: user=${maskId(userId)}, ${sanitizeError(error, [userId])}`
-          );
-          return NextResponse.json(
-            { error: CANCEL_FAILED_MESSAGE },
-            { status: 502 }
-          );
-        }
-        console.warn(
-          `退会: Lemon Squeezy 側に購読が見つからないため解約をスキップ: user=${maskId(userId)}`
+        return NextResponse.json(
+          { error: CANCEL_FAILED_MESSAGE },
+          { status: outcome === "unavailable" ? 503 : 502 }
         );
       }
+      console.info(
+        `退会: Lemon Squeezy の購読を停止済みにしました: user=${maskId(userId)}, subscription=${lemonSqueezySubscriptionId}, outcome=${outcome}`
+      );
+    }
+
+    // 0.5 ネイティブ購入の所有記録を解放する。失敗したまま Auth を消すと、同じ
+    //     Apple ID / Google アカウントで作り直したアカウントが購入を復元できなくなるため、
+    //     ここで失敗したら削除自体を中断して再試行してもらう
+    try {
+      const released = await releasePurchaseOwnership(db, userId);
+      if (released > 0) {
+        console.info(
+          `Purchase ownership released for user: ${maskId(userId)} (${released})`
+        );
+      }
+    } catch (error) {
+      console.error(
+        `購入所有記録の削除に失敗したため退会を中断: ${sanitizeError(error, [userId])}`
+      );
+      return NextResponse.json(
+        {
+          error:
+            "アカウント削除中にエラーが発生しました。時間をおいて再度お試しください。",
+        },
+        { status: 503 }
+      );
     }
 
     // 1. Firestoreからサブスクリプションデータを削除
@@ -147,20 +210,6 @@ export async function POST(request: NextRequest) {
         `サブスクリプションデータ削除エラー: ${sanitizeError(error, [userId])}`
       );
       // データがない場合もあるので、ここでは続行
-    }
-
-    // 2. ネイティブ購入の所有記録を解放（同じストア購入を新しいアカウントで復元できるように）
-    try {
-      const released = await releasePurchaseOwnership(db, userId);
-      if (released > 0) {
-        console.info(
-          `Purchase ownership released for user: ${maskId(userId)} (${released})`
-        );
-      }
-    } catch (error) {
-      console.error(
-        `購入所有記録の削除エラー: ${sanitizeError(error, [userId])}`
-      );
     }
 
     // 3. 深掘り分析の利用回数（signals_claude_usage/{uid}_{date}）を削除

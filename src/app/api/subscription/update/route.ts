@@ -10,6 +10,7 @@ import {
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
 import {
+  authUserExists,
   PurchaseOwnedByOtherAccountError,
   writeSubscriptionWithOwnership,
 } from "@/lib/purchases/purchaseOwnership";
@@ -56,7 +57,9 @@ export async function POST(request: NextRequest) {
     // Firebase Auth ID Tokenの検証
     let decodedToken;
     try {
-      decodedToken = await auth.verifyIdToken(purchaseRequest.idToken);
+      // checkRevoked: 退会（Auth 削除）後も約1時間有効な ID トークンで、
+      // 削除済み uid の購入記録が作り直されるのを防ぐ
+      decodedToken = await auth.verifyIdToken(purchaseRequest.idToken, true);
     } catch (error) {
       console.error(`ID Token検証エラー: ${sanitizeError(error)}`);
       return NextResponse.json(
@@ -85,7 +88,8 @@ export async function POST(request: NextRequest) {
           ? {}
           : { createdAt: FieldValue.serverTimestamp() }),
       }),
-      () => FieldValue.serverTimestamp()
+      () => FieldValue.serverTimestamp(),
+      authUserExists(auth)
     )) as ReturnType<typeof buildSubscriptionDocumentFromVerification>;
 
     return NextResponse.json({

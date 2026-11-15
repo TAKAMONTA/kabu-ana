@@ -139,6 +139,7 @@ class FakeQuery {
   }
 
   async get() {
+    this.db.failIfConfigured("get", this.path);
     const prefix = `${this.path}/`;
     const docs = [...this.db.docs.entries()]
       .filter(

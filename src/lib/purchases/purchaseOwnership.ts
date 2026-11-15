@@ -60,7 +60,8 @@ export async function writeSubscriptionWithOwnership(
   uid: string,
   verified: VerifiedNativePurchase,
   buildSubscriptionData: (subscriptionExists: boolean) => Record<string, unknown>,
-  serverTimestamp: () => unknown
+  serverTimestamp: () => unknown,
+  ownerStillExists: (ownerUid: string) => Promise<boolean>
 ): Promise<Record<string, unknown>> {
   const ownerRef = db
     .collection(PURCHASE_OWNERS_COLLECTION)
@@ -74,15 +75,22 @@ export async function writeSubscriptionWithOwnership(
       tx.get(subscriptionRef),
     ]);
     const ownerUid = ownerSnap.exists ? ownerSnap.data()?.uid : undefined;
+    let takeOver = !ownerSnap.exists;
     if (typeof ownerUid === "string" && ownerUid !== uid) {
-      throw new PurchaseOwnedByOtherAccountError();
+      // 所有者が退会済み（Auth に存在しない）なら引き継ぐ。退会処理の解放が漏れた・
+      // 退会直後に古い ID トークンで所有記録が作り直された、のどちらでも
+      // 同じ Apple ID / Google アカウントで再登録した人が永久に 409 にならないように
+      if (await ownerStillExists(ownerUid)) {
+        throw new PurchaseOwnedByOtherAccountError();
+      }
+      takeOver = true;
     }
 
     const subscriptionData = buildSubscriptionData(subscriptionSnap.exists);
     tx.set(subscriptionRef, subscriptionData, { merge: true });
     tx.set(
       ownerRef,
-      ownerSnap.exists
+      !takeOver
         ? { updatedAt: serverTimestamp() }
         : {
             uid,
@@ -91,10 +99,36 @@ export async function writeSubscriptionWithOwnership(
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           },
-      { merge: true }
+      // 引き継ぎ時は前の所有者の値を残さない
+      { merge: !takeOver }
     );
     return subscriptionData;
   });
+}
+
+/**
+ * Firebase Auth にユーザーが存在するかを返す（所有者の生存確認用）。
+ * 存在しない（auth/user-not-found）ときだけ false。それ以外の失敗は投げる
+ * （判定できないまま所有権を移さない）。
+ */
+export function authUserExists(auth: {
+  getUser: (uid: string) => Promise<unknown>;
+}): (uid: string) => Promise<boolean> {
+  return async (uid: string) => {
+    try {
+      await auth.getUser(uid);
+      return true;
+    } catch (error) {
+      if (
+        typeof error === "object" &&
+        error !== null &&
+        (error as { code?: unknown }).code === "auth/user-not-found"
+      ) {
+        return false;
+      }
+      throw error;
+    }
+  };
 }
 
 /**

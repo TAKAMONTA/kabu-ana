@@ -168,6 +168,41 @@ export async function createCheckout(
 }
 
 /**
+ * サブスクリプションの現在の状態（attributes.status）を取得する。
+ * Lemon Squeezy 側に存在しなければ null。
+ * https://docs.lemonsqueezy.com/api/subscriptions/retrieve-subscription
+ */
+export async function getSubscriptionStatus(
+  subscriptionId: string
+): Promise<string | null> {
+  const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
+  if (!apiKey) {
+    throw new LemonSqueezyApiError("LEMON_SQUEEZY_API_KEY is not set", "config");
+  }
+
+  const response = await lemonSqueezyFetch(
+    `${LEMON_SQUEEZY_API_URL}/subscriptions/${encodeURIComponent(subscriptionId)}`,
+    {
+      headers: {
+        Accept: "application/vnd.api+json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+    }
+  );
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new LemonSqueezyApiError(
+      `Failed to get subscription: ${response.status}`,
+      "http",
+      response.status
+    );
+  }
+  const body = await response.json().catch(() => null);
+  const status = body?.data?.attributes?.status;
+  return typeof status === "string" ? status : null;
+}
+
+/**
  * サブスクリプションをキャンセル（自動更新を停止）する。
  * DELETE /v1/subscriptions/:id は即時削除ではなく cancelled 状態にし、
  * 支払い済み期間の終わり（ends_at）に expired になる。

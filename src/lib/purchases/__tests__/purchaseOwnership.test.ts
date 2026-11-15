@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Firestore } from "firebase-admin/firestore";
 import {
+  authUserExists,
   PURCHASE_OWNED_BY_OTHER_MESSAGE,
   PURCHASE_OWNERS_COLLECTION,
   PurchaseOwnedByOtherAccountError,
@@ -43,6 +44,8 @@ function androidPurchase(
 }
 
 const serverTimestamp = () => SERVER_TIMESTAMP;
+/** 既定では所有者はまだ存在する（退会していない） */
+const ownerExists = async () => true;
 
 describe("purchaseOwnerKey", () => {
   it("uses the iOS originalTransactionId so renewals map to the same owner", () => {
@@ -81,7 +84,8 @@ describe("writeSubscriptionWithOwnership", () => {
       "user-a",
       verified,
       exists => ({ status: "active", existed: exists }),
-      serverTimestamp
+      serverTimestamp,
+      ownerExists
     );
 
     const ownerPath = `${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(verified)}`;
@@ -108,7 +112,8 @@ describe("writeSubscriptionWithOwnership", () => {
       "user-a",
       verified,
       exists => ({ status: "active", existed: exists }),
-      serverTimestamp
+      serverTimestamp,
+      ownerExists
     );
 
     expect(db.docs.get("subscriptions/user-a")).toEqual({
@@ -130,7 +135,8 @@ describe("writeSubscriptionWithOwnership", () => {
       "user-b",
       verified,
       () => ({ status: "active" }),
-      serverTimestamp
+      serverTimestamp,
+      ownerExists
     );
 
     await expect(attempt).rejects.toBeInstanceOf(PurchaseOwnedByOtherAccountError);
@@ -139,6 +145,78 @@ describe("writeSubscriptionWithOwnership", () => {
       message: PURCHASE_OWNED_BY_OTHER_MESSAGE,
     });
     expect(db.docs.has("subscriptions/user-b")).toBe(false);
+  });
+});
+
+describe("writeSubscriptionWithOwnership when the owner account was deleted", () => {
+  it("lets a new account take over a purchase whose owner no longer exists", async () => {
+    // 退会時の解放漏れ・退会直後の古いトークンで所有記録が残った場合でも、
+    // 同じ Apple ID で作り直したアカウントが 409 から抜け出せること
+    const db = new FakeFirestore();
+    const verified = iosPurchase();
+    const ownerPath = `${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(verified)}`;
+    db.seed(ownerPath, { uid: "deleted-user", platform: "ios", createdAt: "old" });
+    const checked: string[] = [];
+
+    await writeSubscriptionWithOwnership(
+      db as unknown as Firestore,
+      "new-user",
+      verified,
+      () => ({ status: "active" }),
+      serverTimestamp,
+      async uid => {
+        checked.push(uid);
+        return false;
+      }
+    );
+
+    expect(checked).toEqual(["deleted-user"]);
+    expect(db.docs.get(ownerPath)).toMatchObject({
+      uid: "new-user",
+      createdAt: SERVER_TIMESTAMP,
+    });
+    expect(db.docs.get("subscriptions/new-user")).toEqual({ status: "active" });
+  });
+
+  it("does not take over when the owner's existence cannot be determined", async () => {
+    const db = new FakeFirestore();
+    const verified = iosPurchase();
+    db.seed(`${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(verified)}`, {
+      uid: "user-a",
+    });
+
+    await expect(
+      writeSubscriptionWithOwnership(
+        db as unknown as Firestore,
+        "user-b",
+        verified,
+        () => ({ status: "active" }),
+        serverTimestamp,
+        async () => {
+          throw new Error("auth unavailable");
+        }
+      )
+    ).rejects.toThrow("auth unavailable");
+    expect(db.docs.has("subscriptions/user-b")).toBe(false);
+  });
+});
+
+describe("authUserExists", () => {
+  it("returns false only for auth/user-not-found", async () => {
+    const missing = authUserExists({
+      getUser: async () => {
+        throw Object.assign(new Error("x"), { code: "auth/user-not-found" });
+      },
+    });
+    await expect(missing("u")).resolves.toBe(false);
+    await expect(authUserExists({ getUser: async () => ({}) })("u")).resolves.toBe(true);
+    await expect(
+      authUserExists({
+        getUser: async () => {
+          throw Object.assign(new Error("x"), { code: "auth/internal-error" });
+        },
+      })("u")
+    ).rejects.toThrow();
   });
 });
 
@@ -154,7 +232,8 @@ describe("writeSubscriptionWithOwnership under contention", () => {
           uid,
           verified,
           () => ({ status: "active" }),
-          serverTimestamp
+          serverTimestamp,
+          ownerExists
         )
       )
     );

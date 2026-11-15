@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
 import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
@@ -10,6 +11,7 @@ import {
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
 import {
+  authUserExists,
   PurchaseOwnedByOtherAccountError,
   writeSubscriptionWithOwnership,
 } from "@/lib/purchases/purchaseOwnership";
@@ -25,7 +27,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
 
-  const authResult = await verifyAuth(request);
+  // 削除済み・無効化されたユーザーの古いトークンでは書き込ませない
+  const authResult = await verifyAuth(request, { checkRevoked: true });
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -78,7 +81,8 @@ export async function POST(request: NextRequest) {
         ),
         updatedAt: FieldValue.serverTimestamp(),
       }),
-      () => FieldValue.serverTimestamp()
+      () => FieldValue.serverTimestamp(),
+      authUserExists({ getUser: uid => getAuth(app).getUser(uid) })
     )) as ReturnType<typeof buildSubscriptionDocumentFromVerification>;
 
     return NextResponse.json({

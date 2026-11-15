@@ -6,6 +6,7 @@ const getAdminAppMock = vi.fn();
 const verifyIdTokenMock = vi.fn();
 const deleteUserMock = vi.fn();
 const cancelSubscriptionMock = vi.fn();
+const getSubscriptionStatusMock = vi.fn();
 let db: FakeFirestore;
 
 vi.mock("@/lib/firebase/admin", async () => {
@@ -34,6 +35,8 @@ vi.mock("@/lib/lemon-squeezy", async () => {
   return {
     ...actual,
     cancelSubscription: (...args: unknown[]) => cancelSubscriptionMock(...args),
+    getSubscriptionStatus: (...args: unknown[]) =>
+      getSubscriptionStatusMock(...args),
   };
 });
 
@@ -165,5 +168,85 @@ describe("POST /api/user/delete", () => {
     const response = await postDelete({});
     expect(response.status).toBe(400);
     expect(deleteUserMock).not.toHaveBeenCalled();
+  });
+
+  it("cancels a Lemon Squeezy subscription even when the document's platform became native", async () => {
+    db.seed("subscriptions/user-1", {
+      platform: "ios",
+      status: "active",
+      lemonSqueezyData: { subscriptionId: "3", status: "active" },
+    });
+
+    const response = await postDelete();
+
+    expect(response.status).toBe(200);
+    expect(cancelSubscriptionMock).toHaveBeenCalledWith("3");
+  });
+
+  it("continues when cancel returns another 4xx but the subscription is already expired", async () => {
+    // Webhook の取りこぼしで、LS 側ではもう期限切れの購読に解約を投げたケース
+    db.seed("subscriptions/user-1", {
+      platform: "web",
+      status: "active",
+      lemonSqueezyData: { subscriptionId: "3", status: "active" },
+    });
+    cancelSubscriptionMock.mockRejectedValue(
+      new LemonSqueezyApiError("Failed to cancel subscription: 422", "http", 422)
+    );
+    getSubscriptionStatusMock.mockResolvedValue("expired");
+
+    const response = await postDelete();
+
+    expect(response.status).toBe(200);
+    expect(getSubscriptionStatusMock).toHaveBeenCalledWith("3");
+    expect(deleteUserMock).toHaveBeenCalledWith("user-1");
+  });
+
+  it("aborts with 502 when cancel returns 4xx and the subscription is confirmed still active", async () => {
+    db.seed("subscriptions/user-1", {
+      platform: "web",
+      status: "active",
+      lemonSqueezyData: { subscriptionId: "3", status: "active" },
+    });
+    cancelSubscriptionMock.mockRejectedValue(
+      new LemonSqueezyApiError("Failed to cancel subscription: 422", "http", 422)
+    );
+    getSubscriptionStatusMock.mockResolvedValue("active");
+
+    const response = await postDelete();
+
+    expect(response.status).toBe(502);
+    expect(deleteUserMock).not.toHaveBeenCalled();
+  });
+
+  it("aborts with 503 (not forever-502) when the Lemon Squeezy API key is not configured", async () => {
+    db.seed("subscriptions/user-1", {
+      platform: "web",
+      status: "active",
+      lemonSqueezyData: { subscriptionId: "3", status: "active" },
+    });
+    cancelSubscriptionMock.mockRejectedValue(
+      new LemonSqueezyApiError("LEMON_SQUEEZY_API_KEY is not set", "config")
+    );
+
+    const response = await postDelete();
+
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("LEMON_SQUEEZY");
+    expect(deleteUserMock).not.toHaveBeenCalled();
+  });
+
+  it("aborts before deleting the Auth user when the purchase ownership cannot be released", async () => {
+    seedUserData();
+    db.seed("subscriptions/user-1", { platform: "ios", status: "active" });
+    db.failOn("get", "purchase_owners", new Error("firestore unavailable"));
+
+    const response = await postDelete();
+
+    expect(response.status).toBe(503);
+    expect(deleteUserMock).not.toHaveBeenCalled();
+    // 再試行できるよう本人データも残す
+    expect(db.docs.has("subscriptions/user-1")).toBe(true);
+    expect(db.docs.has(`${PURCHASE_OWNERS_COLLECTION}/key-1`)).toBe(true);
   });
 });

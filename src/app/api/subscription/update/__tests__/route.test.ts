@@ -4,6 +4,7 @@ import { FakeFirestore, SERVER_TIMESTAMP } from "@/lib/__tests__/fakeFirestore";
 
 const getAdminAppMock = vi.fn();
 const verifyIdTokenMock = vi.fn();
+const getUserMock = vi.fn();
 const verifyNativePurchaseMock = vi.fn();
 let db: FakeFirestore;
 
@@ -16,7 +17,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 });
 
 vi.mock("firebase-admin/auth", () => ({
-  getAuth: () => ({ verifyIdToken: verifyIdTokenMock }),
+  getAuth: () => ({ verifyIdToken: verifyIdTokenMock, getUser: getUserMock }),
 }));
 
 vi.mock("firebase-admin/firestore", () => ({
@@ -82,6 +83,7 @@ describe("POST /api/subscription/update", () => {
     getAdminAppMock.mockReturnValue({});
     verifyIdTokenMock.mockResolvedValue({ uid: "user-b" });
     verifyNativePurchaseMock.mockResolvedValue(VERIFIED);
+    getUserMock.mockResolvedValue({ uid: "user-a" });
   });
 
   it("binds a verified purchase to the first account that registers it", async () => {
@@ -112,6 +114,35 @@ describe("POST /api/subscription/update", () => {
       error: PURCHASE_OWNED_BY_OTHER_MESSAGE,
     });
     expect(db.docs.has("subscriptions/user-b")).toBe(false);
+  });
+
+  it("verifies the ID token with checkRevoked so a deleted account's token cannot write", async () => {
+    verifyIdTokenMock.mockRejectedValue(
+      Object.assign(new Error("user not found"), { code: "auth/user-not-found" })
+    );
+
+    const response = await postUpdate(VALID_BODY);
+
+    expect(verifyIdTokenMock).toHaveBeenCalledWith("token-of-b", true);
+    expect(response.status).toBe(401);
+    expect(db.docs.size).toBe(0);
+  });
+
+  it("takes over a purchase whose previous owner account was deleted (delete-then-recreate)", async () => {
+    db.seed(`${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(VERIFIED)}`, {
+      uid: "deleted-user",
+    });
+    getUserMock.mockRejectedValue(
+      Object.assign(new Error("no user"), { code: "auth/user-not-found" })
+    );
+
+    const response = await postUpdate(VALID_BODY);
+
+    expect(response.status).toBe(200);
+    expect(getUserMock).toHaveBeenCalledWith("deleted-user");
+    expect(
+      db.docs.get(`${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(VERIFIED)}`)
+    ).toMatchObject({ uid: "user-b" });
   });
 
   it("returns 400 for a non-JSON body instead of a 500", async () => {

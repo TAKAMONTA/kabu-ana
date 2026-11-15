@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 const getAdminAppMock = vi.fn();
 const getFirestoreMock = vi.fn();
 const verifyNativePurchaseMock = vi.fn();
+const verifyAuthMock = vi.fn(async (..._args: unknown[]) => ({ uid: "user-1" }));
 
 vi.mock("@/lib/firebase/admin", async () => {
   const actual =
@@ -23,9 +24,14 @@ vi.mock("@/lib/auth/verifyAuth", async () => {
     );
   return {
     ...actual,
-    verifyAuth: () => Promise.resolve({ uid: "user-1" }),
+    verifyAuth: (...args: unknown[]) => verifyAuthMock(...args),
   };
 });
+
+const getUserMock = vi.fn();
+vi.mock("firebase-admin/auth", () => ({
+  getAuth: () => ({ getUser: (uid: string) => getUserMock(uid) }),
+}));
 
 vi.mock("firebase-admin/firestore", () => ({
   getFirestore: () => getFirestoreMock(),
@@ -193,5 +199,17 @@ describe("POST /api/subscription/refresh", () => {
     expect(db.docs.get("subscriptions/user-1")?.status).toBe("expired");
 
     consoleWarnSpy.mockRestore();
+  });
+
+  it("authenticates with checkRevoked (deleted accounts' tokens are rejected)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    getAdminAppMock.mockReturnValue({});
+    getFirestoreMock.mockReturnValue(makeDb({}, false));
+
+    await postRefresh();
+
+    expect(verifyAuthMock).toHaveBeenCalledWith(expect.anything(), {
+      checkRevoked: true,
+    });
   });
 });

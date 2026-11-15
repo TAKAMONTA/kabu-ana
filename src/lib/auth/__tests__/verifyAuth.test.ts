@@ -89,4 +89,17 @@ describe("verifyAuth", () => {
       expect(result.uid).toBe("user-123");
     }
   });
+
+  it("passes checkRevoked only when requested (billing routes)", async () => {
+    getAdminAppMock.mockReturnValue({ name: "[DEFAULT]" });
+    verifyIdTokenMock.mockResolvedValue({ uid: "user-123" });
+
+    await verifyAuth(makeRequest({ Authorization: "Bearer t1" }));
+    await verifyAuth(makeRequest({ Authorization: "Bearer t2" }), {
+      checkRevoked: true,
+    });
+
+    expect(verifyIdTokenMock).toHaveBeenCalledWith("t1", false);
+    expect(verifyIdTokenMock).toHaveBeenCalledWith("t2", true);
+  });
 });
