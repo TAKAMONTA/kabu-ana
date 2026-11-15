@@ -43,7 +43,7 @@ async function searchHandler(request: NextRequest) {
       return NextResponse.json(
         {
           error: "入力データが無効です",
-          details: validationResult.error.errors.map(err => ({
+          details: validationResult.error.issues.map(err => ({
             field: err.path.join("."),
             message: err.message,
           })),

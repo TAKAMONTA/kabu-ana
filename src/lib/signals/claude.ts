@@ -1,10 +1,11 @@
 import { z } from "zod";
 
 /** LLM が欠損・空文字を返しても落とさない。ticker が空の行は除去。 */
+// zod 4.4+ は z.unknown() でもキー欠損を拒否するため、欠損を許す旧挙動を .optional() で維持する。
 const morningBriefStockRaw = z.object({
-  ticker: z.unknown(),
-  reason: z.unknown(),
-  direction: z.unknown(),
+  ticker: z.unknown().optional(),
+  reason: z.unknown().optional(),
+  direction: z.unknown().optional(),
 });
 
 const morningBriefStockParsed = morningBriefStockRaw.transform(
