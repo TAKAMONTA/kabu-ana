@@ -33,6 +33,8 @@ const eslintConfig = defineConfig([
     "android/**",
     "ios/**",
     "backend/**",
+    // Claude Code のローカル作業領域（.gitignore 済みの git worktree 等）を lint 対象に含めない
+    ".claude/**",
   ]),
 ]);
 
