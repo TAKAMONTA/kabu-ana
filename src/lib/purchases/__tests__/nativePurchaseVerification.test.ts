@@ -420,4 +420,89 @@ describe("native purchase verification", () => {
       expect(signal).toBeInstanceOf(AbortSignal);
     }
   });
+
+  it("follows an iOS Monthly → Yearly upgrade on restore instead of falling back to the expired monthly", async () => {
+    setAppleEnv();
+    vi.setSystemTime(new Date("2026-05-24T00:00:00.000Z"));
+    const monthly = {
+      bundleId: "com.takaapps.kabunavi",
+      productId: "com.takaapps.kabunavi.Monthly",
+      transactionId: "1000000000000001",
+      originalTransactionId: "1000000000000001",
+      expiresDate: String(Date.parse("2026-05-01T00:00:00.000Z")),
+    };
+    const yearly = {
+      bundleId: "com.takaapps.kabunavi",
+      productId: "com.takaapps.kabunavi.Yearly",
+      transactionId: "1000000000000009",
+      originalTransactionId: "1000000000000001",
+      purchaseDate: String(Date.parse("2026-05-01T00:00:00.000Z")),
+      expiresDate: String(Date.parse("2027-05-01T00:00:00.000Z")),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/inApps/v1/subscriptions/")) {
+          return Response.json({
+            data: [
+              {
+                lastTransactions: [
+                  {
+                    status: 1,
+                    originalTransactionId: "1000000000000001",
+                    signedTransactionInfo: signedAppleTransaction(yearly),
+                  },
+                  {
+                    // 許可リスト外の商品は候補にしない
+                    status: 1,
+                    originalTransactionId: "1000000000000001",
+                    signedTransactionInfo: signedAppleTransaction({
+                      ...yearly,
+                      productId: "com.other.app.Lifetime",
+                      expiresDate: String(Date.parse("2099-01-01T00:00:00.000Z")),
+                    }),
+                  },
+                ],
+              },
+            ],
+          });
+        }
+        return Response.json({ signedTransactionInfo: signedAppleTransaction(monthly) });
+      })
+    );
+
+    // 保存済みの値（Monthly の取引ID・Monthly の productId）で復元する
+    const request = parseNativePurchaseUpdateRequest({
+      idToken: "already-authenticated",
+      platform: "ios",
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "1000000000000001",
+    });
+    const verified = await verifyNativePurchase(request);
+
+    expect(verified.status).toBe("active");
+    expect(verified.productId).toBe("com.takaapps.kabunavi.Yearly");
+    expect(verified.expiryDate).toBe("2027-05-01T00:00:00.000Z");
+
+    const document = buildSubscriptionDocumentFromVerification("user-1", request, verified);
+    expect(document.productId).toBe("com.takaapps.kabunavi.Yearly");
+    expect(document.status).toBe("active");
+  });
+
+  it("still rejects a verified product that is not in the allowlist", () => {
+    expect(() =>
+      buildSubscriptionDocumentFromVerification(
+        "user-1",
+        { platform: "ios", productId: "com.takaapps.kabunavi.Monthly" },
+        {
+          platform: "ios",
+          productId: "com.other.app.Lifetime",
+          purchaseToken: "t",
+          status: "active",
+          isTrial: false,
+          raw: {},
+        }
+      )
+    ).toThrow(PurchaseVerificationError);
+  });
 });

@@ -102,7 +102,14 @@ export function buildSubscriptionDocumentFromVerification(
   if (request.platform && request.platform !== verified.platform) {
     throw new PurchaseVerificationError("購入プラットフォームが一致しません", 400);
   }
-  if (request.productId && request.productId !== verified.productId) {
+  // 商品はストアの検証結果を正とする。同じサブスクリプショングループ内の
+  // アップグレード／クロスグレード（Monthly → Yearly）では保存済みの productId と
+  // 最新の取引の productId が変わるため、一致ではなく許可リストで確認する
+  if (
+    request.productId &&
+    request.productId !== verified.productId &&
+    !isAllowedNativeProduct(verified.platform, verified.productId)
+  ) {
     throw new PurchaseVerificationError("商品IDが一致しません", 400);
   }
 
@@ -304,11 +311,16 @@ export function appleSubscriptionStatusToSubscriptionStatus(
   return statusFromExpiry(expiryDate, false);
 }
 
+/**
+ * 同じ originalTransactionId（同じ購読の系列）の最新の取引を返す。
+ * productId では絞らない: Monthly → Yearly のようなアップグレード後は最新の取引の
+ * productId が保存済みの値と変わるため、productId で絞ると何も見つからず古い取引
+ * （期限切れ）に戻ってしまっていた。代わりに許可リスト外の商品は除外する。
+ */
 async function fetchLatestAppleSubscriptionTransaction(
   baseUrl: string,
   headers: Record<string, string>,
-  originalTransactionId: string,
-  productId: string
+  originalTransactionId: string
 ): Promise<{
   payload: Record<string, any>;
   status?: number;
@@ -331,7 +343,14 @@ async function fetchLatestAppleSubscriptionTransaction(
       const payload = decodeJwtPayload<Record<string, any>>(
         transaction.signedTransactionInfo
       );
-      if (payload.productId === productId) {
+      const sameLineage =
+        String(payload.originalTransactionId ?? transaction.originalTransactionId ?? "") ===
+        originalTransactionId;
+      if (
+        sameLineage &&
+        typeof payload.productId === "string" &&
+        isAllowedNativeProduct("ios", payload.productId)
+      ) {
         let renewalInfo: Record<string, any> | undefined;
         if (transaction.signedRenewalInfo) {
           try {
@@ -412,8 +431,7 @@ async function verifyApplePurchase(
       ? await fetchLatestAppleSubscriptionTransaction(
           endpoint.baseUrl,
           headers,
-          String(initialPayload.originalTransactionId),
-          request.productId
+          String(initialPayload.originalTransactionId)
         )
       : null;
     const payload = latest?.payload || initialPayload;
