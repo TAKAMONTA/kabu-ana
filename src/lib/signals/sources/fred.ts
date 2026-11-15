@@ -6,6 +6,8 @@ export interface FredObservation {
 }
 
 const FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations";
+/** 1系列あたりの取得タイムアウト */
+export const FRED_FETCH_TIMEOUT_MS = 10_000;
 
 const FRED_SERIES = [
   { key: "vix", label: "VIX", seriesId: "VIXCLS", unit: "pt" },
@@ -51,7 +53,9 @@ export async function fetchFredPriceStrip(apiKey: string): Promise<SignalPricePo
       url.searchParams.set("series_id", series.seriesId);
       url.searchParams.set("sort_order", "desc");
       url.searchParams.set("limit", "2");
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(FRED_FETCH_TIMEOUT_MS),
+      });
       if (!response.ok) throw new Error(`FRED ${series.key} failed: ${response.status}`);
       return latestFredPricePoint(series.key, series.label, series.unit, parseFredObservations(await response.json()));
     })

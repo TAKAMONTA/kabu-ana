@@ -68,6 +68,39 @@ export const claudeDeepDiveSchema = z.object({
     .length(3),
 });
 
+/**
+ * 深掘り分析（POST /api/signals/claude-brief）の入力。
+ * クライアントは { brief: ClaudeMorningBrief } を送る。プロンプトにそのまま
+ * JSON.stringify するため、文字列長・配列長に上限を設けて巨大な入力（AI課金の増大）を
+ * 400 で弾く。未知のキーは zod の既定どおり取り除く。
+ */
+export const claudeDeepDiveRequestSchema = z.object({
+  brief: z.object({
+    headline_jp: z.string().max(100),
+    summary_jp: z.string().max(1000),
+    key_drivers: z
+      .array(
+        z.object({
+          factor: z.string().max(200),
+          impact: z.string().max(500),
+        })
+      )
+      .max(10)
+      .optional(),
+    stocks_to_watch: z
+      .array(
+        z.object({
+          ticker: z.string().max(20),
+          reason: z.string().max(300),
+          direction: z.enum(["up", "down", "watch"]),
+        })
+      )
+      .max(10)
+      .optional(),
+    risk_outlook: z.enum(["low", "elevated", "high", "critical"]).optional(),
+  }),
+});
+
 export type ClaudeMorningBrief = z.infer<typeof claudeMorningBriefSchema>;
 export type ClaudeDeepDive = z.infer<typeof claudeDeepDiveSchema>;
 

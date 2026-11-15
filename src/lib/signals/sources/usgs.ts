@@ -8,6 +8,8 @@ export interface EarthquakeSignal {
 }
 
 const USGS_WEEK_URL = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson";
+/** 取得タイムアウト */
+export const USGS_FETCH_TIMEOUT_MS = 10_000;
 
 export function parseUsgsEarthquakes(payload: any): EarthquakeSignal[] {
   const features = payload?.features;
@@ -26,7 +28,10 @@ export function parseUsgsEarthquakes(payload: any): EarthquakeSignal[] {
 }
 
 export async function fetchUsgsEarthquakes(): Promise<EarthquakeSignal[]> {
-  const response = await fetch(USGS_WEEK_URL, { next: { revalidate: 180 } });
+  const response = await fetch(USGS_WEEK_URL, {
+    next: { revalidate: 180 },
+    signal: AbortSignal.timeout(USGS_FETCH_TIMEOUT_MS),
+  });
   if (!response.ok) throw new Error(`USGS failed: ${response.status}`);
   return parseUsgsEarthquakes(await response.json());
 }

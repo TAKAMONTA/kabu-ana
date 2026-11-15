@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   fail,
+  logSignalError,
   ok,
   readSignalDocWithFallback,
+  SIGNAL_FETCH_FAILED_MESSAGE,
   todayId,
   writeSignalDocWithFallback,
 } from "@/lib/signals/cache";
@@ -23,7 +25,7 @@ export async function GET() {
   const cached = await readSignalDocWithFallback<SeismicPayload>(
     "signals_seismic",
     todayId()
-  );
+  ).catch(() => null);
   try {
     const earthquakes = await fetchUsgsEarthquakes();
     const payload = { earthquakes, fetchedAt: new Date().toISOString() };
@@ -32,8 +34,9 @@ export async function GET() {
       headers: { "Cache-Control": "s-maxage=180, stale-while-revalidate=600" },
     });
   } catch (error) {
+    logSignalError("signals/seismic: 地震データ取得に失敗しました", error);
     return NextResponse.json(
-      fail<SeismicPayload>(error instanceof Error ? error.message : "地震データ取得に失敗しました", cached?.fetchedAt, cached)
+      fail<SeismicPayload>(SIGNAL_FETCH_FAILED_MESSAGE, cached?.fetchedAt, cached)
     );
   }
 }

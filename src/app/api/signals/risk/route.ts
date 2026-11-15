@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { fail, ok, readSignalDoc, todayId, writeSignalDoc } from "@/lib/signals/cache";
+import {
+  fail,
+  logSignalError,
+  ok,
+  previousDayId,
+  readSignalDoc,
+  SIGNAL_FETCH_FAILED_MESSAGE,
+  todayId,
+  writeSignalDoc,
+} from "@/lib/signals/cache";
 import { calculateRiskVector, type BaselineInput, type RiskCalculationResult } from "@/lib/signals/scoring";
 import type { SignalPricePoint } from "@/lib/signals/sources/eia";
 import type { EnergyNewsItem } from "@/lib/signals/sources/rss";
@@ -9,6 +18,8 @@ export const dynamic = "force-dynamic";
 
 interface RiskPayload extends RiskCalculationResult {
   calculatedAt: string;
+  /** 計算した JST の日付（翌日の異常判定の比較元になる） */
+  dateId?: string;
 }
 
 interface PricePayload {
@@ -53,27 +64,43 @@ function buildBaselineFromCurrent(prices: SignalPricePoint[], news: EnergyNewsIt
   };
 }
 
+/**
+ * リスクベクトルを計算して返す。
+ * 「24時間変化 +3.0 以上」の異常判定は、前回の“リクエスト”ではなく前日（JST）の
+ * 確定値 signals_risk/{前日} と比べる。以前は毎回 signals_risk/previous を
+ * 上書きしていたため、数分前の値との差しか見ていなかった。
+ */
 export async function GET() {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json(ok<RiskPayload>(null));
   }
 
-  const cached = await readSignalDoc<RiskPayload>("signals_risk", todayId());
+  const dateId = todayId();
+  const cached = await readSignalDoc<RiskPayload>("signals_risk", dateId).catch(
+    () => null
+  );
   try {
-    const [pricePayload, newsPayload, seismicPayload, storedBaseline, previousRisk] = await Promise.all([
-      readSignalDoc<PricePayload>("signals_prices", todayId()),
-      readSignalDoc<NewsPayload>("signals_news", todayId()),
-      readSignalDoc<SeismicPayload>("signals_seismic", todayId()),
-      readSignalDoc<BaselineInput>("signals_baseline", todayId()),
-      readSignalDoc<RiskPayload>("signals_risk", "previous"),
+    const [pricePayload, newsPayload, seismicPayload, storedBaseline, yesterdayRisk] = await Promise.all([
+      readSignalDoc<PricePayload>("signals_prices", dateId),
+      readSignalDoc<NewsPayload>("signals_news", dateId),
+      readSignalDoc<SeismicPayload>("signals_seismic", dateId),
+      readSignalDoc<BaselineInput>("signals_baseline", dateId),
+      readSignalDoc<RiskPayload>("signals_risk", previousDayId(dateId)),
     ]);
 
     const prices = pricePayload?.prices ?? [];
     const news = newsPayload?.items ?? [];
     const earthquakes = seismicPayload?.earthquakes ?? [];
+    if (prices.length === 0 && news.length === 0 && earthquakes.length === 0) {
+      // 入力が1つも無い日は計算しない（0点のリスクで当日分を上書きし、
+      // それを材料に朝ブリーフが生成されるのを防ぐ）
+      return NextResponse.json(
+        fail<RiskPayload>(SIGNAL_FETCH_FAILED_MESSAGE, cached?.calculatedAt, cached)
+      );
+    }
     const baseline = storedBaseline ?? (prices.length || news.length ? buildBaselineFromCurrent(prices, news) : fallbackBaseline());
     if (!storedBaseline && baseline.daysCollected >= 14) {
-      await writeSignalDoc("signals_baseline", todayId(), { ...baseline });
+      await writeSignalDoc("signals_baseline", dateId, { ...baseline });
     }
 
     const result = calculateRiskVector({
@@ -91,15 +118,15 @@ export async function GET() {
         publishedAt: item.publishedAt,
       })),
       earthquakes: earthquakes.map((item) => ({ magnitude: item.magnitude, time: item.time })),
-      previousComposite: previousRisk?.composite,
+      previousComposite: yesterdayRisk?.composite,
     });
-    const payload = { ...result, calculatedAt: new Date().toISOString() };
-    await writeSignalDoc("signals_risk", todayId(), payload);
-    await writeSignalDoc("signals_risk", "previous", payload);
+    const payload = { ...result, dateId, calculatedAt: new Date().toISOString() };
+    await writeSignalDoc("signals_risk", dateId, payload);
     return NextResponse.json(ok(payload, payload.calculatedAt));
   } catch (error) {
+    logSignalError("signals/risk: リスク計算に失敗しました", error);
     return NextResponse.json(
-      fail<RiskPayload>(error instanceof Error ? error.message : "リスク計算に失敗しました", cached?.calculatedAt, cached)
+      fail<RiskPayload>(SIGNAL_FETCH_FAILED_MESSAGE, cached?.calculatedAt, cached)
     );
   }
 }

@@ -96,3 +96,22 @@ describe("signal cache fallbacks", () => {
     );
   });
 });
+
+describe("signal date ids", () => {
+  it("uses the JST date (00:00 JST boundary, not 09:00 JST)", async () => {
+    const { todayId } = await import("../cache");
+    // 2026-11-14 23:59 JST
+    expect(todayId(new Date("2026-11-14T14:59:00.000Z"))).toBe("2026-11-14");
+    // 2026-11-15 00:00 JST（UTC ではまだ 11-14）
+    expect(todayId(new Date("2026-11-14T15:00:00.000Z"))).toBe("2026-11-15");
+    // JST 06:00 の cron（21:00 UTC）は JST の当日分に書く
+    expect(todayId(new Date("2026-11-14T21:00:00.000Z"))).toBe("2026-11-15");
+  });
+
+  it("computes the previous day across month and year boundaries", async () => {
+    const { previousDayId } = await import("../cache");
+    expect(previousDayId("2026-11-15")).toBe("2026-11-14");
+    expect(previousDayId("2026-03-01")).toBe("2026-02-28");
+    expect(previousDayId("2027-01-01")).toBe("2026-12-31");
+  });
+});

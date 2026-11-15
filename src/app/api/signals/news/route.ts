@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
   fail,
+  logSignalError,
   ok,
   readSignalDocWithFallback,
+  SIGNAL_FETCH_FAILED_MESSAGE,
   todayId,
   writeSignalDocWithFallback,
 } from "@/lib/signals/cache";
@@ -34,7 +36,9 @@ export async function GET() {
   }
 
   const cached = normalizeNewsPayload(
-    await readSignalDocWithFallback<NewsPayload>("signals_news", todayId())
+    await readSignalDocWithFallback<NewsPayload>("signals_news", todayId()).catch(
+      () => null
+    )
   );
   try {
     const items = await fetchEnergyNews();
@@ -44,8 +48,9 @@ export async function GET() {
       headers: { "Cache-Control": "s-maxage=900, stale-while-revalidate=1800" },
     });
   } catch (error) {
+    logSignalError("signals/news: ニュース取得に失敗しました", error);
     return NextResponse.json(
-      fail<NewsPayload>(error instanceof Error ? error.message : "ニュース取得に失敗しました", cached?.fetchedAt, cached)
+      fail<NewsPayload>(SIGNAL_FETCH_FAILED_MESSAGE, cached?.fetchedAt, cached)
     );
   }
 }
