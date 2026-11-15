@@ -142,6 +142,39 @@ describe("writeSubscriptionWithOwnership", () => {
   });
 });
 
+describe("writeSubscriptionWithOwnership under contention", () => {
+  it("lets only one of two accounts claim the same purchase at the same time", async () => {
+    const db = new FakeFirestore();
+    const verified = iosPurchase();
+
+    const results = await Promise.allSettled(
+      ["user-a", "user-b"].map(uid =>
+        writeSubscriptionWithOwnership(
+          db as unknown as Firestore,
+          uid,
+          verified,
+          () => ({ status: "active" }),
+          serverTimestamp
+        )
+      )
+    );
+
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    const rejected = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected"
+    );
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0].reason).toBeInstanceOf(PurchaseOwnedByOtherAccountError);
+    const owner = db.docs.get(
+      `${PURCHASE_OWNERS_COLLECTION}/${purchaseOwnerKey(verified)}`
+    )?.uid;
+    expect(db.docs.has(`subscriptions/${owner}`)).toBe(true);
+    expect(
+      ["user-a", "user-b"].filter(uid => db.docs.has(`subscriptions/${uid}`))
+    ).toHaveLength(1);
+  });
+});
+
 describe("releasePurchaseOwnership", () => {
   it("deletes only the owner records of the given account", async () => {
     const db = new FakeFirestore();

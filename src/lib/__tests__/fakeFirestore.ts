@@ -122,8 +122,7 @@ export class FakeDocRef {
 
   async delete(): Promise<void> {
     this.db.failIfConfigured("delete", this.path);
-    this.db.docs.delete(this.path);
-    this.db.deletedPaths.push(this.path);
+    this.db.remove(this.path);
   }
 }
 
@@ -162,12 +161,18 @@ export class FakeCollectionRef extends FakeQuery {
 export class FakeTransaction {
   private writes: Array<() => void> = [];
   private written = false;
+  /** 読んだ文書のバージョン（コミット時に変わっていたら競合として再実行する） */
+  readonly readVersions = new Map<string, number>();
 
   constructor(private readonly db: FakeFirestore) {}
 
   async get(ref: FakeDocRef): Promise<FakeSnapshot> {
     if (this.written) throw new Error("READ_AFTER_WRITE");
-    return ref.get();
+    this.readVersions.set(ref.path, this.db.versionOf(ref.path));
+    const snapshot = await ref.get();
+    // 実物と同じく読み取りは非同期。並列トランザクションが交互に進む状況を作る
+    await new Promise(resolve => setTimeout(resolve, 0));
+    return snapshot;
   }
 
   set(
@@ -181,10 +186,7 @@ export class FakeTransaction {
 
   delete(ref: FakeDocRef): void {
     this.written = true;
-    this.writes.push(() => {
-      this.db.docs.delete(ref.path);
-      this.db.deletedPaths.push(ref.path);
-    });
+    this.writes.push(() => this.db.remove(ref.path));
   }
 
   commit(): void {
@@ -195,6 +197,17 @@ export class FakeTransaction {
 export class FakeFirestore {
   readonly docs = new Map<string, Record<string, unknown>>();
   readonly deletedPaths: string[] = [];
+  private readonly versions = new Map<string, number>();
+  /** runTransaction の関数が（競合による再実行を含めて）呼ばれた回数 */
+  transactionAttempts = 0;
+
+  versionOf(path: string): number {
+    return this.versions.get(path) ?? 0;
+  }
+
+  private bump(path: string): void {
+    this.versions.set(path, this.versionOf(path) + 1);
+  }
   /** 指定パス（前方一致）の操作を失敗させる */
   private failures: Array<{ op: string; prefix: string; error: Error }> = [];
 
@@ -238,6 +251,7 @@ export class FakeFirestore {
       path,
       options?.merge && current ? deepMerge(current, resolved) : resolved
     );
+    this.bump(path);
   }
 
   collection(name: string): FakeCollectionRef {
@@ -248,18 +262,35 @@ export class FakeFirestore {
     return new FakeDocRef(this, path);
   }
 
+  /**
+   * 楽観的並行性制御つきのトランザクション。読んだ文書がコミットまでに
+   * 他から書き換えられていたら、実物と同様に関数ごと再実行する。
+   */
   async runTransaction<T>(fn: (tx: FakeTransaction) => Promise<T>): Promise<T> {
-    const tx = new FakeTransaction(this);
-    const result = await fn(tx);
-    tx.commit();
-    return result;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      this.transactionAttempts += 1;
+      const tx = new FakeTransaction(this);
+      const result = await fn(tx);
+      const conflicted = [...tx.readVersions].some(
+        ([path, version]) => this.versionOf(path) !== version
+      );
+      if (conflicted) continue;
+      tx.commit();
+      return result;
+    }
+    throw new Error("ABORTED: too much contention");
+  }
+
+  remove(path: string): void {
+    this.docs.delete(path);
+    this.deletedPaths.push(path);
+    this.bump(path);
   }
 
   async recursiveDelete(ref: FakeDocRef): Promise<void> {
     for (const path of [...this.docs.keys()]) {
       if (path === ref.path || path.startsWith(`${ref.path}/`)) {
-        this.docs.delete(path);
-        this.deletedPaths.push(path);
+        this.remove(path);
       }
     }
   }
