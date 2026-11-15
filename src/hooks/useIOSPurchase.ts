@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { auth } from "@/lib/firebase";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp, Capacitor } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
 
 const PRODUCT_IDS = {
   ios: {
@@ -180,7 +181,13 @@ export function useIOSPurchase() {
                 ) {
                     setError(null); // キャンセルはエラーとして扱わない
                 } else {
-                    setError(err.message || "購入処理中にエラーが発生しました");
+                    // ストアの英語メッセージや技術的な文言は既定の案内に置き換える
+                    setError(
+                        toFriendlyErrorMessage(
+                            err?.message,
+                            "購入処理を完了できませんでした。時間をおいて、もう一度お試しください。"
+                        )
+                    );
                 }
 
                 setIsLoading(false);

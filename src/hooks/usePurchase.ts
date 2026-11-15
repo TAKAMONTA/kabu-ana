@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { auth } from "@/lib/firebase";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const PURCHASE_ERROR_FALLBACK =
+  "購入手続きを開始できませんでした。少し待ってからもう一度お試しください。";
 
 /**
  * 購入処理を管理するカスタムフック
@@ -38,8 +42,9 @@ export function usePurchase() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "チェックアウトの作成に失敗しました");
+        // エラー時に JSON 以外（HTML のエラーページ等）が返っても例外文を画面に出さない
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || PURCHASE_ERROR_FALLBACK);
       }
 
       const data = await response.json();
@@ -50,9 +55,14 @@ export function usePurchase() {
 
       // Lemon Squeezyのチェックアウトページに遷移
       window.location.href = data.checkoutUrl;
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("購入エラー:", err);
-      setError(err.message || "購入処理中にエラーが発生しました");
+      setError(
+        toFriendlyErrorMessage(
+          err instanceof Error ? err.message : null,
+          PURCHASE_ERROR_FALLBACK
+        )
+      );
       setIsLoading(false);
     }
   };

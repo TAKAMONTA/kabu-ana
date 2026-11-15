@@ -160,6 +160,7 @@ export default function HomePage() {
     isLoading: isRankingLoading,
     error: rankingError,
     warning: rankingWarning,
+    refresh: refreshRanking,
   } = useTopTradingValue();
   const {
     isLoading: isFinancialLoading,
@@ -515,6 +516,7 @@ export default function HomePage() {
       error={rankingError}
       warning={rankingWarning}
       onSelect={handlePickSelect}
+      onRetry={() => void refreshRanking()}
     />
   );
 

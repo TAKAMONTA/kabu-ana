@@ -13,6 +13,12 @@ import {
   FREE_WATCHLIST_LIMIT,
 } from "@/lib/watchlist/limits";
 import { normalizeWatchlistCode } from "@/lib/watchlist/codes";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const ADD_ERROR_FALLBACK =
+  "ウォッチリストに登録できませんでした。もう一度お試しください。";
+const REMOVE_ERROR_FALLBACK =
+  "ウォッチリストから削除できませんでした。もう一度お試しください。";
 
 export interface WatchlistItem {
   code: string;
@@ -114,10 +120,15 @@ export function useWatchlist() {
           data: { code: normalized, name },
         });
         if (response.status >= 400) {
-          throw new Error(response.data?.error ?? "登録に失敗しました");
+          throw new Error(response.data?.error ?? ADD_ERROR_FALLBACK);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "登録に失敗しました");
+        setError(
+          toFriendlyErrorMessage(
+            err instanceof Error ? err.message : null,
+            ADD_ERROR_FALLBACK
+          )
+        );
       } finally {
         // 成功時は onSnapshot が items を更新するので、楽観分は必ず外す
         setPending(prev => prev.filter(item => item.code !== normalized));
@@ -143,10 +154,15 @@ export function useWatchlist() {
           headers: await getAuthHeaders(),
         });
         if (response.status >= 400) {
-          throw new Error(response.data?.error ?? "削除に失敗しました");
+          throw new Error(response.data?.error ?? REMOVE_ERROR_FALLBACK);
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "削除に失敗しました");
+        setError(
+          toFriendlyErrorMessage(
+            err instanceof Error ? err.message : null,
+            REMOVE_ERROR_FALLBACK
+          )
+        );
       } finally {
         setRemoving(prev => prev.filter(c => c !== normalized));
       }

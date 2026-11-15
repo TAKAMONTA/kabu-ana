@@ -1,5 +1,9 @@
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const PANEL_ERROR_FALLBACK =
+  "データを取得できませんでした。少し待ってから再取得してください。";
 
 export function PanelLoading({ rows = 3 }: { rows?: number }) {
   return (
@@ -12,11 +16,16 @@ export function PanelLoading({ rows = 3 }: { rows?: number }) {
 }
 
 export function PanelError({ error, onRetry }: { error: string; onRetry?: () => void }) {
+  // "fetch failed" や「EIA_API_KEY … が未設定です」のような技術的な文言は出さない
+  const message = toFriendlyErrorMessage(error, PANEL_ERROR_FALLBACK);
   return (
-    <div className="flex items-start justify-between gap-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800">
+    <div
+      role="alert"
+      className="flex items-start justify-between gap-3 rounded-md border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800 dark:border-orange-900 dark:bg-orange-950/40 dark:text-orange-200"
+    >
       <div className="flex gap-2">
         <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-        <span>{error}</span>
+        <span>{message}</span>
       </div>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>

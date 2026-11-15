@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
 
 export interface TradingValueItem {
   rank: number;
@@ -40,32 +41,17 @@ const translateWarningCode = (code: string): string | null => {
   }
 };
 
+/** 画面に出すランキング取得失敗の案内（理由の詳細は利用者に対処できないので出さない） */
+export const RANKING_ERROR_MESSAGE =
+  "話題の銘柄を取得できませんでした。少し待ってから再読み込みしてください。";
+
+// /api/top-trading-value が返すエラーコードは ranking_fetch_failed のみ
+// （route.ts の catch 節）。以前あった APIキー未設定などのコードは
+// どこからも返らないため削除した。
 const translateErrorCode = (code: string): string | null => {
   switch (code) {
-    case "api_key_missing":
-      return "外部株価APIキーが未設定です。";
-    case "empty_response":
-      return "外部株価APIから有効なデータが得られませんでした。";
     case "ranking_fetch_failed":
-      return "ランキングの取得に失敗しました。時間をおいて再度お試しください。";
-    case "news_unavailable":
-      return "最新ニュースを取得できませんでした。";
-    case "openrouter_api_key_missing":
-      return "OpenRouterのAPIキーが未設定です。.env.localファイルにOPENROUTER_API_KEYを設定してください。";
-    case "openrouter_timeout":
-      return "AI分析のタイムアウトが発生しました。しばらくしてから再度お試しください。";
-    case "openrouter_unauthorized":
-      return "OpenRouterのAPIキーが無効です。正しいAPIキーを設定してください。";
-    case "openrouter_rate_limit":
-      return "APIの利用制限に達しました。しばらくしてから再度お試しください。";
-    case "openrouter_server_error":
-      return "OpenRouterサーバーでエラーが発生しました。しばらくしてから再度お試しください。";
-    case "openrouter_invalid_response":
-      return "AI分析の応答形式が不正でした。";
-    case "openrouter_empty":
-      return "AI分析から注目銘柄が得られませんでした。";
-    case "openrouter_failed":
-      return "AI分析で注目銘柄を生成できませんでした。";
+      return RANKING_ERROR_MESSAGE;
     default:
       return null;
   }
@@ -73,7 +59,9 @@ const translateErrorCode = (code: string): string | null => {
 
 export function useTopTradingValue() {
   const [items, setItems] = useState<TradingValueItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  // マウント直後に取得を始めるので、初期表示（プリレンダー含む）から読み込み中にする。
+  // false だと取得前に「まだありません」と表示されてしまう
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -98,39 +86,32 @@ export function useTopTradingValue() {
       const { status, data } = response;
 
       if (status !== 200) {
-        // エラーレスポンスでもJSON形式の可能性があるので、パースを試みる
-        const errorData = data;
-        const errorCode = errorData?.error || "ranking_fetch_failed";
-        const friendlyMessage = translateErrorCode(errorCode);
         throw new Error(
-          friendlyMessage ||
-            `ランキングの取得に失敗しました（ステータス: ${status}）`
+          translateErrorCode(data?.error ?? "") ?? RANKING_ERROR_MESSAGE
         );
       }
 
       if (!mountedRef.current) return;
-      const itemsFromApi = Array.isArray(data.items) ? data.items : [];
+      const itemsFromApi = Array.isArray(data?.items) ? data.items : [];
       setItems(itemsFromApi);
 
-      if (data.warning) {
+      if (data?.warning) {
         setWarning(translateWarningCode(data.warning) || null);
       }
 
-      if (data.error) {
-        const friendlyMessage = translateErrorCode(data.error);
-        if (friendlyMessage) {
-          setError(friendlyMessage);
-        }
+      if (data?.error) {
+        setError(translateErrorCode(data.error) ?? RANKING_ERROR_MESSAGE);
       } else {
         setError(null);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (!mountedRef.current) return;
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("エラーが発生しました");
-      }
+      setError(
+        toFriendlyErrorMessage(
+          err instanceof Error ? err.message : null,
+          RANKING_ERROR_MESSAGE
+        )
+      );
       setItems([]);
       setWarning(null);
     } finally {

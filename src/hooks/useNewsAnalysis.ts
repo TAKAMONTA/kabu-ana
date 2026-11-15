@@ -2,6 +2,10 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { NewsAnalysisResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const NEWS_ERROR_FALLBACK =
+  "ニュースの分析を取得できませんでした。少し待ってから再試行してください。";
 
 interface NewsAnalysisState {
   isLoading: boolean;
@@ -49,7 +53,7 @@ export function useNewsAnalysis() {
         const response = await CapacitorHttp.post(requestOptions);
 
         if (response.status !== 200) {
-          throw new Error(response.data?.error || "ニュース分析に失敗しました");
+          throw new Error(response.data?.error || NEWS_ERROR_FALLBACK);
         }
 
         if (!mountedRef.current) return;
@@ -65,10 +69,10 @@ export function useNewsAnalysis() {
         setState(prev => ({
           ...prev,
           isLoading: false,
-          error:
-            err instanceof Error
-              ? err.message
-              : "ニュース分析中にエラーが発生しました",
+          error: toFriendlyErrorMessage(
+            err instanceof Error ? err.message : null,
+            NEWS_ERROR_FALLBACK
+          ),
         }));
       }
     },

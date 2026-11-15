@@ -4,6 +4,10 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { FinancialEvaluationResult } from "@/lib/api/openrouter";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const FINANCIAL_ERROR_FALLBACK =
+  "財務の評価を取得できませんでした。少し待ってから再試行してください。";
 
 export function useFinancialEvaluation() {
   const [isLoading, setIsLoading] = useState(false);
@@ -57,12 +61,17 @@ export function useFinancialEvaluation() {
         const response = await CapacitorHttp.post(requestOptions);
         const data = response.data;
         if (response.status !== 200)
-          throw new Error(data.error || "財務評価に失敗しました");
+          throw new Error(data?.error || FINANCIAL_ERROR_FALLBACK);
         if (!mountedRef.current) return;
         setResult(data.analysis);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!mountedRef.current) return;
-        setError(e.message || "財務評価に失敗しました");
+        setError(
+          toFriendlyErrorMessage(
+            e instanceof Error ? e.message : null,
+            FINANCIAL_ERROR_FALLBACK
+          )
+        );
       } finally {
         if (mountedRef.current) setIsLoading(false);
       }
