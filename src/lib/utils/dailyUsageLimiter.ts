@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { isSubscriptionPremium } from "@/lib/types/subscription";
 
 /** 無料プランの1日あたりのAI機能利用上限 */
 const FREE_DAILY_LIMIT = 5;
@@ -134,13 +135,7 @@ export async function checkPremiumStatus(
 
     if (!subscriptionDoc.exists) return false;
 
-    const data = subscriptionDoc.data()!;
-    const isActive = data.status === "active" || data.status === "trial";
-    const hasExpired = data.expiryDate
-      ? new Date() > data.expiryDate.toDate()
-      : false;
-
-    return isActive && !hasExpired;
+    return isSubscriptionPremium(subscriptionDoc.data());
   } catch {
     return false;
   }

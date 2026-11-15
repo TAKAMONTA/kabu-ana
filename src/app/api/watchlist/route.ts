@@ -4,6 +4,7 @@ import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
 import { normalizeWatchlistCode } from "@/lib/watchlist/codes";
 import { canAddMore, FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
+import { isSubscriptionPremium } from "@/lib/types/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +15,7 @@ const MAX_NAME_LENGTH = 100;
 class WatchlistLimitError extends Error {}
 
 /**
- * uid から有料判定を行う。
- * uid を受け取る共通関数が無いため、signals/claude-brief と同じ判定をここで行う。
+ * uid から有料判定を行う（判定ロジックは isSubscriptionPremium に集約）。
  * 判定できない場合は無料扱い（fail-closed）。
  */
 async function isPremiumUser(
@@ -24,12 +24,7 @@ async function isPremiumUser(
 ): Promise<boolean> {
   try {
     const snapshot = await db.collection("subscriptions").doc(uid).get();
-    const data = snapshot.data();
-    if (!data) return false;
-    const active = data.status === "active" || data.status === "trial";
-    const notExpired =
-      !data.expiryDate || data.expiryDate.toDate() > new Date();
-    return active && notExpired;
+    return isSubscriptionPremium(snapshot.data());
   } catch (error) {
     // 判定できないときは無料扱い（fail-closed）。ただし無言にはしない —
     // Firestore 障害と実装バグの両方がここに落ちるため、記録が無いと

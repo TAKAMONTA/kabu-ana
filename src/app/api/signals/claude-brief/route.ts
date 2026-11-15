@@ -30,6 +30,7 @@ import {
   type BriefSourceInput,
 } from "@/lib/signals/briefCache";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
+import { isSubscriptionPremium } from "@/lib/types/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -183,10 +184,7 @@ async function postHandler(request: NextRequest) {
     const sub = db
       ? await db.collection("subscriptions").doc(authResult.uid).get()
       : null;
-    const subData = sub?.data();
-    const isPremium =
-      (subData?.status === "active" || subData?.status === "trial") &&
-      (!subData?.expiryDate || subData.expiryDate.toDate() > new Date());
+    const isPremium = isSubscriptionPremium(sub?.data());
     if (!isPremium)
       return NextResponse.json(
         fail<ClaudeDeepDive>("プレミアムユーザーのみ利用できます")
