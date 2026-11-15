@@ -7,6 +7,7 @@ import {
   isSubscriptionPremium,
   type Subscription,
 } from "@/lib/types/subscription";
+import { maybeRefreshNativeSubscription } from "@/lib/purchases/nativeRefresh";
 import { useAuth } from "./useAuth";
 
 /**
@@ -45,6 +46,9 @@ export function useSubscription() {
             isTrial: data.isTrial || false,
             createdAt: data.createdAt?.toDate() || new Date(data.createdAt),
             updatedAt: data.updatedAt?.toDate() || new Date(data.updatedAt),
+            storeValidatedAt: data.storeValidation?.validatedAt
+              ? new Date(data.storeValidation.validatedAt)
+              : undefined,
           });
           setError(null);
         } else {
@@ -61,6 +65,25 @@ export function useSubscription() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // ネイティブ購入の定期的な再検証（起動時・アプリ復帰時）。
+  // 更新・返金はサーバーに通知されないため、期限が近い（3日以内・過ぎた）か
+  // 最終検証から24時間以上経っていれば /api/subscription/refresh を静かに呼ぶ。
+  // 端末ごとに6時間に1回まで。ネイティブアプリ以外では何もしない。
+  useEffect(() => {
+    if (!user || !subscription) return;
+    const uid = user.uid;
+    const run = () => {
+      void maybeRefreshNativeSubscription(uid, subscription);
+    };
+    run();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") run();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+  }, [user, subscription]);
 
   /**
    * 購入状態が有効かどうかを判定。

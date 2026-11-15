@@ -64,6 +64,7 @@ import {
   purchaseOwnerKey,
 } from "@/lib/purchases/purchaseOwnership";
 import { FakeFirestore } from "@/lib/__tests__/fakeFirestore";
+import { isSubscriptionPremium } from "@/lib/types/subscription";
 
 function postRefresh() {
   const request = new NextRequest("http://localhost/api/subscription/refresh", {
@@ -211,5 +212,36 @@ describe("POST /api/subscription/refresh", () => {
     expect(verifyAuthMock).toHaveBeenCalledWith(expect.anything(), {
       checkRevoked: true,
     });
+  });
+
+  it("writes the store's latest state (e.g. revoked → cancelled) so premium ends at once", async () => {
+    verifyNativePurchaseMock.mockResolvedValue({
+      platform: "ios" as const,
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "token-2",
+      originalTransactionId: "original-1",
+      status: "cancelled" as const,
+      expiryDate: "2099-01-01T00:00:00.000Z",
+      isTrial: false,
+      raw: {},
+    });
+    const db = new FakeFirestore();
+    db.seed("subscriptions/user-1", {
+      platform: "ios",
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "token-1",
+      status: "active",
+    });
+    getAdminAppMock.mockReturnValue({});
+    getFirestoreMock.mockReturnValue(db);
+
+    const response = await postRefresh();
+
+    expect(response.status).toBe(200);
+    const doc = db.docs.get("subscriptions/user-1")!;
+    expect(doc.status).toBe("cancelled");
+    expect(doc.purchaseToken).toBe("token-2");
+    expect(doc.storeValidation).toMatchObject({ validatedAt: expect.any(String) });
+    expect(isSubscriptionPremium(doc)).toBe(false);
   });
 });
