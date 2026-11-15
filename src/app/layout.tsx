@@ -51,17 +51,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // manifest / theme-color / mobile-web-app-capable / apple-mobile-web-app-* /
+    // apple-touch-icon は上の metadata・viewport から出力される
+    // （以前は <head> にも手書きしており二重に出ていた）。
+    // Service Worker は登録しない。株価は常に最新が必要なため。
+    // public/sw.js は過去に登録された端末の後始末（自己登録解除）専用。
     <html lang="ja" suppressHydrationWarning>
-      <head>
-        <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#3b82f6" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content={APP_NAME} />
-        <link rel="apple-touch-icon" href="/icon-192x192.png" />
-        {/* Service Worker は登録しない。株価は常に最新が必要なため。
-            public/sw.js は過去に登録された端末の後始末（自己登録解除）専用。 */}
-      </head>
       <body className="font-sans antialiased">
         <ThemeProvider
           attribute="class"

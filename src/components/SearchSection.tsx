@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { normalizeDisplayText } from "@/lib/displayText";
-import { Search } from "lucide-react";
+import { AlertCircle, Search } from "lucide-react";
 
 interface Suggestion {
   symbol: string;
@@ -28,6 +28,10 @@ interface SearchSectionProps {
   onInputChange: (value: string) => void;
   onSelectSuggestion: (symbol: string, displayText?: string) => void;
   renderHighlighted: (text: string, query: string) => React.ReactNode;
+  /** 検索の失敗理由。検索欄のすぐ下に出す（画面下部まで探させない） */
+  error?: string | null;
+  /** 指定時のみ「もう一度検索」を出す */
+  onRetry?: () => void;
 }
 
 export function SearchSection({
@@ -43,9 +47,14 @@ export function SearchSection({
   onInputChange,
   onSelectSuggestion,
   renderHighlighted,
+  error,
+  onRetry,
 }: SearchSectionProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // 日本語入力の変換確定（かな→漢字の Enter）で検索・候補選択をしない。
+      // Safari は確定の keydown で isComposing が false になるため keyCode 229 も見る
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (!showSuggestions || suggestions.length === 0) {
         if (e.key === "Enter") onSearch();
         return;
@@ -110,6 +119,8 @@ export function SearchSection({
                 role="combobox"
                 aria-autocomplete="list"
                 aria-controls="search-suggestions"
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? "search-error" : undefined}
                 aria-expanded={
                   showSuggestions &&
                   (suggestions.length > 0 || isSuggestLoading)
@@ -208,6 +219,29 @@ export function SearchSection({
               {isLoading ? "基本データ取得中..." : "企業を検索"}
             </Button>
           </div>
+          {error && (
+            <div
+              id="search-error"
+              role="alert"
+              className="mt-3 flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">検索できませんでした</p>
+                <p className="mt-1 text-sm">{error}</p>
+                {onRetry && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    disabled={isLoading}
+                    className="mt-3 min-h-11 rounded-md bg-destructive/10 px-4 py-2 text-sm font-medium transition-colors hover:bg-destructive/20 disabled:opacity-50"
+                  >
+                    もう一度検索
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

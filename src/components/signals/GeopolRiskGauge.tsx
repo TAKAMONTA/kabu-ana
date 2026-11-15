@@ -29,13 +29,15 @@ export function GeopolRiskGauge() {
       </CardHeader>
       <CardContent>
         {isLoading ? <PanelLoading rows={4} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : data && !data.baselineReady ? (
-          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">ベースライン収集中</div>
+          <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+            ふだんの水準と比べるためのデータを集めています。2週間分のデータがそろうと表示されます。
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-[220px_1fr]">
             <div className="flex flex-col justify-center rounded-md border bg-background p-5 text-center">
-              <div className="text-xs text-muted-foreground">Composite</div>
+              <div className="text-xs text-muted-foreground">総合スコア</div>
               <div className="mt-2 text-5xl font-semibold">{data?.composite?.toFixed(1) ?? "--"}</div>
-              <div className="mt-2 text-xs text-muted-foreground">0-10</div>
+              <div className="mt-2 text-xs text-muted-foreground">0〜10（高いほど注意）</div>
             </div>
             <div className="h-72 min-w-0">
               <ResponsiveContainer width="100%" height="100%">

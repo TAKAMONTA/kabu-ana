@@ -10,6 +10,14 @@ import {
 import { auth } from "@/lib/firebase";
 import { getApiUrl } from "@/lib/utils/apiClient";
 import { CapacitorHttp } from "@capacitor/core";
+import {
+  AUTH_UNAVAILABLE_MESSAGE,
+  toAuthErrorMessage,
+} from "@/lib/authErrorMessage";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
+
+const DELETE_ACCOUNT_FALLBACK =
+  "アカウントを削除できませんでした。時間をおいてもう一度お試しください。";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -34,18 +42,20 @@ export function useAuth() {
     }
   }, []);
 
+  // Firebase の英語メッセージ（"Firebase: Error (auth/...)"）は画面に出さず、
+  // error.code から日本語の案内に置き換えて返す
   const login = async (email: string, password: string) => {
-    if (!auth) return { success: false, error: "Firebase not initialized" };
+    if (!auth) return { success: false, error: AUTH_UNAVAILABLE_MESSAGE };
     try {
       const result = await signInWithEmailAndPassword(auth, email, password);
       return { success: true, user: result.user };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: toAuthErrorMessage(error, "login") };
     }
   };
 
   const register = async (email: string, password: string) => {
-    if (!auth) return { success: false, error: "Firebase not initialized" };
+    if (!auth) return { success: false, error: AUTH_UNAVAILABLE_MESSAGE };
     try {
       const result = await createUserWithEmailAndPassword(
         auth,
@@ -53,34 +63,41 @@ export function useAuth() {
         password
       );
       return { success: true, user: result.user };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: toAuthErrorMessage(error, "register") };
     }
   };
 
   const logout = async () => {
-    if (!auth) return { success: false, error: "Firebase not initialized" };
+    if (!auth) return { success: false, error: AUTH_UNAVAILABLE_MESSAGE };
     try {
       await signOut(auth);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return { success: false, error: toAuthErrorMessage(error, "logout") };
     }
   };
 
   const resetPassword = async (email: string) => {
-    if (!auth) return { success: false, error: "Firebase not initialized" };
+    if (!auth) return { success: false, error: AUTH_UNAVAILABLE_MESSAGE };
     try {
       await sendPasswordResetEmail(auth, email);
       return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
+    } catch (error: unknown) {
+      return {
+        success: false,
+        error: toAuthErrorMessage(error, "resetPassword"),
+      };
     }
   };
 
   const deleteAccount = async () => {
     if (!auth || !auth.currentUser) {
-      return { success: false, error: "認証されていません" };
+      return {
+        success: false,
+        error:
+          "ログイン状態を確認できませんでした。もう一度ログインしてからお試しください。",
+      };
     }
 
     try {
@@ -103,9 +120,15 @@ export function useAuth() {
       await signOut(auth);
       setUser(null);
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Delete account error:", error);
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: toFriendlyErrorMessage(
+          error instanceof Error ? error.message : null,
+          DELETE_ACCOUNT_FALLBACK
+        ),
+      };
     }
   };
 

@@ -33,7 +33,12 @@ export function WatchlistSection({
   const { user } = useAuth();
   const { items, loading, error, limit, remove, clearError } = watchlist;
   const codes = items.map(item => item.code);
-  const { quotes, failed, refresh } = useWatchlistQuotes(codes);
+  const {
+    quotes,
+    failed,
+    loading: quotesLoading,
+    refresh,
+  } = useWatchlistQuotes(codes);
   const [confirmingCode, setConfirmingCode] = useState<string | null>(null);
 
   if (!user) {
@@ -79,9 +84,13 @@ export function WatchlistSection({
               variant="ghost"
               size="sm"
               onClick={refresh}
-              aria-label="株価を再取得"
+              disabled={quotesLoading}
+              aria-label={quotesLoading ? "株価を取得中" : "株価を再取得"}
+              className="size-11"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw
+                className={`w-4 h-4 ${quotesLoading ? "animate-spin" : ""}`}
+              />
             </Button>
           )}
         </div>
@@ -101,7 +110,7 @@ export function WatchlistSection({
               <button
                 type="button"
                 onClick={clearError}
-                className="text-xs underline"
+                className="-my-2 min-h-11 shrink-0 px-3 text-xs underline"
               >
                 閉じる
               </button>
@@ -198,6 +207,7 @@ export function WatchlistSection({
                         size="sm"
                         onClick={() => setConfirmingCode(item.code)}
                         aria-label={`${displayName} を削除`}
+                        className="size-11"
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -212,7 +222,12 @@ export function WatchlistSection({
         {failed && items.length > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
             株価を取得できませんでした。
-            <button type="button" onClick={refresh} className="underline ml-1">
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={quotesLoading}
+              className="-my-3 ml-1 min-h-11 px-2 underline disabled:opacity-50"
+            >
               再試行
             </button>
           </p>

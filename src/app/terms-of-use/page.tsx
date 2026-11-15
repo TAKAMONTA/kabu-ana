@@ -1,9 +1,21 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackToHomeLink } from "@/components/BackToHomeLink";
 import { APP_NAME } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "利用規約",
+  description:
+    "kabuana の利用規約です。サービスの内容、禁止事項、免責事項、有料プラン（自動更新のサブスクリプション）について定めています。",
+  alternates: { canonical: "/terms-of-use" },
+};
 
 export default function TermsOfUsePage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    // iOS アプリ（viewportFit: cover）でノッチ・ステータスバーに隠れないよう上端を空ける
+    <div className="container mx-auto px-4 pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] max-w-4xl">
+      {/* このページへはアプリ内のリンクから来るため、戻る手段を置く */}
+      <BackToHomeLink className="mb-3 -ml-2" />
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">
@@ -206,6 +218,7 @@ export default function TermsOfUsePage() {
           </div>
         </CardContent>
       </Card>
+      <BackToHomeLink className="mt-4 -ml-2" />
     </div>
   );
 }

@@ -7,12 +7,15 @@ import {
   getAttentionBadgeTone,
 } from "@/lib/attentionScore";
 import { normalizeDisplayText } from "@/lib/displayText";
-import { BarChart3, ExternalLink } from "lucide-react";
+import { BarChart3, ExternalLink, RefreshCw } from "lucide-react";
 
 interface FrontPageLeadStoryProps {
   idea?: TradingValueItem;
   isLoading: boolean;
   warning?: string | null;
+  /** ランキングの取得に失敗したときの案内文 */
+  error?: string | null;
+  onRetry?: () => void;
   showAttentionScore?: boolean;
   onSelectIdea: (item: TradingValueItem) => void;
 }
@@ -32,6 +35,8 @@ export function FrontPageLeadStory({
   idea,
   isLoading,
   warning,
+  error,
+  onRetry,
   showAttentionScore = true,
   onSelectIdea,
 }: FrontPageLeadStoryProps) {
@@ -43,6 +48,35 @@ export function FrontPageLeadStory({
         <div className="mb-3 h-4 w-28 shimmer rounded" />
         <div className="mb-3 h-8 w-3/4 shimmer rounded" />
         <div className="h-4 w-full max-w-xl shimmer rounded" />
+      </article>
+    );
+  }
+
+  // 取得に失敗したのに「まだありません」と出すと、今日は話題が無いように見えてしまう
+  if (!idea && error) {
+    return (
+      <article className="border-y border-border py-5">
+        <p className="text-xs font-semibold text-muted-foreground">
+          今日の注目銘柄
+        </p>
+        <h2 className="mt-2 text-xl font-bold tracking-tight">
+          今日の注目銘柄を取得できませんでした
+        </h2>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          {error}
+        </p>
+        {onRetry && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-3 min-h-11"
+            onClick={onRetry}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            再読み込み
+          </Button>
+        )}
       </article>
     );
   }
