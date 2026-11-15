@@ -1,3 +1,5 @@
+import { isSubscriptionPremium } from "@/lib/types/subscription";
+
 /**
  * Lemon Squeezy Webhook のペイロード解釈（ルートから切り出した純粋関数群）。
  * Next.js の route.ts は GET/POST 等以外を export できないため、ここに置く。
@@ -130,6 +132,9 @@ export function buildSubscriptionEventDocument(
         typeof attrs.cancelled === "boolean" ? attrs.cancelled : undefined,
       endsAt: typeof attrs.ends_at === "string" ? attrs.ends_at : null,
       renewsAt: typeof attrs.renews_at === "string" ? attrs.renews_at : null,
+      // 順不同の配送を判定するための Lemon Squeezy 側の更新時刻
+      updatedAt: typeof attrs.updated_at === "string" ? attrs.updated_at : null,
+      lifetime: false,
     },
     updatedAt: serverTimestamp(),
     ...(eventName === "subscription_created"
@@ -138,42 +143,255 @@ export function buildSubscriptionEventDocument(
   });
 }
 
-/** 定期購入用の variant ID（設定されているもののみ） */
-function subscriptionVariantIds(): Set<string> {
-  return new Set(
-    [
-      process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY,
-      process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY,
-    ].filter((value): value is string => Boolean(value))
-  );
+export interface LemonSqueezyWebhookConfig {
+  /** LEMON_SQUEEZY_STORE_ID（設定時は他ストアのイベントを無視） */
+  storeId?: string;
+  /** 定期購入の variant（LEMON_SQUEEZY_VARIANT_ID_MONTHLY / YEARLY） */
+  subscriptionVariantIds: string[];
+  /** 買い切り（期限なし）の variant（LEMON_SQUEEZY_VARIANT_ID_LIFETIME）。未設定なら付与しない */
+  lifetimeVariantId?: string;
+  /** 本番か（本番では test_mode のイベントを無視） */
+  isProduction: boolean;
 }
 
 /**
- * order_created を一括購入（期限なし）として保存してよいかを判定する。
- * order_created は定期購入のチェックアウトでも subscription_created と一緒に
- * 必ず送られるため、定期購入 variant の注文を一括購入として扱うと
- * expiryDate=null / isTrial=false で上書きしてしまう。
+ * 環境変数から設定を読む。本番判定は Vercel の VERCEL_ENV を優先する
+ * （vercel.json はプレビューでも NODE_ENV=production にするため、NODE_ENV だけだと
+ * プレビューでテスト購入ができない）。VERCEL_ENV が無い環境では NODE_ENV を使う。
  */
-export function shouldGrantOneTimeOrder(
-  attributes: Record<string, unknown> | undefined
-): { grant: boolean; reason?: string } {
-  const attrs = attributes ?? {};
-  if (attrs.status !== "paid") {
-    return { grant: false, reason: "order_not_paid" };
+export function readLemonSqueezyWebhookConfig(
+  env: NodeJS.ProcessEnv = process.env
+): LemonSqueezyWebhookConfig {
+  const isProduction = env.VERCEL_ENV
+    ? env.VERCEL_ENV === "production"
+    : env.NODE_ENV === "production";
+  return {
+    storeId: env.LEMON_SQUEEZY_STORE_ID || undefined,
+    subscriptionVariantIds: [
+      env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY,
+      env.LEMON_SQUEEZY_VARIANT_ID_YEARLY,
+    ].filter((value): value is string => Boolean(value)),
+    lifetimeVariantId: env.LEMON_SQUEEZY_VARIANT_ID_LIFETIME || undefined,
+    isProduction,
+  };
+}
+
+export type WebhookPlan =
+  | { kind: "write"; document: Record<string, unknown> }
+  | { kind: "skip"; reason: string };
+
+export interface WebhookPlanInput {
+  eventName: string | undefined;
+  userId: string;
+  data: { id?: unknown; attributes?: Record<string, unknown> } | undefined;
+  /** 現在の subscriptions/{uid}（無ければ undefined） */
+  current: Record<string, unknown> | undefined;
+  now: Date;
+  serverTimestamp: () => unknown;
+  config: LemonSqueezyWebhookConfig;
+}
+
+function lsData(doc: Record<string, unknown> | undefined): Record<string, unknown> {
+  const value = doc?.lemonSqueezyData;
+  return isPlainObject(value) ? value : {};
+}
+
+function toIsoOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (value instanceof Date) return value.toISOString();
+  if (
+    typeof value === "object" &&
+    typeof (value as { toDate?: unknown }).toDate === "function"
+  ) {
+    const date = (value as { toDate: () => Date }).toDate();
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
   }
-  const firstItem = isPlainObject(attrs.first_order_item)
-    ? attrs.first_order_item
-    : {};
-  const variantId = toIdString(firstItem.variant_id);
-  const subscriptionVariants = subscriptionVariantIds();
-  if (subscriptionVariants.size === 0) {
-    // 定期購入か判定できない。期限なしのプレミアムを誤付与しないよう保存しない
-    return { grant: false, reason: "subscription_variants_not_configured" };
+  return parseDateOrNull(value)?.toISOString() ?? null;
+}
+
+function isFullyRefunded(attrs: Record<string, unknown>): boolean {
+  // Order / Subscription invoice とも、全額返金は status "refunded"（部分は "partial_refund"）
+  return attrs.status === "refunded" || attrs.refunded === true;
+}
+
+/**
+ * Webhook 1件を subscriptions/{uid} にどう反映するかを決める（トランザクション内で呼ぶ純粋関数）。
+ *
+ * 文書は1ユーザー1つなので、どのイベントでも上書きしてよいわけではない:
+ * - 他ストア（store_id）・本番での test_mode・未知の variant のイベントは無視
+ * - ネイティブ購入で有効な文書、買い切りで有効な文書は Web の購読イベントで上書きしない
+ * - 別の購読（月額を解約して年額を購入した等）が有効な間は、古い購読の
+ *   失効・解約イベントで上書きしない（新しい有効な購読への切り替えは許可）
+ * - 同じ購読のイベントは attributes.updated_at が保存済みより古ければ無視（順不同の配送対策）
+ * - 全額返金（subscription_payment_refunded / order_refunded）は expired にする。
+ *   返金された期間が終わるまで、同じ購読のイベントで再び有効にしない
+ */
+export function planLemonSqueezyWebhook(input: WebhookPlanInput): WebhookPlan {
+  const { eventName, userId, data, current, now, serverTimestamp, config } = input;
+  const attrs = data?.attributes ?? {};
+
+  if (!eventName) return { kind: "skip", reason: "no_event_name" };
+  if (config.storeId && toIdString(attrs.store_id) !== config.storeId) {
+    return { kind: "skip", reason: "other_store" };
   }
-  if (!variantId || subscriptionVariants.has(variantId)) {
-    return { grant: false, reason: "subscription_order" };
+  if (config.isProduction && attrs.test_mode === true) {
+    return { kind: "skip", reason: "test_mode" };
   }
-  return { grant: true };
+
+  const currentLs = lsData(current);
+  const currentPlatform = current?.platform;
+  const currentIsNative = currentPlatform === "ios" || currentPlatform === "android";
+  const currentPremium = isSubscriptionPremium(current, now);
+
+  if (SUBSCRIPTION_OBJECT_EVENTS.has(eventName)) {
+    const variantId = toIdString(attrs.variant_id);
+    if (
+      config.subscriptionVariantIds.length > 0 &&
+      (!variantId || !config.subscriptionVariantIds.includes(variantId))
+    ) {
+      return { kind: "skip", reason: "unknown_variant" };
+    }
+    if (currentIsNative && currentPremium) {
+      return { kind: "skip", reason: "native_active" };
+    }
+    if (currentLs.lifetime === true && currentPremium) {
+      return { kind: "skip", reason: "lifetime_active" };
+    }
+
+    const document = buildSubscriptionEventDocument(
+      eventName,
+      userId,
+      data,
+      serverTimestamp
+    );
+    const incomingId = toIdString(data?.id);
+    const currentId = toIdString(currentLs.subscriptionId);
+    const sameSubscription = Boolean(currentId) && currentId === incomingId;
+
+    if (currentId && !sameSubscription && currentPremium) {
+      const incomingLive = document.status === "active" || document.status === "trial";
+      const currentLive = current?.status === "active" || current?.status === "trial";
+      if (!incomingLive || currentLive) {
+        return { kind: "skip", reason: "other_subscription_active" };
+      }
+    }
+
+    if (sameSubscription) {
+      const storedUpdatedAt = parseDateOrNull(currentLs.updatedAt);
+      const incomingUpdatedAt = parseDateOrNull(attrs.updated_at);
+      if (
+        storedUpdatedAt &&
+        incomingUpdatedAt &&
+        incomingUpdatedAt.getTime() < storedUpdatedAt.getTime()
+      ) {
+        return { kind: "skip", reason: "stale_event" };
+      }
+    }
+
+    const ls = document.lemonSqueezyData as Record<string, unknown>;
+    const refundedPeriodEnd = sameSubscription
+      ? parseDateOrNull(currentLs.refundedPeriodEnd)
+      : null;
+    const incomingExpiry = document.expiryDate as Date | null | undefined;
+    if (
+      refundedPeriodEnd &&
+      (!incomingExpiry || incomingExpiry.getTime() <= refundedPeriodEnd.getTime())
+    ) {
+      // 返金された期間の延長線上のイベント。返金状態を維持する
+      document.status = "expired";
+      ls.refundedAt = currentLs.refundedAt ?? null;
+      ls.refundedPeriodEnd = currentLs.refundedPeriodEnd;
+    } else {
+      // 別の購読・新しい請求期間に入った購読では返金の印を消す
+      ls.refundedAt = null;
+      ls.refundedPeriodEnd = null;
+    }
+    return { kind: "write", document };
+  }
+
+  if (eventName === "subscription_payment_refunded") {
+    if (!isFullyRefunded(attrs)) return { kind: "skip", reason: "partial_refund" };
+    const subscriptionId = toIdString(attrs.subscription_id);
+    if (
+      currentIsNative ||
+      !subscriptionId ||
+      toIdString(currentLs.subscriptionId) !== subscriptionId
+    ) {
+      return { kind: "skip", reason: "refund_for_other_entitlement" };
+    }
+    return {
+      kind: "write",
+      document: {
+        status: "expired",
+        lemonSqueezyData: {
+          refundedAt: toIsoOrNull(attrs.refunded_at) ?? now.toISOString(),
+          refundedPeriodEnd: toIsoOrNull(current?.expiryDate) ?? now.toISOString(),
+        },
+        updatedAt: serverTimestamp(),
+      },
+    };
+  }
+
+  if (SUBSCRIPTION_INVOICE_EVENTS.has(eventName)) {
+    return { kind: "skip", reason: "invoice_acknowledged" };
+  }
+
+  if (eventName === "order_created") {
+    if (attrs.status !== "paid") return { kind: "skip", reason: "order_not_paid" };
+    const firstItem = isPlainObject(attrs.first_order_item) ? attrs.first_order_item : {};
+    const variantId = toIdString(firstItem.variant_id);
+    // 許可リスト方式: 買い切り variant が設定され、かつ一致したときだけ期限なしで付与する
+    // （定期購入のチェックアウトでも order_created は必ず送られる）
+    if (!config.lifetimeVariantId || variantId !== config.lifetimeVariantId) {
+      return { kind: "skip", reason: "not_lifetime_variant" };
+    }
+    return {
+      kind: "write",
+      document: stripUndefined({
+        userId,
+        status: "active",
+        platform: "web",
+        productId: toIdString(firstItem.product_id) ?? "",
+        orderId: toIdString(data?.id),
+        purchaseDate: serverTimestamp(),
+        expiryDate: null, // 買い切りは有効期限なし
+        isTrial: false,
+        lemonSqueezyData: {
+          orderId: toIdString(data?.id),
+          customerId: attrs.customer_id ?? undefined,
+          status: typeof attrs.status === "string" ? attrs.status : undefined,
+          lifetime: true,
+          refundedAt: null,
+          refundedPeriodEnd: null,
+        },
+        ...(current ? {} : { createdAt: serverTimestamp() }),
+        updatedAt: serverTimestamp(),
+      }),
+    };
+  }
+
+  if (eventName === "order_refunded") {
+    if (!isFullyRefunded(attrs)) return { kind: "skip", reason: "partial_refund" };
+    if (
+      currentLs.lifetime !== true ||
+      toIdString(currentLs.orderId) !== toIdString(data?.id)
+    ) {
+      // 定期購入の初回注文の返金などは subscription_payment_refunded 側で扱う
+      return { kind: "skip", reason: "refund_for_other_entitlement" };
+    }
+    return {
+      kind: "write",
+      document: {
+        status: "expired",
+        lemonSqueezyData: {
+          refundedAt: toIsoOrNull(attrs.refunded_at) ?? now.toISOString(),
+        },
+        updatedAt: serverTimestamp(),
+      },
+    };
+  }
+
+  return { kind: "skip", reason: "unhandled_event" };
 }
 
 export function isUserNotFoundError(error: unknown): boolean {
