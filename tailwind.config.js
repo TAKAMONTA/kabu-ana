@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  // next-themes が <html> に付ける .dark クラスで切り替える。
+  // 未指定（media）だと OS 設定に従い、アプリ側のテーマ切替と食い違って文字が読めなくなる
+  darkMode: "class",
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
