@@ -5,6 +5,43 @@
 import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 const LEMON_SQUEEZY_API_URL = "https://api.lemonsqueezy.com/v1";
+/** Lemon Squeezy API 呼び出しのタイムアウト */
+const LEMON_SQUEEZY_TIMEOUT_MS = 15_000;
+
+/**
+ * Lemon Squeezy API の失敗。
+ * - kind "config": APIキー等の未設定（呼び出し前に判明）
+ * - kind "network": 接続失敗・タイムアウト
+ * - kind "http": 非2xx応答（status に HTTP ステータス）
+ * message は環境変数名を含み得るのでログ専用。クライアントには固定文言を返すこと。
+ */
+export class LemonSqueezyApiError extends Error {
+  constructor(
+    message: string,
+    public readonly kind: "config" | "network" | "http",
+    public readonly status?: number
+  ) {
+    super(message);
+    this.name = "LemonSqueezyApiError";
+  }
+}
+
+async function lemonSqueezyFetch(
+  url: string,
+  init: RequestInit
+): Promise<Response> {
+  try {
+    return await fetch(url, {
+      ...init,
+      signal: AbortSignal.timeout(LEMON_SQUEEZY_TIMEOUT_MS),
+    });
+  } catch (error) {
+    throw new LemonSqueezyApiError(
+      `Lemon Squeezy API request failed: ${sanitizeError(error)}`,
+      "network"
+    );
+  }
+}
 
 export interface LemonSqueezyCheckoutOptions {
   variantId: string;
@@ -49,14 +86,14 @@ export async function createCheckout(
   const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
 
   if (!apiKey) {
-    throw new Error("LEMON_SQUEEZY_API_KEY is not set");
+    throw new LemonSqueezyApiError("LEMON_SQUEEZY_API_KEY is not set", "config");
   }
 
   if (!storeId) {
-    throw new Error("LEMON_SQUEEZY_STORE_ID is not set");
+    throw new LemonSqueezyApiError("LEMON_SQUEEZY_STORE_ID is not set", "config");
   }
 
-  const response = await fetch(`${LEMON_SQUEEZY_API_URL}/checkouts`, {
+  const response = await lemonSqueezyFetch(`${LEMON_SQUEEZY_API_URL}/checkouts`, {
     method: "POST",
     headers: {
       Accept: "application/vnd.api+json",
@@ -124,63 +161,44 @@ export async function createCheckout(
 
     const errorMessage =
       sanitizedDetail || `Failed to create checkout: ${response.status}`;
-    throw new Error(errorMessage);
+    throw new LemonSqueezyApiError(errorMessage, "http", response.status);
   }
 
   return response.json();
 }
 
 /**
- * サブスクリプション情報を取得
- */
-export async function getSubscription(subscriptionId: string) {
-  const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("LEMON_SQUEEZY_API_KEY is not set");
-  }
-
-  const response = await fetch(
-    `${LEMON_SQUEEZY_API_URL}/subscriptions/${subscriptionId}`,
-    {
-      headers: {
-        Accept: "application/vnd.api+json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to get subscription: ${response.status}`);
-  }
-
-  return response.json();
-}
-
-/**
- * サブスクリプションをキャンセル
+ * サブスクリプションをキャンセル（自動更新を停止）する。
+ * DELETE /v1/subscriptions/:id は即時削除ではなく cancelled 状態にし、
+ * 支払い済み期間の終わり（ends_at）に expired になる。
+ * https://docs.lemonsqueezy.com/api/subscriptions/cancel-subscription
  */
 export async function cancelSubscription(subscriptionId: string) {
   const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
 
   if (!apiKey) {
-    throw new Error("LEMON_SQUEEZY_API_KEY is not set");
+    throw new LemonSqueezyApiError("LEMON_SQUEEZY_API_KEY is not set", "config");
   }
 
-  const response = await fetch(
-    `${LEMON_SQUEEZY_API_URL}/subscriptions/${subscriptionId}`,
+  const response = await lemonSqueezyFetch(
+    `${LEMON_SQUEEZY_API_URL}/subscriptions/${encodeURIComponent(subscriptionId)}`,
     {
       method: "DELETE",
       headers: {
         Accept: "application/vnd.api+json",
+        "Content-Type": "application/vnd.api+json",
         Authorization: `Bearer ${apiKey}`,
       },
     }
   );
 
   if (!response.ok) {
-    throw new Error(`Failed to cancel subscription: ${response.status}`);
+    throw new LemonSqueezyApiError(
+      `Failed to cancel subscription: ${response.status}`,
+      "http",
+      response.status
+    );
   }
 
-  return response.json();
+  return response.json().catch(() => null);
 }

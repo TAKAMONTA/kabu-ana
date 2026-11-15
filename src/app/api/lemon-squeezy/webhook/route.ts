@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import crypto from "crypto";
-import { getAdminApp } from "@/lib/firebase/admin";
+import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
 import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
+import {
+  buildSubscriptionEventDocument,
+  isUserNotFoundError,
+  shouldGrantOneTimeOrder,
+  stripUndefined,
+  SUBSCRIPTION_INVOICE_EVENTS,
+  SUBSCRIPTION_OBJECT_EVENTS,
+  toIdString,
+} from "@/lib/lemonSqueezyWebhook";
 
 /**
  * Webhook署名を検証
@@ -29,11 +39,13 @@ export const dynamic = "force-dynamic";
  * POST /api/lemon-squeezy/webhook
  *
  * 処理するイベント:
- * - subscription_created: サブスクリプション作成
- * - subscription_updated: サブスクリプション更新
- * - subscription_cancelled: サブスクリプションキャンセル
- * - subscription_payment_success: 支払い成功
- * - order_created: 注文作成（一括購入）
+ * - subscription_created / updated / cancelled / resumed / expired / paused / unpaused:
+ *   Subscription オブジェクトで subscriptions/{uid} を更新
+ * - subscription_payment_*: Subscription invoice オブジェクト。受領のみ
+ * - order_created: 一括購入（定期購入 variant 以外・支払い済み）のみ保存
+ *
+ * 退会済み（Firebase Auth に存在しない）ユーザー宛てのイベントは保存しない
+ * （退会後に届く解約・期限切れ通知で subscriptions/{uid} が復活するのを防ぐ）。
  */
 export async function POST(request: NextRequest) {
   // 静的エクスポート時はビルドエラーを防ぐためダミーを返す
@@ -51,8 +63,8 @@ export async function POST(request: NextRequest) {
     if (!webhookSecret) {
       console.error("LEMON_SQUEEZY_WEBHOOK_SECRET is not set");
       return NextResponse.json(
-        { error: "Webhook secret not configured" },
-        { status: 500 }
+        { error: "Webhook is not available" },
+        { status: 503 }
       );
     }
 
@@ -65,16 +77,22 @@ export async function POST(request: NextRequest) {
     }
 
     // ペイロードをパース
-    const payload = JSON.parse(rawBody);
-    eventName = payload.meta?.event_name;
-    const customData = payload.meta?.custom_data || {};
-    const data = payload.data;
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch {
+      console.error("Webhook payload is not valid JSON");
+      return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
+    }
+    eventName = payload?.meta?.event_name;
+    const customData = payload?.meta?.custom_data || {};
+    const data = payload?.data;
     eventId = data?.id !== undefined ? String(data.id) : undefined;
 
     console.info(`📦 Lemon Squeezy Webhook: ${eventName}`);
 
-    // ユーザーIDの取得
-    userId = customData.userId;
+    // ユーザーIDの取得（checkout の checkout_data.custom.userId）
+    userId = typeof customData.userId === "string" ? customData.userId : undefined;
     if (!userId) {
       console.warn(
         "⚠️ userId not found in custom_data. Skipping Firestore update."
@@ -83,162 +101,107 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
+    if (eventName && SUBSCRIPTION_INVOICE_EVENTS.has(eventName)) {
+      console.info(
+        `ℹ️ Invoice event acknowledged: ${eventName}, subscription=${toIdString(
+          data?.attributes?.subscription_id
+        ) ?? "unknown"}`
+      );
+      return NextResponse.json({ received: true });
+    }
+
+    const isSubscriptionEvent =
+      eventName !== undefined && SUBSCRIPTION_OBJECT_EVENTS.has(eventName);
+    let orderDecision: { grant: boolean; reason?: string } | null = null;
+    if (eventName === "order_created") {
+      orderDecision = shouldGrantOneTimeOrder(data?.attributes);
+      if (!orderDecision.grant) {
+        console.info(
+          `ℹ️ order_created ignored: ${orderDecision.reason}, id=${eventId ?? "unknown"}`
+        );
+        return NextResponse.json({ received: true });
+      }
+    } else if (!isSubscriptionEvent) {
+      console.info(`ℹ️ Unhandled event: ${eventName}`);
+      return NextResponse.json({ received: true });
+    }
+
     // Firebase Admin SDKの初期化
     const app = getAdminApp();
+
+    // 退会済みユーザーのデータは作り直さない
+    try {
+      await getAuth(app).getUser(userId);
+    } catch (error) {
+      if (isUserNotFoundError(error)) {
+        console.info(
+          `ℹ️ ${eventName} ignored: user no longer exists (${maskId(userId)})`
+        );
+        return NextResponse.json({ received: true });
+      }
+      throw error;
+    }
+
     const db = getFirestore(app);
     const subscriptionRef = db.collection("subscriptions").doc(userId);
+    const serverTimestamp = () => FieldValue.serverTimestamp();
 
-    // イベントに応じて処理
-    switch (eventName) {
-      case "subscription_created":
-      case "subscription_payment_success": {
-        const subscriptionData = data.attributes;
-        const expiryDate = subscriptionData.renews_at
-          ? new Date(subscriptionData.renews_at)
-          : null;
-
-        await subscriptionRef.set(
-          {
-            userId,
-            status: "active",
-            platform: "web",
-            productId: String(subscriptionData.product_id),
-            orderId: String(data.id),
-            purchaseDate: FieldValue.serverTimestamp(),
-            expiryDate: expiryDate,
-            isTrial: subscriptionData.status === "on_trial",
-            lemonSqueezyData: {
-              subscriptionId: data.id,
-              customerId: subscriptionData.customer_id,
-              variantId: subscriptionData.variant_id,
-              status: subscriptionData.status,
-            },
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
+    if (isSubscriptionEvent) {
+      const document = buildSubscriptionEventDocument(
+        eventName!,
+        userId,
+        data,
+        serverTimestamp
+      );
+      await subscriptionRef.set(document, { merge: true });
+      console.info(
+        `✅ Subscription ${eventName} for user: ${maskId(userId)}, status: ${String(
+          document.status
+        )}`
+      );
+    } else {
+      // 一括購入（定期購入 variant 以外・支払い済みの注文）
+      const orderData = data?.attributes ?? {};
+      await subscriptionRef.set(
+        stripUndefined({
+          userId,
+          status: "active",
+          platform: "web",
+          productId: String(orderData.first_order_item?.product_id ?? ""),
+          orderId: toIdString(data?.id),
+          purchaseDate: serverTimestamp(),
+          expiryDate: null, // 一括購入は有効期限なし
+          isTrial: false,
+          lemonSqueezyData: {
+            orderId: toIdString(data?.id),
+            customerId: orderData.customer_id ?? undefined,
+            status: orderData.status ?? undefined,
           },
-          { merge: true }
-        );
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }),
+        { merge: true }
+      );
 
-        console.info(
-          `✅ Subscription created/renewed for user: ${maskId(userId)}`
-        );
-        break;
-      }
-
-      case "subscription_updated": {
-        const subscriptionData = data.attributes;
-        const expiryDate = subscriptionData.renews_at
-          ? new Date(subscriptionData.renews_at)
-          : null;
-
-        // ステータスのマッピング
-        let status: string;
-        switch (subscriptionData.status) {
-          case "active":
-            status = "active";
-            break;
-          case "on_trial":
-            status = "trial";
-            break;
-          case "paused":
-          case "past_due":
-            status = "pending";
-            break;
-          case "cancelled":
-          case "expired":
-            status = "cancelled";
-            break;
-          default:
-            status = "pending";
-        }
-
-        await subscriptionRef.set(
-          {
-            status,
-            expiryDate: expiryDate,
-            isTrial: subscriptionData.status === "on_trial",
-            lemonSqueezyData: {
-              subscriptionId: data.id,
-              status: subscriptionData.status,
-            },
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        console.info(
-          `✅ Subscription updated for user: ${maskId(userId)}, status: ${status}`
-        );
-        break;
-      }
-
-      case "subscription_cancelled": {
-        const subscriptionData = data.attributes;
-        const endsAt = subscriptionData.ends_at
-          ? new Date(subscriptionData.ends_at)
-          : null;
-
-        await subscriptionRef.set(
-          {
-            status: "cancelled",
-            expiryDate: endsAt, // キャンセル後も期限まで有効
-            lemonSqueezyData: {
-              subscriptionId: data.id,
-              status: "cancelled",
-              cancelledAt: subscriptionData.cancelled_at,
-              endsAt: subscriptionData.ends_at,
-            },
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        console.info(`✅ Subscription cancelled for user: ${maskId(userId)}`);
-        break;
-      }
-
-      case "order_created": {
-        // 一括購入の場合
-        const orderData = data.attributes;
-
-        await subscriptionRef.set(
-          {
-            userId,
-            status: "active",
-            platform: "web",
-            productId: String(orderData.first_order_item?.product_id || ""),
-            orderId: String(data.id),
-            purchaseDate: FieldValue.serverTimestamp(),
-            expiryDate: null, // 一括購入は有効期限なし
-            isTrial: false,
-            lemonSqueezyData: {
-              orderId: data.id,
-              customerId: orderData.customer_id,
-              status: orderData.status,
-            },
-            createdAt: FieldValue.serverTimestamp(),
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
-
-        console.info(`✅ Order created for user: ${maskId(userId)}`);
-        break;
-      }
-
-      default:
-        console.info(`ℹ️ Unhandled event: ${eventName}`);
+      console.info(`✅ Order created for user: ${maskId(userId)}`);
     }
 
     return NextResponse.json({ received: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     const safeMessage = sanitizeError(error, [userId]);
     // eventId（LSリソースID）は調査用トレーサビリティのため意図的に非マスク（ユーザー直接識別子ではない）
     console.error(
       `Webhook処理エラー: event=${eventName ?? "unknown"}, id=${eventId ?? "unknown"}, message=${safeMessage}`
     );
+    if (error instanceof FirebaseAdminConfigError) {
+      return NextResponse.json(
+        { error: "Webhook is not available" },
+        { status: 503 }
+      );
+    }
+    // 詳細はログのみ。非2xxで Lemon Squeezy が再送する
     return NextResponse.json(
-      { error: safeMessage || "Webhook processing failed" },
+      { error: "Webhook processing failed" },
       { status: 500 }
     );
   }

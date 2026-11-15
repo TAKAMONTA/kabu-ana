@@ -23,9 +23,15 @@ vi.mock("firebase-admin/auth", () => ({
   getAuth: (app: unknown) => getAuthMock(app),
 }));
 
-vi.mock("@/lib/lemon-squeezy", () => ({
-  createCheckout: (...args: unknown[]) => createCheckoutMock(...args),
-}));
+vi.mock("@/lib/lemon-squeezy", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/lemon-squeezy")>(
+    "@/lib/lemon-squeezy"
+  );
+  return {
+    ...actual,
+    createCheckout: (...args: unknown[]) => createCheckoutMock(...args),
+  };
+});
 
 import { POST } from "../route";
 import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
