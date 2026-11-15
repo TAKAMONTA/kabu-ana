@@ -621,7 +621,9 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* ヘッダー */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      {/* iOS アプリ（viewportFit: cover）でステータスバーの下に潜らないよう、
+          セーフエリア分だけ上を空ける（/signals と同じ考え方） */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* ロゴは一面（検索前の画面）に戻る導線を兼ねる */}

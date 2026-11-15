@@ -1,9 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackToHomeLink } from "@/components/BackToHomeLink";
 import { APP_NAME } from "@/lib/constants";
 
 export default function TermsOfUsePage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    // iOS アプリ（viewportFit: cover）でノッチ・ステータスバーに隠れないよう上端を空ける
+    <div className="container mx-auto px-4 pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] max-w-4xl">
+      {/* このページへはアプリ内のリンクから来るため、戻る手段を置く */}
+      <BackToHomeLink className="mb-3 -ml-2" />
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">
@@ -206,6 +210,7 @@ export default function TermsOfUsePage() {
           </div>
         </CardContent>
       </Card>
+      <BackToHomeLink className="mt-4 -ml-2" />
     </div>
   );
 }
