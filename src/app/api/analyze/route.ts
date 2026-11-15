@@ -5,8 +5,7 @@ import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { withDailyLimit, getClientIP } from "@/lib/utils/dailyUsageLimiter";
 import { createAiBundleToken } from "@/lib/utils/aiBundleToken";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const num = typeof value === "number" ? value : Number(value);

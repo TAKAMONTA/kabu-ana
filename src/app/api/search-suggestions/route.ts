@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { resolveSearchQuery } from "@/lib/jpx/searchResolution";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 async function searchSuggestionsHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {

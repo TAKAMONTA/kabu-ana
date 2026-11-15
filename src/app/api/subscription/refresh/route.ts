@@ -10,8 +10,7 @@ import {
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * 既存のネイティブ購入レコードをストア側で再検証する。

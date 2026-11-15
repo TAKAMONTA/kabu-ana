@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ok, writeSignalDoc } from "@/lib/signals/cache";
 import { SIGNAL_REFRESH_GROUPS } from "@/lib/signals/refreshPlan";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 async function callInternal(path: string, origin: string) {
   const response = await fetch(`${origin}${path}`, { cache: "no-store" });

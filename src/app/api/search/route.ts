@@ -11,8 +11,7 @@ import {
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 const SEARCH_OPTIONAL_TIMEOUT_MS = 2200;
 const NEWS_OPTIONAL_TIMEOUT_MS = 1800;

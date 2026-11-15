@@ -4,8 +4,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getAdminApp } from "@/lib/firebase/admin";
 import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * ユーザーアカウントとそのデータを削除するAPI

@@ -22,8 +22,7 @@ function verifyWebhookSignature(
   }
 }
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * Lemon Squeezy Webhook処理

@@ -19,8 +19,7 @@ import { jstDateId } from "@/lib/digest/dateId";
 import { buildDigestPrompt, type DigestStockInput } from "@/lib/digest/prompt";
 import { parseDigestResponse } from "@/lib/digest/schema";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /** 要約対象の銘柄数上限（超過分は対象外） */
 const MAX_DIGEST_STOCKS = 10;

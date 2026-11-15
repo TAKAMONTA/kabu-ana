@@ -4,8 +4,7 @@ import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
 import { createCheckout } from "@/lib/lemon-squeezy";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * チェックアウトセッションを作成

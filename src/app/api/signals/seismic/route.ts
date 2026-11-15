@@ -8,7 +8,7 @@ import {
 } from "@/lib/signals/cache";
 import { fetchUsgsEarthquakes, type EarthquakeSignal } from "@/lib/signals/sources/usgs";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface SeismicPayload {
   earthquakes: EarthquakeSignal[];

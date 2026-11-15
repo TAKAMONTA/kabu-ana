@@ -31,8 +31,7 @@ import {
 } from "@/lib/signals/briefCache";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface BriefPayload {
   brief: ClaudeMorningBrief;

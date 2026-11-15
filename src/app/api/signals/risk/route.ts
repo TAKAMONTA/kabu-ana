@@ -5,7 +5,7 @@ import type { SignalPricePoint } from "@/lib/signals/sources/eia";
 import type { EnergyNewsItem } from "@/lib/signals/sources/rss";
 import type { EarthquakeSignal } from "@/lib/signals/sources/usgs";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface RiskPayload extends RiskCalculationResult {
   calculatedAt: string;

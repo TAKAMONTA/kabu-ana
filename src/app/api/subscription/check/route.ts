@@ -5,8 +5,7 @@ import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
 import type { Subscription } from "@/lib/types/subscription";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * 購入状態を確認するAPI

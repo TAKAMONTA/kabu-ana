@@ -14,8 +14,7 @@ export interface NewsAnalysisResult {
   keyPoints: string[];
   recommendations: string[];
 }
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 // getComprehensiveNews は内部で Yahoo Finance・Google News RSS の
 // 2ソースを Promise.allSettled で並列に取得し、各呼び出し自体は

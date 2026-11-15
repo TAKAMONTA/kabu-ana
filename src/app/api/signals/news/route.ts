@@ -9,7 +9,7 @@ import {
 import { fetchEnergyNews, type EnergyNewsItem } from "@/lib/signals/sources/rss";
 import { buildJapaneseSignalTitle } from "@/lib/signals/localize";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface NewsPayload {
   items: EnergyNewsItem[];

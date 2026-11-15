@@ -5,8 +5,7 @@ import { normalizeWatchlistCode } from "@/lib/watchlist/codes";
 import { canAddMore, FREE_WATCHLIST_LIMIT } from "@/lib/watchlist/limits";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /** 銘柄名の最大長 */
 const MAX_NAME_LENGTH = 100;

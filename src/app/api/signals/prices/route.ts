@@ -9,7 +9,7 @@ import {
 import { fetchEiaPriceStrip, type SignalPricePoint } from "@/lib/signals/sources/eia";
 import { fetchFredPriceStrip } from "@/lib/signals/sources/fred";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface PriceStripPayload {
   prices: SignalPricePoint[];

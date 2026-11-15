@@ -7,10 +7,9 @@ import {
 } from "@/lib/topTradingValue";
 
 // export const dynamic = "force-dynamic";
-export const revalidate = 60 * 30; // 30分ごとに更新
+export const revalidate = 1800; // 30分ごとに更新（segment config は数値リテラル必須）
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 const NEWS_TOPICS = [
   "日本株 急騰 銘柄",

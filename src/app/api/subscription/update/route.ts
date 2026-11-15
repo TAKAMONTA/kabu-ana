@@ -9,7 +9,7 @@ import {
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * Android版・iOS版から購入状態を更新するAPI

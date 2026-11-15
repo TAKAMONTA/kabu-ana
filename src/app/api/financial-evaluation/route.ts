@@ -3,8 +3,7 @@ import { OpenRouterClient } from "@/lib/api/openrouter";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
 import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 async function financialEvaluationHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
