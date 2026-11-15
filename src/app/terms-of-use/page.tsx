@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackToHomeLink } from "@/components/BackToHomeLink";
 import { APP_NAME } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "利用規約",
+  description:
+    "kabuana の利用規約です。サービスの内容、禁止事項、免責事項、有料プラン（自動更新のサブスクリプション）について定めています。",
+  alternates: { canonical: "/terms-of-use" },
+};
 
 export default function TermsOfUsePage() {
   return (

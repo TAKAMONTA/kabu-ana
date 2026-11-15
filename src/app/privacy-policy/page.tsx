@@ -1,6 +1,14 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackToHomeLink } from "@/components/BackToHomeLink";
 import { APP_NAME } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "プライバシーポリシー",
+  description:
+    "kabuana のプライバシーポリシーです。収集する情報と利用目的、保存期間、第三者との共有（広告配信を含む）、お問い合わせ先について説明しています。",
+  alternates: { canonical: "/privacy-policy" },
+};
 
 export default function PrivacyPolicyPage() {
   return (
