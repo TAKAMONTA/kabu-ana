@@ -56,6 +56,7 @@ import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { isNative } from "@/lib/utils/platformDetect";
 import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
 import { APP_NAME } from "@/lib/constants";
+import { getCompanyProfileView } from "@/lib/companyProfile";
 
 const SAMPLE_STOCKS = [
   {
@@ -373,10 +374,20 @@ export default function HomePage() {
     analyzeNews,
   ]);
 
-  const getCurrencySymbol = useMemo(() => {
-    if (!searchResult) return "$";
-    return searchResult.companyInfo.market === "TYO" ? "¥" : "$";
+  // 日本株は market が "TYO" のほか、J-Quants 経由だと「プライム」等の市場区分に
+  // なることがあるため、証券コード（7203 / 130A 形式）でも判定する
+  const isJapanStock = useMemo(() => {
+    if (!searchResult) return false;
+    const { market, symbol } = searchResult.companyInfo;
+    return market === "TYO" || /^\d{3}[0-9A-Z]$/.test(symbol);
   }, [searchResult]);
+
+  const getCurrencySymbol = isJapanStock ? "¥" : "$";
+
+  const companyProfile = useMemo(
+    () => getCompanyProfileView(searchResult?.companyInfo.description),
+    [searchResult]
+  );
 
   const handleChartPeriodChange = useCallback(
     async (period: string) => {
@@ -728,39 +739,51 @@ export default function HomePage() {
                   onPeriodChange={handleChartPeriodChange}
                 />
 
-                {/* 会社概要セクション */}
-                {searchResult.companyInfo.description && (
+                {/* 会社概要セクション（日本株は「プライム / 輸送用機器」のような
+                    市場・業種だけのことが多いので、その場合は見出しを変え、
+                    押しても何も変わらない「続きを読む」は出さない） */}
+                {companyProfile && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">会社概要</CardTitle>
-                        <button
-                          onClick={() =>
-                            setIsDescriptionExpanded(!isDescriptionExpanded)
-                          }
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {isDescriptionExpanded ? (
-                            <>
-                              <ChevronUp className="h-3 w-3" />
-                              折りたたむ
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-3 w-3" />
-                              続きを読む
-                            </>
-                          )}
-                        </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-base">
+                          {companyProfile.title}
+                        </CardTitle>
+                        {companyProfile.collapsible && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsDescriptionExpanded(!isDescriptionExpanded)
+                            }
+                            aria-expanded={isDescriptionExpanded}
+                            aria-controls="company-description"
+                            className="-my-2 flex min-h-11 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {isDescriptionExpanded ? (
+                              <>
+                                <ChevronUp className="h-3 w-3" />
+                                折りたたむ
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="h-3 w-3" />
+                                続きを読む
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
                       <p
+                        id="company-description"
                         className={`text-sm text-muted-foreground leading-relaxed ${
-                          isDescriptionExpanded ? "" : "line-clamp-10"
+                          companyProfile.collapsible && !isDescriptionExpanded
+                            ? "line-clamp-10"
+                            : ""
                         }`}
                       >
-                        {searchResult.companyInfo.description}
+                        {companyProfile.text}
                       </p>
                     </CardContent>
                   </Card>
