@@ -33,8 +33,11 @@ async function fetchPulse(): Promise<PulseResult> {
     Array.isArray(pricesRes.value?.data?.prices)
       ? pricesRes.value.data.prices
       : null;
+  // 0件でもエラー付き（取得失敗して空を返した）なら取得できなかった扱いにする
   const items =
-    newsRes.status === "fulfilled" && Array.isArray(newsRes.value?.data?.items)
+    newsRes.status === "fulfilled" &&
+    Array.isArray(newsRes.value?.data?.items) &&
+    !(newsRes.value.data.items.length === 0 && newsRes.value.error)
       ? newsRes.value.data.items
       : null;
 
