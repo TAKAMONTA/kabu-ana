@@ -25,6 +25,10 @@ export default defineConfig({
       "backend/**",
       "ios/**",
       "android/**",
+      // ブラウザでの通し確認は Playwright で実行する（npm run test:e2e）
+      "e2e/**",
+      "playwright-report/**",
+      "test-results/**",
       // 銘柄マスタ全件スキャンは数十秒かかるため既定スイートから外す。
       // 実行は `npm run test:jpx-fullscan`（vitest.fullscan.config.ts）。
       "**/*.fullscan.test.ts",
