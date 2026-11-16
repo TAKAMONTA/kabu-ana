@@ -13,6 +13,7 @@
     "check:release-env:ios": "node scripts/check-release-env.mjs --target=ios",
     "check:production": "node scripts/production-smoke-check.mjs",
     "check:secrets": "node scripts/check-secrets.mjs",
+    "backfill:purchase-owners": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/backfill-purchase-owners.mts",
     "preflight:release": "node scripts/release-preflight.mjs",
     "preflight:release:ios": "node scripts/release-preflight.mjs --target=ios",
     "preflight:release:native": "node scripts/release-preflight.mjs --native",

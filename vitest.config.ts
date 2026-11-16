@@ -15,7 +15,7 @@ export default defineConfig({
     },
     include: [
       "src/**/*.{test,spec}.{ts,tsx}",
-      "scripts/**/*.{test,spec}.{js,mjs,cjs,ts}",
+      "scripts/**/*.{test,spec}.{js,mjs,cjs,ts,mts}",
     ],
     exclude: [
       "node_modules/**",
