@@ -319,6 +319,34 @@ describe("POST /api/watchlist", () => {
     expect(setMock).toHaveBeenCalled();
   });
 
+  it("Web購読を解約済みでも期限（ends_at）まではプレミアムとして扱う", async () => {
+    state.subscription = {
+      status: "cancelled",
+      platform: "web",
+      expiryDate: { toDate: () => new Date(Date.now() + 86_400_000) },
+    };
+    state.watchlistSize = 4;
+    const response = await postWatchlist({
+      code: "7203",
+      name: "トヨタ自動車",
+    });
+    expect(response.status).toBe(201);
+  });
+
+  it("期限切れの購読は無料プランとして上限を適用する", async () => {
+    state.subscription = {
+      status: "active",
+      expiryDate: { toDate: () => new Date(Date.now() - 3 * 86_400_000) /* Web は48時間の猶予があるため3日前 */ },
+    };
+    state.watchlistSize = FREE_WATCHLIST_LIMIT;
+    const response = await postWatchlist({
+      code: "7203",
+      name: "トヨタ自動車",
+    });
+    expect(response.status).not.toBe(201);
+    expect(setMock).not.toHaveBeenCalled();
+  });
+
   it("プレミアムでは件数の読み取りを行わない", async () => {
     state.subscription = { status: "active" };
     state.watchlistSize = 500;

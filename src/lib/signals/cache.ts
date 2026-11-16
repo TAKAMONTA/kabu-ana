@@ -1,4 +1,7 @@
 import { getAdminApp } from "@/lib/auth/verifyAuth";
+import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
+import { jstDateId } from "@/lib/digest/dateId";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 
 export interface SignalApiResponse<T> {
   data: T | null;
@@ -8,11 +11,39 @@ export interface SignalApiResponse<T> {
 
 export const PREVIOUS_SIGNAL_ID = "previous";
 
+/** 外部データの取得に失敗したときにクライアントへ返す固定文言 */
+export const SIGNAL_FETCH_FAILED_MESSAGE =
+  "データを取得できませんでした。時間をおいて再度お試しください。";
+/** APIキー未設定など、設定が整っていないときにクライアントへ返す固定文言 */
+export const SIGNAL_NOT_CONFIGURED_MESSAGE = "現在このデータは準備中です";
+
+/**
+ * シグナル系ルートの失敗をサーバーログに残す（詳細はクライアントに返さない）。
+ * error.message には上流のURL・ステータス・"fetch failed" 等が入るため、
+ * レスポンスには SIGNAL_FETCH_FAILED_MESSAGE などの固定文言を使うこと。
+ */
+export function logSignalError(label: string, error: unknown): void {
+  console.error(`${label}: ${sanitizeError(error)}`);
+}
+
+/** 同時に呼ばれても動的 import を1本にまとめる */
+let firestoreModule: Promise<typeof import("firebase-admin/firestore")> | null =
+  null;
+
 export async function getSignalsDb() {
   try {
-    const { getFirestore } = await import("firebase-admin/firestore");
+    firestoreModule ??= import("firebase-admin/firestore").catch(error => {
+      firestoreModule = null; // 失敗した import を使い回さない
+      throw error;
+    });
+    const { getFirestore } = await firestoreModule;
     return getFirestore(getAdminApp());
-  } catch {
+  } catch (error) {
+    if (error instanceof FirebaseAdminConfigError) {
+      console.error(
+        "getSignalsDb: Firebase Admin SDKの設定エラーのためシグナルキャッシュを無効化します"
+      );
+    }
     return null;
   }
 }
@@ -69,8 +100,19 @@ export async function writeSignalDocWithFallback(
   }
 }
 
+/**
+ * シグナルの日付ID（JST の YYYY-MM-DD）。
+ * UTC の日付だと日本時間 09:00 に日付が切り替わり、朝のブリーフ（JST 06:00 の cron）が
+ * 前日扱いの文書に書かれてしまうため、JST に揃える。
+ */
 export function todayId(date = new Date()): string {
-  return date.toISOString().slice(0, 10);
+  return jstDateId(date.getTime());
+}
+
+/** 日付ID（YYYY-MM-DD）の前日 */
+export function previousDayId(dateId: string): string {
+  const time = Date.parse(`${dateId}T00:00:00.000Z`);
+  return new Date(time - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 export function ok<T>(data: T | null, lastSuccessfulAt?: string): SignalApiResponse<T> {

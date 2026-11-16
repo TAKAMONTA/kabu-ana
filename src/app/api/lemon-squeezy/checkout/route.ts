@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "firebase-admin/auth";
 import { getAdminApp, FirebaseAdminConfigError } from "@/lib/firebase/admin";
-import { createCheckout } from "@/lib/lemon-squeezy";
+import { createCheckout, LemonSqueezyApiError } from "@/lib/lemon-squeezy";
 import { sanitizeError } from "@/lib/utils/logSanitizer";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
+
+const CHECKOUT_UNAVAILABLE_MESSAGE =
+  "現在お支払い手続きを開始できません。時間をおいて再度お試しください。";
 
 /**
  * チェックアウトセッションを作成
@@ -32,47 +34,47 @@ export async function POST(request: NextRequest) {
   let userEmail: string | null = null;
 
   try {
-    const body = await request.json();
-    const { idToken, planType = "monthly" } = body;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        { error: "リクエストの形式が正しくありません" },
+        { status: 400 }
+      );
+    }
+    const { idToken, planType = "monthly" } = body as Record<string, unknown>;
+    if (planType !== "monthly" && planType !== "yearly") {
+      return NextResponse.json(
+        { error: "プランの指定が正しくありません" },
+        { status: 400 }
+      );
+    }
 
-    // 環境変数のチェック
+    // 環境変数のチェック（どの変数が欠けているかはログにだけ出す）
     const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
     const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
-    const variantId =
+    const variantEnvName =
       planType === "yearly"
-        ? process.env.LEMON_SQUEEZY_VARIANT_ID_YEARLY
-        : process.env.LEMON_SQUEEZY_VARIANT_ID_MONTHLY;
+        ? "LEMON_SQUEEZY_VARIANT_ID_YEARLY"
+        : "LEMON_SQUEEZY_VARIANT_ID_MONTHLY";
+    const variantId = process.env[variantEnvName];
 
-    if (!apiKey) {
-      console.error("LEMON_SQUEEZY_API_KEY is not set");
-      return NextResponse.json(
-        { error: "LEMON_SQUEEZY_API_KEY環境変数が設定されていません" },
-        { status: 500 }
-      );
-    }
-
-    if (!storeId) {
-      console.error("LEMON_SQUEEZY_STORE_ID is not set");
-      return NextResponse.json(
-        { error: "LEMON_SQUEEZY_STORE_ID環境変数が設定されていません" },
-        { status: 500 }
-      );
-    }
-
-    if (!variantId) {
+    const missingEnv = [
+      !apiKey && "LEMON_SQUEEZY_API_KEY",
+      !storeId && "LEMON_SQUEEZY_STORE_ID",
+      !variantId && variantEnvName,
+    ].filter(Boolean);
+    if (missingEnv.length > 0 || !variantId) {
       console.error(
-        `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()} is not set`
+        `lemon-squeezy/checkout: 環境変数が未設定です: ${missingEnv.join(", ")}`
       );
       return NextResponse.json(
-        {
-          error: `LEMON_SQUEEZY_VARIANT_ID_${planType.toUpperCase()}環境変数が設定されていません`,
-        },
-        { status: 500 }
+        { error: CHECKOUT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
       );
     }
 
     // Firebase Auth ID Tokenの検証（オプション: 未ログインでも購入可能にする場合）
-    if (idToken) {
+    if (typeof idToken === "string" && idToken) {
       // Admin SDKの設定エラーは「ゲスト購入」に握り潰さず中断する。
       // ここを内側catchに含めると、ログイン済みユーザーの購入がuserId無しで
       // 成立してしまい、webhookが購入をユーザーに紐付けられなくなる
@@ -142,14 +144,18 @@ export async function POST(request: NextRequest) {
     const safeMessage = sanitizeError(error, [userId, userEmail]);
     console.error(`チェックアウト作成エラー: ${safeMessage}`);
 
-    // 404エラーの場合は、環境変数やIDが間違っている可能性がある
-    if (safeMessage.includes("404")) {
+    // 設定不備（APIキー未設定、Variant/Store ID の誤りで 401/404 など）は
+    // 利用者には直せないので 503 の固定文言にし、詳細はログに残す
+    if (
+      error instanceof LemonSqueezyApiError &&
+      (error.kind === "config" ||
+        error.status === 401 ||
+        error.status === 403 ||
+        error.status === 404)
+    ) {
       return NextResponse.json(
-        {
-          error:
-            "商品が見つかりません。Variant IDまたはStore IDが正しいか確認してください。",
-        },
-        { status: 404 }
+        { error: CHECKOUT_UNAVAILABLE_MESSAGE },
+        { status: 503 }
       );
     }
 

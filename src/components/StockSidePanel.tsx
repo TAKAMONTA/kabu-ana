@@ -15,6 +15,9 @@ import {
   formatNumber,
   formatPercentage,
   formatMarketCap,
+  formatPerShare,
+  formatPriceChange,
+  formatVolume,
 } from "@/lib/utils/textUtils";
 
 interface CompanyInfo {
@@ -34,6 +37,8 @@ interface StockData {
   volume: number;
   high52: number;
   low52: number;
+  /** 値の基準日（YYYY-MM-DD） */
+  asOf?: string;
 }
 
 interface FinancialData {
@@ -178,14 +183,17 @@ export function StockPriceHeaderCard({
                   <TrendingDown className="w-4 h-4 text-red-600" />
                 )}
                 <span
-                  className={`font-semibold ${
-                    isUp ? "text-green-600" : "text-red-600"
+                  className={`font-semibold tabular-nums ${
+                    isUp
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
                   }`}
                 >
-                  {isUp ? "+" : ""}
-                  {currencySymbol}
-                  {stockData.change.toFixed(2)} (
-                  {stockData.changePercent.toFixed(2)}%)
+                  {formatPriceChange(
+                    stockData.change,
+                    stockData.changePercent,
+                    currencySymbol
+                  )}
                 </span>
               </div>
             </div>
@@ -194,6 +202,94 @@ export function StockPriceHeaderCard({
       </CardContent>
     </Card>
   );
+}
+
+/** 2026-11-13 → 11月13日 */
+function formatAsOfDate(asOf?: string): string | undefined {
+  const m = asOf?.match(/^\d{4}-(\d{2})-(\d{2})/);
+  if (!m) return undefined;
+  return `${Number(m[1])}月${Number(m[2])}日時点`;
+}
+
+function formatPrice(value: number, currency: string): string {
+  return `${currency}${value.toLocaleString("ja-JP", {
+    maximumFractionDigits: currency === "¥" ? 1 : 2,
+  })}`;
+}
+
+interface MetricItem {
+  label: string;
+  value: string;
+  description?: string;
+  highlight?: boolean;
+  trend?: "up" | "down" | "neutral";
+}
+
+/**
+ * 主要指標のうち、値が取れたものだけを並べる。
+ * 株価APIは時価総額・PER を返さないことが多く、以前は全銘柄で「N/A」の
+ * カードが並んでいた。値の無い指標はカードごと出さない。
+ */
+function buildKeyMetrics(
+  stockData: StockData,
+  currencySymbol: string,
+  dividendYieldPercent: number | null,
+  hasReportDividend: boolean
+): MetricItem[] {
+  const metrics: MetricItem[] = [];
+
+  const marketCap = formatMarketCap(stockData.marketCap, {
+    currency: currencySymbol,
+  });
+  if (marketCap !== "N/A") {
+    metrics.push({ label: "時価総額", value: marketCap, highlight: true });
+  }
+
+  const pe =
+    typeof stockData.pe === "number" ? stockData.pe : Number(stockData.pe);
+  if (Number.isFinite(pe) && pe > 0) {
+    metrics.push({
+      label: "PER（株価収益率）",
+      value: `${pe.toFixed(1)}倍`,
+      description: "株価が1株あたり利益の何倍かを示します",
+    });
+  }
+
+  if (dividendYieldPercent != null) {
+    metrics.push({
+      label: "配当利回り",
+      value: formatPercentage(dividendYieldPercent),
+      description: hasReportDividend ? "有価証券報告書ベース" : undefined,
+      trend:
+        dividendYieldPercent >= 2
+          ? "up"
+          : dividendYieldPercent > 0
+            ? "neutral"
+            : undefined,
+    });
+  }
+
+  if (stockData.high52 > 0 && stockData.low52 > 0) {
+    metrics.push({
+      label: "過去1年の高値",
+      value: formatPrice(stockData.high52, currencySymbol),
+    });
+    metrics.push({
+      label: "過去1年の安値",
+      value: formatPrice(stockData.low52, currencySymbol),
+    });
+  }
+
+  const volume = formatVolume(stockData.volume);
+  if (volume) {
+    metrics.push({
+      label: "出来高",
+      value: volume,
+      description: formatAsOfDate(stockData.asOf),
+    });
+  }
+
+  return metrics;
 }
 
 export function StockSidePanel({
@@ -247,6 +343,13 @@ export function StockSidePanel({
     );
   }
 
+  const keyMetrics = buildKeyMetrics(
+    stockData,
+    currencySymbol,
+    dividendYieldPercent,
+    dividendYield != null
+  );
+
   return (
     <div className="space-y-4">
       {/* ヘッダー情報 */}
@@ -258,65 +361,26 @@ export function StockSidePanel({
         />
       )}
 
-      {/* 主要指標 */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">主要指標</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <StatsCard
-            label="時価総額"
-            value={formatMarketCap(stockData.marketCap, {
-              currency: currencySymbol,
-            })}
-            highlight
-          />
-          <StatsCard
-            label="P/E レシオ"
-            value={
-              typeof stockData.pe === "number"
-                ? stockData.pe > 0
-                  ? stockData.pe.toFixed(2)
-                  : "N/A"
-                : stockData.pe || "N/A"
-            }
-            description="株価収益率（株価 ÷ 1株あたり利益）"
-          />
-          <StatsCard
-            label="配当利回り"
-            value={
-              dividendYieldPercent != null
-                ? formatPercentage(dividendYieldPercent)
-                : "—"
-            }
-            description={
-              dividendYieldPercent != null
-                ? dividendYield != null
-                  ? "有価証券報告書ベース"
-                  : undefined
-                : "データなし"
-            }
-            trend={
-              dividendYieldPercent == null
-                ? undefined
-                : dividendYieldPercent >= 2
-                  ? "up"
-                  : dividendYieldPercent > 0
-                    ? "neutral"
-                    : undefined
-            }
-          />
-          <StatsCard
-            label="出来高"
-            value={formatNumber(stockData.volume, { compact: true })}
-            description={
-              stockData.volume > 0
-                ? `${(stockData.volume / 1000000).toFixed(1)}M`
-                : "データなし"
-            }
-          />
-        </CardContent>
-      </Card>
+      {/* 主要指標（値が取れたものだけ） */}
+      {keyMetrics.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">主要指標</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {keyMetrics.map(metric => (
+              <StatsCard
+                key={metric.label}
+                label={metric.label}
+                value={metric.value}
+                description={metric.description}
+                highlight={metric.highlight}
+                trend={metric.trend}
+              />
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* 財務データ */}
       {financialData && (
@@ -359,11 +423,8 @@ export function StockSidePanel({
             )}
             {financialData.eps && (
               <StatsCard
-                label="EPS"
-                value={formatNumber(financialData.eps, {
-                  currency: currencySymbol,
-                  decimals: 2,
-                })}
+                label="EPS（1株あたり利益）"
+                value={formatPerShare(financialData.eps, currencySymbol)}
               />
             )}
           </CardContent>

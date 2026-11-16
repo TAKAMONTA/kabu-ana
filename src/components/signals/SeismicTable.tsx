@@ -17,13 +17,21 @@ export function SeismicTable() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <PanelLoading rows={4} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : (
+        {isLoading ? <PanelLoading rows={4} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : !data ? (
+          <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            地震の情報はまだ取得できていません。
+          </p>
+        ) : earthquakes.length === 0 ? (
+          <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            直近7日間に M4.5 以上の地震は観測されていません。
+          </p>
+        ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="border-b text-xs text-muted-foreground">
                 <tr>
                   <th className="py-2">時刻</th>
-                  <th className="py-2">M</th>
+                  <th className="py-2">マグニチュード</th>
                   <th className="py-2">震源</th>
                   <th className="py-2">深さ</th>
                 </tr>

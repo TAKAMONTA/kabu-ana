@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { OpenRouterClient } from "@/lib/api/openrouter";
+import {
+  AI_ANALYSIS_FAILED_MESSAGE,
+  AiServiceError,
+  OpenRouterClient,
+} from "@/lib/api/openrouter";
+import {
+  AI_SERVICE_UNAVAILABLE_MESSAGE,
+  getOpenRouterApiKey,
+} from "@/lib/api/openrouterConfig";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 import { formatSSE, splitNarrativeAndJson } from "@/lib/api/analysisStream";
 import { analysisSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { withDailyLimit, getClientIP } from "@/lib/utils/dailyUsageLimiter";
 import { createAiBundleToken } from "@/lib/utils/aiBundleToken";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 function toFiniteNumber(value: unknown, fallback = 0): number {
   const num = typeof value === "number" ? value : Number(value);
@@ -77,26 +85,34 @@ function normalizeAnalysisBody(body: any) {
   };
 }
 
+/** ストリームが終わっても構造化JSONが読めなかったとき（クライアントが待ち続けないように送る） */
+const RESULT_UNREADABLE_MESSAGE =
+  "AI分析の結果を読み取れませんでした。もう一度お試しください。";
+
 async function analyzeHandler(request: NextRequest) {
   if (process.env.EXPORT_STATIC === "true") {
     return NextResponse.json({ status: "static_export" });
   }
   const startedAt = Date.now();
   try {
-    const body = await request.json();
-    const validationResult = analysisSchema.safeParse(
-      normalizeAnalysisBody(body)
-    );
+    const body = await request.json().catch(() => null);
+    // normalizeAnalysisBody は欠けた値を "UNKNOWN" 等で補うので、本文そのものが
+    // 無い・companyInfo が無いリクエストは補う前に弾く（空の本文で AI が呼ばれないように）
+    const hasCompanyInfo =
+      body !== null &&
+      typeof body === "object" &&
+      body.companyInfo !== null &&
+      typeof body.companyInfo === "object" &&
+      (typeof body.companyInfo.symbol === "string" ||
+        typeof body.companyInfo.name === "string");
+    const validationResult = hasCompanyInfo
+      ? analysisSchema.safeParse(normalizeAnalysisBody(body))
+      : null;
 
-    if (!validationResult.success) {
+    if (!validationResult || !validationResult.success) {
+      // zod の issues はそのまま返さない
       return NextResponse.json(
-        {
-          error: "入力データが無効です",
-          details: validationResult.error.errors.map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        },
+        { error: "入力データが無効です" },
         { status: 400 }
       );
     }
@@ -104,14 +120,12 @@ async function analyzeHandler(request: NextRequest) {
     const { companyInfo, stockData, newsData, edinetExtras, question } =
       validationResult.data;
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey || apiKey === "your_openrouter_key_here") {
+    const apiKey = getOpenRouterApiKey();
+    if (!apiKey) {
+      console.error("analyze: OpenRouter APIキーが未設定です");
       return NextResponse.json(
-        {
-          error:
-            "OpenRouter APIキーが設定されていません。.env.localファイルでOPENROUTER_API_KEYを設定してください。",
-        },
-        { status: 400 }
+        { error: AI_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
       );
     }
 
@@ -131,24 +145,23 @@ async function analyzeHandler(request: NextRequest) {
       const first = await generator.next();
       if (first.done) {
         return NextResponse.json(
-          { error: "AI分析中にエラーが発生しました。" },
-          { status: 500 }
+          { error: AI_ANALYSIS_FAILED_MESSAGE },
+          { status: 502 }
         );
       }
       firstChunk = first.value;
     } catch (preflightError) {
-      const message =
-        preflightError instanceof Error
-          ? preflightError.message
-          : "AI分析中にエラーが発生しました。";
-      const status = message.includes("認証")
-        ? 401
-        : message.includes("残高")
-          ? 402
-          : message.includes("制限")
-            ? 429
-            : 500;
-      return NextResponse.json({ error: message }, { status });
+      if (preflightError instanceof AiServiceError) {
+        return NextResponse.json(
+          { error: preflightError.message },
+          { status: preflightError.status }
+        );
+      }
+      console.error(`analyze: 想定外のエラー: ${sanitizeError(preflightError)}`);
+      return NextResponse.json(
+        { error: AI_ANALYSIS_FAILED_MESSAGE },
+        { status: 500 }
+      );
     }
 
     const clientIp = getClientIP(request);
@@ -177,6 +190,12 @@ async function analyzeHandler(request: NextRequest) {
           if (json) {
             const analysisResult = openRouter.parseAnalysisResult(json);
             enqueue(formatSSE("result", JSON.stringify(analysisResult)));
+          } else {
+            // result も error も送らないと、クライアントは結果待ちのまま終わる
+            console.warn("analyze: ストリーム終了時に構造化JSONがありませんでした", {
+              symbol: companyInfo.symbol,
+            });
+            enqueue(formatSSE("error", RESULT_UNREADABLE_MESSAGE));
           }
 
           console.info("Analyze API timings", {
@@ -185,11 +204,17 @@ async function analyzeHandler(request: NextRequest) {
             newsCount: newsData?.length || 0,
           });
         } catch (streamError) {
-          const message =
-            streamError instanceof Error
-              ? streamError.message
-              : "AI分析中にエラーが発生しました。";
-          enqueue(formatSSE("error", message));
+          if (!(streamError instanceof AiServiceError)) {
+            console.error(`analyze: ストリーム中のエラー: ${sanitizeError(streamError)}`);
+          }
+          enqueue(
+            formatSSE(
+              "error",
+              streamError instanceof AiServiceError
+                ? streamError.message
+                : AI_ANALYSIS_FAILED_MESSAGE
+            )
+          );
         } finally {
           controller.close();
         }
@@ -206,9 +231,10 @@ async function analyzeHandler(request: NextRequest) {
   } catch (error) {
     const { logError } = await import("@/lib/utils/errorHandler");
     logError(error, "Analysis API");
-    const message =
-      error instanceof Error ? error.message : "分析中にエラーが発生しました";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      { error: "分析中にエラーが発生しました" },
+      { status: 500 }
+    );
   }
 }
 

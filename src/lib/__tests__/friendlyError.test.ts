@@ -42,6 +42,39 @@ describe("toFriendlyErrorMessage", () => {
     ).toBe("企業情報が見つかりませんでした");
   });
 
+  it("環境変数名やAPIキーの設定状況は日本語でも利用者に見せない", () => {
+    expect(
+      toFriendlyErrorMessage(
+        "EIA_API_KEY または FRED_API_KEY が未設定です",
+        FALLBACK
+      )
+    ).toBe(FALLBACK);
+    expect(
+      toFriendlyErrorMessage(
+        "OpenRouterのAPIキーが未設定です。.env.localファイルに設定してください。",
+        FALLBACK
+      )
+    ).toBe(FALLBACK);
+    expect(toFriendlyErrorMessage("APIキーが無効です", FALLBACK)).toBe(
+      FALLBACK
+    );
+  });
+
+  it("HTTP ステータスや fetch failed などの技術的な文言は既定文言にする", () => {
+    expect(toFriendlyErrorMessage("HTTP 500", FALLBACK)).toBe(FALLBACK);
+    expect(
+      toFriendlyErrorMessage(
+        "ランキングの取得に失敗しました（ステータス: 503）",
+        FALLBACK
+      )
+    ).toBe(FALLBACK);
+    expect(toFriendlyErrorMessage("fetch failed", FALLBACK)).toBe(FALLBACK);
+    // 429 は従来どおり待ち時間の案内
+    expect(toFriendlyErrorMessage("HTTP 429", FALLBACK)).toBe(
+      RATE_LIMIT_ERROR_MESSAGE
+    );
+  });
+
   it("技術的な英語や空文字は既定文言にする", () => {
     expect(toFriendlyErrorMessage("Unexpected token < in JSON", FALLBACK)).toBe(
       FALLBACK

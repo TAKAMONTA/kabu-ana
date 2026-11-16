@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { auth } from "@/lib/firebase";
 import { getApiUrl, getAuthHeaders } from "@/lib/utils/apiClient";
 import { CapacitorHttp, Capacitor } from "@capacitor/core";
+import { toFriendlyErrorMessage } from "@/lib/friendlyError";
 
 const PRODUCT_IDS = {
   ios: {
@@ -92,7 +93,6 @@ export function useIOSPurchase() {
             }
 
             setIsInitialized(true);
-            console.log("ネイティブ課金初期化完了:", storeProducts);
         } catch (err: any) {
             console.error("ネイティブ課金初期化エラー:", err);
             setError("ストアの初期化に失敗しました。アプリを再起動してお試しください。");
@@ -140,7 +140,7 @@ export function useIOSPurchase() {
                     quantity: 1,
                 });
 
-                console.log("ネイティブ購入成功:", result);
+                // 購入結果（トランザクション情報）はログに残さない
 
                 // Firebase Auth トークンを取得
                 const idToken = await auth.currentUser!.getIdToken();
@@ -180,7 +180,13 @@ export function useIOSPurchase() {
                 ) {
                     setError(null); // キャンセルはエラーとして扱わない
                 } else {
-                    setError(err.message || "購入処理中にエラーが発生しました");
+                    // ストアの英語メッセージや技術的な文言は既定の案内に置き換える
+                    setError(
+                        toFriendlyErrorMessage(
+                            err?.message,
+                            "購入処理を完了できませんでした。時間をおいて、もう一度お試しください。"
+                        )
+                    );
                 }
 
                 setIsLoading(false);
@@ -216,7 +222,6 @@ export function useIOSPurchase() {
                 );
             }
 
-            console.log("購入の復元が完了しました");
             setIsLoading(false);
             return true;
         } catch (err: any) {

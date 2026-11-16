@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  appleSubscriptionStatusToSubscriptionStatus,
   buildSubscriptionDocumentFromVerification,
   isAllowedNativeProduct,
   parseNativePurchaseUpdateRequest,
+  PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE,
+  PurchaseVerificationError,
   type NativePurchaseUpdateRequest,
   type VerifiedNativePurchase,
   verifyNativePurchase,
@@ -234,5 +237,272 @@ describe("native purchase verification", () => {
 
     expect(verified.status).toBe("active");
     expect(verified.expiryDate).toBe("2026-06-01T00:00:00Z");
+  });
+
+  it("maps App Store status codes (1 active, 2 expired, 3 billing retry, 4 grace period, 5 revoked)", () => {
+    const future = "2099-01-01T00:00:00.000Z";
+    const past = "2020-01-01T00:00:00.000Z";
+    expect(appleSubscriptionStatusToSubscriptionStatus(1, future)).toBe("active");
+    expect(appleSubscriptionStatusToSubscriptionStatus(2, past)).toBe("expired");
+    expect(appleSubscriptionStatusToSubscriptionStatus(3, past)).toBe("pending");
+    // 請求猶予期間は取引の期限が過ぎていても利用継続（以前は expired になっていた）
+    expect(appleSubscriptionStatusToSubscriptionStatus(4, past)).toBe("active");
+    expect(appleSubscriptionStatusToSubscriptionStatus(5, future)).toBe("cancelled");
+  });
+
+  it("keeps an App Store subscription in billing grace period active until gracePeriodExpiresDate", async () => {
+    setAppleEnv();
+    vi.setSystemTime(new Date("2026-05-24T00:00:00.000Z"));
+    const transaction = {
+      bundleId: "com.takaapps.kabunavi",
+      productId: "com.takaapps.kabunavi.Monthly",
+      transactionId: "1000000000000002",
+      originalTransactionId: "1000000000000001",
+      purchaseDate: String(Date.parse("2026-04-20T00:00:00.000Z")),
+      // 取引の期限は過ぎている
+      expiresDate: String(Date.parse("2026-05-20T00:00:00.000Z")),
+    };
+    const gracePeriodExpiresDate = Date.parse("2026-06-05T00:00:00.000Z");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/inApps/v1/subscriptions/")) {
+          return Response.json({
+            data: [
+              {
+                lastTransactions: [
+                  {
+                    status: 4,
+                    originalTransactionId: "1000000000000001",
+                    signedTransactionInfo: signedAppleTransaction(transaction),
+                    signedRenewalInfo: signedAppleTransaction({
+                      originalTransactionId: "1000000000000001",
+                      gracePeriodExpiresDate,
+                    }),
+                  },
+                ],
+              },
+            ],
+          });
+        }
+        return Response.json({
+          signedTransactionInfo: signedAppleTransaction(transaction),
+        });
+      })
+    );
+
+    const verified = await verifyNativePurchase(
+      parseNativePurchaseUpdateRequest({
+        idToken: "firebase-token",
+        platform: "ios",
+        productId: "com.takaapps.kabunavi.Monthly",
+        purchaseToken: "1000000000000002",
+      })
+    );
+
+    expect(verified.status).toBe("active");
+    expect(verified.expiryDate).toBe(new Date(gracePeriodExpiresDate).toISOString());
+  });
+
+  it("returns a generic 503 (no env var names) when App Store credentials are missing", async () => {
+    delete process.env.APP_STORE_CONNECT_KEY_ID;
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+
+    const attempt = verifyNativePurchase(
+      parseNativePurchaseUpdateRequest({
+        idToken: "firebase-token",
+        platform: "ios",
+        productId: "com.takaapps.kabunavi.Monthly",
+        purchaseToken: "1000000000000001",
+      })
+    );
+
+    await expect(attempt).rejects.toBeInstanceOf(PurchaseVerificationError);
+    await expect(attempt).rejects.toMatchObject({
+      statusCode: 503,
+      message: PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE,
+    });
+    const error = await attempt.catch((e: Error) => e);
+    expect((error as Error).message).not.toContain("APP_STORE_CONNECT");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    // 詳細はサーバーログ側にだけ残る
+    expect(
+      consoleErrorSpy.mock.calls.some(call =>
+        String(call[0]).includes("APP_STORE_CONNECT_KEY_ID")
+      )
+    ).toBe(true);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("does not echo Apple's raw error body when the transaction is not found", async () => {
+    setAppleEnv();
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        Response.json(
+          { errorCode: 4040010, errorMessage: "Transaction id not found." },
+          { status: 404 }
+        )
+      )
+    );
+
+    const error = await verifyNativePurchase(
+      parseNativePurchaseUpdateRequest({
+        idToken: "firebase-token",
+        platform: "ios",
+        productId: "com.takaapps.kabunavi.Monthly",
+        purchaseToken: "1000000000000001",
+      })
+    ).catch((e: PurchaseVerificationError) => e);
+
+    expect(error).toBeInstanceOf(PurchaseVerificationError);
+    expect((error as PurchaseVerificationError).statusCode).toBe(404);
+    expect((error as Error).message).not.toContain("4040010");
+    expect((error as Error).message).not.toContain("errorMessage");
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("maps an App Store 401 (our credentials) to 503 instead of a login-style 401", async () => {
+    setAppleEnv();
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({}, { status: 401 }))
+    );
+
+    const error = await verifyNativePurchase(
+      parseNativePurchaseUpdateRequest({
+        idToken: "firebase-token",
+        platform: "ios",
+        productId: "com.takaapps.kabunavi.Monthly",
+        purchaseToken: "1000000000000001",
+      })
+    ).catch((e: PurchaseVerificationError) => e);
+
+    expect((error as PurchaseVerificationError).statusCode).toBe(503);
+    expect((error as Error).message).toBe(PURCHASE_VERIFICATION_UNAVAILABLE_MESSAGE);
+    consoleErrorSpy.mockRestore();
+  });
+
+  it("passes a timeout signal to store API requests", async () => {
+    setGoogleEnv();
+    const signals: Array<AbortSignal | null | undefined> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        signals.push(init?.signal);
+        if (url === "https://oauth2.googleapis.com/token") {
+          return Response.json({ access_token: "google-token" });
+        }
+        return Response.json({
+          subscriptionState: "SUBSCRIPTION_STATE_ACTIVE",
+          lineItems: [
+            { productId: "premium_monthly", expiryTime: "2099-01-01T00:00:00Z" },
+          ],
+        });
+      })
+    );
+
+    await verifyNativePurchase(
+      parseNativePurchaseUpdateRequest({
+        idToken: "firebase-token",
+        platform: "android",
+        productId: "premium_monthly",
+        purchaseToken: "play-purchase-token",
+      })
+    );
+
+    expect(signals).toHaveLength(2);
+    for (const signal of signals) {
+      expect(signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it("follows an iOS Monthly → Yearly upgrade on restore instead of falling back to the expired monthly", async () => {
+    setAppleEnv();
+    vi.setSystemTime(new Date("2026-05-24T00:00:00.000Z"));
+    const monthly = {
+      bundleId: "com.takaapps.kabunavi",
+      productId: "com.takaapps.kabunavi.Monthly",
+      transactionId: "1000000000000001",
+      originalTransactionId: "1000000000000001",
+      expiresDate: String(Date.parse("2026-05-01T00:00:00.000Z")),
+    };
+    const yearly = {
+      bundleId: "com.takaapps.kabunavi",
+      productId: "com.takaapps.kabunavi.Yearly",
+      transactionId: "1000000000000009",
+      originalTransactionId: "1000000000000001",
+      purchaseDate: String(Date.parse("2026-05-01T00:00:00.000Z")),
+      expiresDate: String(Date.parse("2027-05-01T00:00:00.000Z")),
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url.includes("/inApps/v1/subscriptions/")) {
+          return Response.json({
+            data: [
+              {
+                lastTransactions: [
+                  {
+                    status: 1,
+                    originalTransactionId: "1000000000000001",
+                    signedTransactionInfo: signedAppleTransaction(yearly),
+                  },
+                  {
+                    // 許可リスト外の商品は候補にしない
+                    status: 1,
+                    originalTransactionId: "1000000000000001",
+                    signedTransactionInfo: signedAppleTransaction({
+                      ...yearly,
+                      productId: "com.other.app.Lifetime",
+                      expiresDate: String(Date.parse("2099-01-01T00:00:00.000Z")),
+                    }),
+                  },
+                ],
+              },
+            ],
+          });
+        }
+        return Response.json({ signedTransactionInfo: signedAppleTransaction(monthly) });
+      })
+    );
+
+    // 保存済みの値（Monthly の取引ID・Monthly の productId）で復元する
+    const request = parseNativePurchaseUpdateRequest({
+      idToken: "already-authenticated",
+      platform: "ios",
+      productId: "com.takaapps.kabunavi.Monthly",
+      purchaseToken: "1000000000000001",
+    });
+    const verified = await verifyNativePurchase(request);
+
+    expect(verified.status).toBe("active");
+    expect(verified.productId).toBe("com.takaapps.kabunavi.Yearly");
+    expect(verified.expiryDate).toBe("2027-05-01T00:00:00.000Z");
+
+    const document = buildSubscriptionDocumentFromVerification("user-1", request, verified);
+    expect(document.productId).toBe("com.takaapps.kabunavi.Yearly");
+    expect(document.status).toBe("active");
+  });
+
+  it("still rejects a verified product that is not in the allowlist", () => {
+    expect(() =>
+      buildSubscriptionDocumentFromVerification(
+        "user-1",
+        { platform: "ios", productId: "com.takaapps.kabunavi.Monthly" },
+        {
+          platform: "ios",
+          productId: "com.other.app.Lifetime",
+          purchaseToken: "t",
+          status: "active",
+          isTrial: false,
+          raw: {},
+        }
+      )
+    ).toThrow(PurchaseVerificationError);
   });
 });

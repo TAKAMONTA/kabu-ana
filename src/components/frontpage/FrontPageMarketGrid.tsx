@@ -8,6 +8,8 @@ import { Newspaper, Radio, Search } from "lucide-react";
 interface FrontPageMarketGridProps {
   topIdea?: TradingValueItem;
   isLoading: boolean;
+  /** ランキングの取得に失敗したか（「まだありません」と区別する） */
+  hasError?: boolean;
   remainingUses: number;
   dailyLimit: number;
   isPremium: boolean;
@@ -16,6 +18,7 @@ interface FrontPageMarketGridProps {
 export function FrontPageMarketGrid({
   topIdea,
   isLoading,
+  hasError = false,
   remainingUses,
   dailyLimit,
   isPremium,
@@ -28,7 +31,9 @@ export function FrontPageMarketGrid({
         ? "確認中"
         : topIdea
           ? `${normalizeDisplayText(topIdea.name)} ${topIdea.code}`
-          : "まだありません",
+          : hasError
+            ? "取得できませんでした"
+            : "まだありません",
       sub: topIdea?.signalLabel || "ニュースで話題の銘柄",
     },
     {

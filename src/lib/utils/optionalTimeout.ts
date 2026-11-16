@@ -29,3 +29,30 @@ export function optionalWithTimeout<T>(
       });
   });
 }
+
+/**
+ * 指定時間内に解決しなければ reject する（Promise.allSettled と組み合わせ、
+ * 結果の有無を rejected として扱いたい処理向け）。
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`timeout: ${label}`)),
+      timeoutMs
+    );
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}

@@ -4,7 +4,14 @@ const isStaticExport = process.env.EXPORT_STATIC === "true";
 const nextConfig = {
   output: isStaticExport ? "export" : undefined,
   ...(isStaticExport
-    ? {}
+    ? {
+        // 静的エクスポート（Capacitor 用）では API Route（src/app/api/**/route.ts）を
+        // ビルド対象から外す。ネイティブアプリは本番 API（getApiBaseUrl）を直接叩くため不要で、
+        // Next.js 15+ では route segment config（`dynamic`）が静的な文字列リテラル必須となり
+        // 環境変数での force-static / force-dynamic 切替ができなくなったため。
+        // ページ・レイアウトは .tsx のみなので影響しない（.ts のルートファイルを追加する場合は注意）。
+        pageExtensions: ["tsx", "jsx", "js"],
+      }
     : {
         async headers() {
           return [
@@ -31,27 +38,22 @@ const nextConfig = {
           ];
         },
       }),
-  // 実験的機能の設定
-  experimental: {
-    serverComponentsExternalPackages: ["@firebase/auth", "@firebase/firestore"],
-  },
-  // 静的エクスポート時にfirebase-adminをwebpackの外部モジュールとして扱う
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        "firebase-admin": false,
-        "firebase-admin/auth": false,
-        "firebase-admin/app": false,
-        "firebase-admin/firestore": false,
-      };
-    }
-    return config;
-  },
+  // サーバー側でバンドルせず Node.js の require に任せるパッケージ
+  // （Next.js 15 で experimental.serverComponentsExternalPackages から改名）
+  serverExternalPackages: ["@firebase/auth", "@firebase/firestore"],
+  // Next.js 16 から next build も Turbopack が既定。旧 webpack() の resolve.fallback
+  // （クライアント側で firebase-admin を空モジュール化）は、クライアントバンドルが
+  // firebase-admin を参照していないため不要として削除した（誤って参照すればビルドが失敗して検知できる）。
   // 画像最適化の設定
   images: {
     unoptimized: true,
-    domains: ["www24.a8.net", "www17.a8.net", "www25.a8.net", "www10.a8.net"],
+    // images.domains は Next.js 16 で非推奨のため remotePatterns へ移行
+    remotePatterns: [
+      "www24.a8.net",
+      "www17.a8.net",
+      "www25.a8.net",
+      "www10.a8.net",
+    ].map((hostname) => ({ protocol: "https", hostname })),
   },
   // 本番環境での最適化
   // output: "standalone", // Vercelデプロイエラーのため一時的に無効化

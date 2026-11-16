@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
+import { FirebaseAdminConfigError } from "@/lib/firebase/admin";
+import { maskId, sanitizeError } from "@/lib/utils/logSanitizer";
 import {
   buildSubscriptionDocumentFromVerification,
   parseNativePurchaseUpdateRequest,
   PurchaseVerificationError,
   verifyNativePurchase,
 } from "@/lib/purchases/nativePurchaseVerification";
+import {
+  authUserExists,
+  PurchaseOwnedByOtherAccountError,
+  writeSubscriptionWithOwnership,
+} from "@/lib/purchases/purchaseOwnership";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /**
  * 既存のネイティブ購入レコードをストア側で再検証する。
@@ -20,7 +27,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: "static_export" });
   }
 
-  const authResult = await verifyAuth(request);
+  // 削除済み・無効化されたユーザーの古いトークンでは書き込ませない
+  const authResult = await verifyAuth(request, { checkRevoked: true });
   if (isAuthError(authResult)) {
     return authResult;
   }
@@ -60,16 +68,22 @@ export async function POST(request: NextRequest) {
       orderId: current.orderId,
     });
     const verifiedPurchase = await verifyNativePurchase(purchaseRequest);
-    const subscriptionData = {
-      ...buildSubscriptionDocumentFromVerification(
-        authResult.uid,
-        purchaseRequest,
-        verifiedPurchase
-      ),
-      updatedAt: FieldValue.serverTimestamp(),
-    };
-
-    await subscriptionRef.set(subscriptionData, { merge: true });
+    // update と同じく、別アカウントが所有する購入には紐付けない（409）
+    const subscriptionData = (await writeSubscriptionWithOwnership(
+      db,
+      authResult.uid,
+      verifiedPurchase,
+      () => ({
+        ...buildSubscriptionDocumentFromVerification(
+          authResult.uid,
+          purchaseRequest,
+          verifiedPurchase
+        ),
+        updatedAt: FieldValue.serverTimestamp(),
+      }),
+      () => FieldValue.serverTimestamp(),
+      authUserExists({ getUser: uid => getAuth(app).getUser(uid) })
+    )) as ReturnType<typeof buildSubscriptionDocumentFromVerification>;
 
     return NextResponse.json({
       success: true,
@@ -81,16 +95,35 @@ export async function POST(request: NextRequest) {
         isTrial: subscriptionData.isTrial,
       },
     });
-  } catch (error: any) {
-    console.error("購入状態再検証エラー:", error);
-    if (error instanceof PurchaseVerificationError) {
+  } catch (error: unknown) {
+    if (error instanceof FirebaseAdminConfigError) {
+      console.error("subscription/refresh: Firebase Admin SDKの設定エラー");
+      return NextResponse.json(
+        { error: "認証サービスが利用できません" },
+        { status: 503 }
+      );
+    }
+    if (error instanceof PurchaseOwnedByOtherAccountError) {
+      console.warn(
+        `subscription/refresh: 別アカウント所有の購入の再検証を拒否しました: user=${maskId(authResult.uid)}`
+      );
       return NextResponse.json(
         { error: error.message },
         { status: error.statusCode }
       );
     }
+    if (error instanceof PurchaseVerificationError) {
+      console.error(
+        `subscription/refresh: 購入検証エラー: ${sanitizeError(error, [authResult.uid])}`
+      );
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      );
+    }
+    console.error(`購入状態再検証エラー: ${sanitizeError(error)}`);
     return NextResponse.json(
-      { error: error.message || "購入状態の再検証に失敗しました" },
+      { error: "購入状態の再検証に失敗しました" },
       { status: 500 }
     );
   }

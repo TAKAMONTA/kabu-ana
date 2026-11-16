@@ -13,6 +13,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, BarChart3 } from "lucide-react";
 import { ChartPeriodSelector } from "./ChartPeriodSelector";
+import {
+  formatChartAxisPrice,
+  formatChartPrice,
+  formatChartTick,
+  formatChartTooltipLabel,
+} from "@/lib/chartFormat";
+import { formatVolume } from "@/lib/utils/textUtils";
 
 interface ChartData {
   date: string;
@@ -30,6 +37,10 @@ interface StockChartProps {
   data?: ChartData[];
   isLoading?: boolean;
   currency?: string;
+  /** 表示中の期間（親が持つ値）。省略時はこのコンポーネント内で持つ */
+  period?: string;
+  /** 日本株か（「1日」が分足にならないため期間の選択肢を変える） */
+  isJapanStock?: boolean;
   onPeriodChange?: (period: string) => void;
 }
 
@@ -38,16 +49,26 @@ export function StockChart({
   data,
   isLoading,
   currency = "$",
+  period,
+  isJapanStock = false,
   onPeriodChange,
 }: StockChartProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState("1M");
+  const [internalPeriod, setInternalPeriod] = useState("1M");
+  // 一度閉じて開き直しても、親が持つ期間と表示がずれないよう親の値を優先する
+  const selectedPeriod = period ?? internalPeriod;
   const hasData = !!data && data.length > 0;
   const chartData: ChartData[] = hasData ? data! : [];
+  const prices = chartData
+    .map(d => d.price)
+    .filter(price => Number.isFinite(price) && price > 0);
+  const averageVolume = hasData
+    ? chartData.reduce((sum, d) => sum + (d.volume || 0), 0) / chartData.length
+    : 0;
 
-  const handlePeriodChange = (period: string) => {
-    setSelectedPeriod(period);
+  const handlePeriodChange = (nextPeriod: string) => {
+    setInternalPeriod(nextPeriod);
     if (onPeriodChange) {
-      onPeriodChange(period);
+      onPeriodChange(nextPeriod);
     }
   };
 
@@ -83,6 +104,7 @@ export function StockChart({
           <ChartPeriodSelector
             selectedPeriod={selectedPeriod}
             onPeriodChange={handlePeriodChange}
+            isJapanStock={isJapanStock}
           />
         )}
         {hasData ? (
@@ -93,30 +115,24 @@ export function StockChart({
                   <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                   <XAxis
                     dataKey="date"
-                    tickFormatter={value => {
-                      try {
-                        const date = new Date(value);
-                        return date.toLocaleDateString("ja-JP", {
-                          month: "short",
-                          day: "numeric",
-                        });
-                      } catch {
-                        return value;
-                      }
-                    }}
+                    tickFormatter={value =>
+                      formatChartTick(value, selectedPeriod)
+                    }
+                    minTickGap={16}
                   />
                   <YAxis
                     domain={["dataMin - 5", "dataMax + 5"]}
-                    tickFormatter={value => `${currency}${value}`}
+                    tickFormatter={value =>
+                      formatChartAxisPrice(Number(value), currency)
+                    }
+                    width={currency === "¥" ? 72 : 60}
                   />
                   <Tooltip
-                    labelFormatter={value =>
-                      new Date(value).toLocaleDateString("ja-JP")
-                    }
+                    labelFormatter={value => formatChartTooltipLabel(value)}
                     formatter={(value: number, name: string) => [
                       name === "price"
-                        ? `${currency}${value}`
-                        : value.toLocaleString(),
+                        ? formatChartPrice(Number(value), currency)
+                        : (formatVolume(value) ?? "—"),
                       name === "price" ? "価格" : "出来高",
                     ]}
                   />
@@ -136,25 +152,24 @@ export function StockChart({
             <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">最高値</span>
-                <p className="font-semibold">
-                  {currency}
-                  {Math.max(...chartData.map(d => d.price)).toFixed(2)}
+                <p className="font-semibold tabular-nums">
+                  {prices.length > 0
+                    ? formatChartPrice(Math.max(...prices), currency)
+                    : "—"}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">最安値</span>
-                <p className="font-semibold">
-                  {currency}
-                  {Math.min(...chartData.map(d => d.price)).toFixed(2)}
+                <p className="font-semibold tabular-nums">
+                  {prices.length > 0
+                    ? formatChartPrice(Math.min(...prices), currency)
+                    : "—"}
                 </p>
               </div>
               <div>
                 <span className="text-muted-foreground">平均出来高</span>
-                <p className="font-semibold">
-                  {Math.round(
-                    chartData.reduce((sum, d) => sum + d.volume, 0) /
-                      chartData.length
-                  ).toLocaleString()}
+                <p className="font-semibold tabular-nums">
+                  {formatVolume(Math.round(averageVolume)) ?? "—"}
                 </p>
               </div>
             </div>

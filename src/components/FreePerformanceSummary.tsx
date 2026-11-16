@@ -6,7 +6,11 @@ import type {
   FinancialHistoryItem,
   SearchResultRatios,
 } from "@/hooks/useCompanySearch";
-import { formatNumber, formatPercentage } from "@/lib/utils/textUtils";
+import {
+  formatNumber,
+  formatPercentage,
+  formatPerShare,
+} from "@/lib/utils/textUtils";
 
 interface FreePerformanceSummaryProps {
   financialData?: {
@@ -31,6 +35,11 @@ function formatCurrency(
 
 function formatRatio(value: number | null | undefined) {
   return value == null ? "N/A" : formatPercentage(value * 100);
+}
+
+/** 成長率は増減が分かるよう「+5.00%」と符号を付ける */
+function formatGrowth(value: number) {
+  return `${value > 0 ? "+" : ""}${formatPercentage(value)}`;
 }
 
 function getSortedHistory(financialHistory?: FinancialHistoryItem[] | null) {
@@ -145,6 +154,7 @@ export function FreePerformanceSummary({
 
   if (!hasAnyData) return null;
 
+  // 取得できなかった指標は「N/A」のカードを並べず、出さない
   const metrics = [
     { label: "売上高", value: formatCurrency(revenue, currencySymbol) },
     {
@@ -152,10 +162,14 @@ export function FreePerformanceSummary({
       value: formatCurrency(operatingIncome, currencySymbol),
     },
     { label: "純利益", value: formatCurrency(netIncome, currencySymbol) },
-    { label: "EPS", value: formatCurrency(eps, currencySymbol) },
+    // 1株あたりの値なので「¥1.2K」のように丸めない
+    {
+      label: "EPS（1株あたり利益）",
+      value: formatPerShare(eps, currencySymbol),
+    },
     { label: "ROE", value: formatRatio(ratios?.roe) },
     { label: "営業利益率", value: formatRatio(ratios?.operatingMargin) },
-  ];
+  ].filter(item => item.value !== "N/A");
   const performanceComment = buildPerformanceComment({
     revenueGrowth,
     netIncomeGrowth,
@@ -177,14 +191,21 @@ export function FreePerformanceSummary({
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {metrics.map(item => (
-            <div key={item.label} className="rounded-lg border bg-muted/30 p-3">
-              <div className="text-xs text-muted-foreground">{item.label}</div>
-              <div className="mt-1 text-base font-semibold">{item.value}</div>
-            </div>
-          ))}
-        </div>
+        {metrics.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {metrics.map(item => (
+              <div
+                key={item.label}
+                className="rounded-lg border bg-muted/30 p-3"
+              >
+                <div className="text-xs text-muted-foreground">
+                  {item.label}
+                </div>
+                <div className="mt-1 text-base font-semibold">{item.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {(revenueGrowth != null || netIncomeGrowth != null) && (
           <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm dark:border-blue-900 dark:bg-blue-950/30">
@@ -193,8 +214,16 @@ export function FreePerformanceSummary({
               成長率の目安
             </div>
             <div className="text-muted-foreground">
-              売上成長率: {formatPercentage(revenueGrowth)} / 純利益成長率:{" "}
-              {formatPercentage(netIncomeGrowth)}
+              {[
+                revenueGrowth != null
+                  ? `売上成長率: ${formatGrowth(revenueGrowth)}`
+                  : null,
+                netIncomeGrowth != null
+                  ? `純利益成長率: ${formatGrowth(netIncomeGrowth)}`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(" / ")}
             </div>
           </div>
         )}

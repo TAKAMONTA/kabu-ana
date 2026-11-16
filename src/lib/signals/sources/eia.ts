@@ -14,6 +14,8 @@ export interface EiaObservation {
 }
 
 const EIA_BASE_URL = "https://api.eia.gov/v2";
+/** 1系列あたりの取得タイムアウト */
+export const EIA_FETCH_TIMEOUT_MS = 10_000;
 
 const EIA_SERIES = [
   {
@@ -90,7 +92,9 @@ export async function fetchEiaPriceStrip(
       url.searchParams.set("sort[0][column]", "period");
       url.searchParams.set("sort[0][direction]", "desc");
       url.searchParams.set("length", "2");
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(EIA_FETCH_TIMEOUT_MS),
+      });
       if (!response.ok)
         throw new Error(`EIA ${series.key} failed: ${response.status}`);
       return latestEiaPricePoint(

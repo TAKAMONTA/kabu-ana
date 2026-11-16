@@ -1,74 +1,15 @@
 import { NextResponse } from "next/server";
 
-// エラータイプの定義
-export enum ErrorType {
-  VALIDATION_ERROR = "VALIDATION_ERROR",
-  API_ERROR = "API_ERROR",
-  AUTHENTICATION_ERROR = "AUTHENTICATION_ERROR",
-  RATE_LIMIT_ERROR = "RATE_LIMIT_ERROR",
-  INTERNAL_ERROR = "INTERNAL_ERROR",
-}
-
-// カスタムエラークラス
-export class AppError extends Error {
-  public readonly type: ErrorType;
-  public readonly statusCode: number;
-  public readonly isOperational: boolean;
-
-  constructor(
-    message: string,
-    type: ErrorType = ErrorType.INTERNAL_ERROR,
-    statusCode: number = 500,
-    isOperational: boolean = true
-  ) {
-    super(message);
-    this.type = type;
-    this.statusCode = statusCode;
-    this.isOperational = isOperational;
-
-    Error.captureStackTrace(this, this.constructor);
-  }
-}
-
-// セキュアなエラーレスポンス生成
+/**
+ * セキュアなエラーレスポンス生成。
+ * クライアントには常に固定文言だけを返す（以前は NODE_ENV が production 以外のとき
+ * error.message をそのまま返していた）。詳細は logError でサーバーログに残すこと。
+ */
 export function createErrorResponse(
-  error: unknown,
+  _error: unknown,
   defaultMessage: string = "処理中にエラーが発生しました"
 ): NextResponse {
-  // 本番環境では詳細なエラー情報を隠す
-  const isProduction = process.env.NODE_ENV === "production";
-
-  if (error instanceof AppError) {
-    // アプリケーションエラー
-    return NextResponse.json(
-      {
-        error: isProduction ? "処理中にエラーが発生しました" : error.message,
-        type: isProduction ? undefined : error.type,
-        statusCode: error.statusCode,
-      },
-      { status: error.statusCode }
-    );
-  }
-
-  if (error instanceof Error) {
-    // 一般的なエラー
-    return NextResponse.json(
-      {
-        error: isProduction ? defaultMessage : error.message,
-        type: isProduction ? undefined : ErrorType.INTERNAL_ERROR,
-      },
-      { status: 500 }
-    );
-  }
-
-  // 未知のエラー
-  return NextResponse.json(
-    {
-      error: defaultMessage,
-      type: isProduction ? undefined : ErrorType.INTERNAL_ERROR,
-    },
-    { status: 500 }
-  );
+  return NextResponse.json({ error: defaultMessage }, { status: 500 });
 }
 
 // ログ用のエラー情報（サーバーサイドのみ）

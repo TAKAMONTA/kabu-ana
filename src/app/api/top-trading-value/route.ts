@@ -6,11 +6,9 @@ import {
   type TradingValueItem,
 } from "@/lib/topTradingValue";
 
-// export const dynamic = "force-dynamic";
-export const revalidate = 60 * 30; // 30分ごとに更新
-
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+// force-dynamic のルートでは segment の revalidate は効かない（毎リクエスト実行される）。
+// 更新間隔はこのファイル内のメモリキャッシュ（CACHE_TTL_MS）で制御している。
+export const dynamic = "force-dynamic";
 
 const NEWS_TOPICS = [
   "日本株 急騰 銘柄",

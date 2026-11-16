@@ -1,6 +1,7 @@
 import axios from "axios";
 import { APP_NAME, APP_URL } from "../constants";
 import { STRUCTURED_JSON_SENTINEL } from "./analysisStream";
+import { AI_SERVICE_UNAVAILABLE_MESSAGE } from "./openrouterConfig";
 
 const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
@@ -74,6 +75,40 @@ export interface EdinetExtras {
   financialHistory?: any[] | null;
   accountingStandard?: string | null;
 }
+
+/** AI分析の失敗をクライアントに返すときの固定文言とHTTPステータス */
+export class AiServiceError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "AiServiceError";
+  }
+}
+
+export const AI_ANALYSIS_FAILED_MESSAGE =
+  "AI分析中にエラーが発生しました。しばらくしてから再試行してください。";
+export const AI_TIMEOUT_MESSAGE =
+  "AI分析がタイムアウトしました。しばらくしてから再試行してください。";
+export const AI_RATE_LIMITED_MESSAGE =
+  "AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。";
+export { AI_SERVICE_UNAVAILABLE_MESSAGE };
+
+export interface StreamTimeouts {
+  /** 応答ヘッダーが届くまで */
+  connectMs: number;
+  /** チャンク間の無通信 */
+  idleMs: number;
+  /** 全体（/api/analyze は Vercel の関数実行時間の上限内に収める） */
+  totalMs: number;
+}
+
+export const DEFAULT_STREAM_TIMEOUTS: StreamTimeouts = {
+  connectMs: 30_000,
+  idleMs: 30_000,
+  totalMs: 120_000,
+};
 
 function buildEdinetSections(edinetExtras?: EdinetExtras | null): string {
   const ratios = edinetExtras?.ratios;
@@ -258,85 +293,6 @@ export class OpenRouterClient {
   constructor(apiKey: string) {
     this.apiKey = apiKey;
     this.baseURL = OPENROUTER_BASE_URL;
-  }
-
-  async analyzeStock(
-    companyInfo: any,
-    stockData: any,
-    newsData: any[],
-    edinetExtras?: EdinetExtras | null
-  ): Promise<AnalysisResult> {
-    try {
-      const prompt = buildAnalysisPrompt(
-        companyInfo,
-        stockData,
-        newsData,
-        false,
-        edinetExtras
-      );
-
-      const response = await axios.post(
-        `${this.baseURL}/chat/completions`,
-        {
-          model: "anthropic/claude-sonnet-4-5",
-          messages: [
-            {
-              role: "system",
-              content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。会社概要ではなく、業績・収益性・株価材料・リスクから「なぜ注目/注意すべきか」が伝わる分析結論を作ってください。回答はJSON形式で返してください。`,
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.3,
-          max_tokens: 2500,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": APP_URL,
-            "X-Title": APP_NAME,
-          },
-          timeout: 30000,
-        }
-      );
-
-      const data: OpenRouterResponse = response.data;
-      const content = data.choices[0]?.message?.content;
-
-      if (!content) {
-        throw new Error("AI分析結果が取得できませんでした");
-      }
-
-      return this.parseAnalysisResult(content);
-    } catch (error: any) {
-      console.error(
-        "OpenRouter分析エラー:",
-        error instanceof Error ? error.message : "Unknown error"
-      );
-      if (axios.isAxiosError(error)) {
-        const status = error.response?.status;
-        const apiMessage = error.response?.data?.error?.message;
-        if (status === 401)
-          throw new Error(
-            "AI分析サービスの認証に失敗しました。APIキーを確認してください。"
-          );
-        if (status === 402)
-          throw new Error("AI分析サービスの残高が不足しています。");
-        if (status === 429)
-          throw new Error(
-            "AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。"
-          );
-        if (error.code === "ECONNABORTED")
-          throw new Error(
-            "AI分析がタイムアウトしました。しばらくしてから再試行してください。"
-          );
-        throw new Error(apiMessage || "AI分析中にエラーが発生しました。");
-      }
-      throw error;
-    }
   }
 
   parseAnalysisResult(content: string): AnalysisResult {
@@ -589,12 +545,21 @@ ${newsText}
   }
 
   // fetch is used here instead of axios because axios does not natively support streaming SSE responses
+  /**
+   * 分析文をストリーミングで生成する。
+   * タイムアウトは3段階（全体を30秒で切ると max_tokens 3000 の長い生成が途中で切れていた）:
+   * - 接続（応答ヘッダーが届くまで）: STREAM_CONNECT_TIMEOUT_MS
+   * - チャンク間の無通信: STREAM_IDLE_TIMEOUT_MS
+   * - 全体の上限: STREAM_TOTAL_TIMEOUT_MS
+   * 失敗はすべて固定文言の AiServiceError で投げる（上流の本文や "fetch failed" を出さない）。
+   */
   async *analyzeStockStream(
     companyInfo: any,
     stockData: any,
     newsData: any[],
     edinetExtras?: EdinetExtras | null,
-    question?: string
+    question?: string,
+    timeouts: StreamTimeouts = DEFAULT_STREAM_TIMEOUTS
   ): AsyncGenerator<string> {
     const prompt = buildAnalysisPrompt(
       companyInfo,
@@ -605,74 +570,140 @@ ${newsText}
       question
     );
 
-    const res = await fetch(`${this.baseURL}/chat/completions`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": APP_URL,
-        "X-Title": APP_NAME,
-      },
-      body: JSON.stringify({
-        model: "anthropic/claude-sonnet-4-5",
-        messages: [
-          {
-            role: "system",
-            content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。会社概要ではなく、業績・収益性・株価材料・リスクから「なぜ注目/注意すべきか」が伝わる分析結論を作ってください。`,
-          },
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.3,
-        max_tokens: 3000,
-        stream: true,
-      }),
-      signal: AbortSignal.timeout(30000),
-    });
+    const controller = new AbortController();
+    const startedAt = Date.now();
+    let timedOut = false;
+    const abortAfter = (ms: number) =>
+      setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, ms);
+
+    let res: Response;
+    const connectTimer = abortAfter(
+      Math.min(timeouts.connectMs, timeouts.totalMs)
+    );
+    try {
+      res = await fetch(`${this.baseURL}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": APP_URL,
+          "X-Title": APP_NAME,
+        },
+        body: JSON.stringify({
+          model: "anthropic/claude-sonnet-4-5",
+          messages: [
+            {
+              role: "system",
+              content: `あなたは企業情報と市場ニュースを整理する分析アシスタントです。投資助言、売買推奨、購入・売却・保有などの行動指示は出さず、参考情報として主要材料・リスク・確認ポイントを中立的にまとめてください。会社概要ではなく、業績・収益性・株価材料・リスクから「なぜ注目/注意すべきか」が伝わる分析結論を作ってください。`,
+            },
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.3,
+          max_tokens: 3000,
+          stream: true,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      console.error(
+        "OpenRouter接続エラー:",
+        error instanceof Error ? error.message : error
+      );
+      throw timedOut
+        ? new AiServiceError(AI_TIMEOUT_MESSAGE, 504)
+        : new AiServiceError(AI_ANALYSIS_FAILED_MESSAGE, 502);
+    } finally {
+      clearTimeout(connectTimer);
+    }
 
     if (!res.ok) {
       const status = res.status;
-      if (status === 401)
-        throw new Error(
-          "AI分析サービスの認証に失敗しました。APIキーを確認してください。"
-        );
-      if (status === 402)
-        throw new Error("AI分析サービスの残高が不足しています。");
-      if (status === 429)
-        throw new Error(
-          "AI分析サービスのリクエスト制限に達しました。しばらくしてから再試行してください。"
-        );
-      throw new Error("AI分析中にエラーが発生しました。");
+      console.error(`OpenRouterエラー応答: status=${status}`);
+      // 401/402/403 はこちらのキー・残高の問題。利用者には「再ログイン」や
+      // 「残高不足」ではなく、サービスが使えないことだけを伝える
+      if (status === 401 || status === 402 || status === 403)
+        throw new AiServiceError(AI_SERVICE_UNAVAILABLE_MESSAGE, 503);
+      if (status === 429) throw new AiServiceError(AI_RATE_LIMITED_MESSAGE, 429);
+      throw new AiServiceError(AI_ANALYSIS_FAILED_MESSAGE, 502);
     }
 
-    if (!res.body) throw new Error("AI分析中にエラーが発生しました。");
+    if (!res.body) throw new AiServiceError(AI_ANALYSIS_FAILED_MESSAGE, 502);
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buf = "";
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buf += decoder.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const payload = line.slice(6).trim();
-        if (payload === "[DONE]") return;
-        try {
-          const parsed = JSON.parse(payload);
+    const readChunk = async () => {
+      const remaining = timeouts.totalMs - (Date.now() - startedAt);
+      if (remaining <= 0) {
+        timedOut = true;
+        controller.abort();
+        throw new AiServiceError(AI_TIMEOUT_MESSAGE, 504);
+      }
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        return await Promise.race([
+          reader.read(),
+          new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+              timedOut = true;
+              controller.abort();
+              reject(new AiServiceError(AI_TIMEOUT_MESSAGE, 504));
+            }, Math.min(timeouts.idleMs, remaining));
+          }),
+        ]);
+      } catch (error) {
+        if (error instanceof AiServiceError) throw error;
+        throw timedOut
+          ? new AiServiceError(AI_TIMEOUT_MESSAGE, 504)
+          : new AiServiceError(AI_ANALYSIS_FAILED_MESSAGE, 502);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      while (true) {
+        const { done, value } = await readChunk();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") return;
+          let parsed: any;
+          try {
+            parsed = JSON.parse(payload);
+          } catch {
+            continue; // ignore malformed SSE lines
+          }
+          // 生成途中のエラーは { error: {...} } や finish_reason: "error" で届く
+          if (parsed?.error || parsed?.choices?.[0]?.finish_reason === "error") {
+            console.error(
+              "OpenRouterストリーム中のエラー:",
+              typeof parsed?.error?.message === "string"
+                ? parsed.error.message.slice(0, 200)
+                : "unknown"
+            );
+            throw new AiServiceError(AI_ANALYSIS_FAILED_MESSAGE, 502);
+          }
           const delta = parsed.choices?.[0]?.delta?.content;
           if (typeof delta === "string" && delta.length > 0) {
             yield delta;
           }
-        } catch {
-          // ignore malformed SSE lines
         }
       }
+    } finally {
+      // 途中で抜けた（呼び出し側の中断・例外）場合も接続を閉じる
+      reader.cancel().catch(() => {});
     }
   }
 

@@ -9,6 +9,7 @@ import {
   Suspense,
 } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,10 +20,13 @@ import {
   ChevronUp,
   Crown,
 } from "lucide-react";
-import { useCompanySearch } from "@/hooks/useCompanySearch";
+import {
+  NOT_FOUND_MESSAGE,
+  useCompanySearch,
+  type SearchResult,
+} from "@/hooks/useCompanySearch";
 import { useAIAnalysis } from "@/hooks/useAIAnalysis";
 import { useAuth } from "@/hooks/useAuth";
-import { StockChart } from "@/components/StockChart";
 import { AuthModal } from "@/components/AuthModal";
 import {
   StockPriceHeaderCard,
@@ -56,6 +60,26 @@ import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { isNative } from "@/lib/utils/platformDetect";
 import { shouldShowSponsoredAds } from "@/lib/utils/sponsoredAds";
 import { APP_NAME } from "@/lib/constants";
+import { getCompanyProfileView } from "@/lib/companyProfile";
+
+// チャート（recharts）は検索後にしか使わないため、一面の初回読み込みから外す
+const StockChart = dynamic(
+  () => import("@/components/StockChart").then(mod => mod.StockChart),
+  {
+    ssr: false,
+    loading: () => (
+      <Card>
+        <CardContent className="pt-6">
+          <div
+            role="status"
+            aria-label="チャートを読み込み中"
+            className="h-80 rounded-md shimmer"
+          />
+        </CardContent>
+      </Card>
+    ),
+  }
+);
 
 const SAMPLE_STOCKS = [
   {
@@ -125,9 +149,11 @@ export default function HomePage() {
     searchResult,
     searchCompany,
     retry: retrySearch,
+    clearSearch,
   } = useCompanySearch();
   const {
     isAnalyzing,
+    status: analysisStatus,
     error: analysisError,
     analysisResult,
     analyzedAt,
@@ -160,6 +186,7 @@ export default function HomePage() {
     isLoading: isRankingLoading,
     error: rankingError,
     warning: rankingWarning,
+    refresh: refreshRanking,
   } = useTopTradingValue();
   const {
     isLoading: isFinancialLoading,
@@ -182,6 +209,10 @@ export default function HomePage() {
   });
   const autoAnalyzedSymbolRef = useRef<string | null>(null);
   const autoExtraAnalyzedSymbolRef = useRef<string | null>(null);
+  // 新しい検索を始めた時点で表示していた結果。新しい結果が届くまでは、
+  // この結果を対象に自動分析を走らせない（前の銘柄の分析が終わった拍子に
+  // 前の銘柄を分析し直して無料回数を消費する、を防ぐ）
+  const staleSearchResultRef = useRef<SearchResult | null>(null);
 
   useEffect(() => {
     setIsNativeApp(isNative());
@@ -199,29 +230,72 @@ export default function HomePage() {
   // 「分析を実行した時点で AI に渡したデータ」にする
   const [aiReferenceLabels, setAiReferenceLabels] = useState<string[]>([]);
 
-  const handleSearchAndAnalyze = useCallback(async () => {
-    const queryToUse = searchQuery.trim();
-    if (!queryToUse) return;
-
-    setShowSuggestions(false);
-    setActiveSuggestion(-1);
-    clearSuggestions();
+  /** 表示中の銘柄に紐づく分析（メイン・財務・ニュース）をすべて破棄する */
+  const resetAnalysisState = useCallback(() => {
     clearAiAnalysis();
     clearNewsAnalysis();
     clearFinancialEval();
     autoAnalyzedSymbolRef.current = null;
     autoExtraAnalyzedSymbolRef.current = null;
+    setIsDescriptionExpanded(false);
+  }, [clearAiAnalysis, clearNewsAnalysis, clearFinancialEval]);
 
-    await searchCompany(queryToUse, chartPeriod);
-  }, [
-    searchQuery,
-    chartPeriod,
-    searchCompany,
-    clearSuggestions,
-    clearAiAnalysis,
-    clearNewsAnalysis,
-    clearFinancialEval,
-  ]);
+  /** 別の銘柄を探す検索を始める（入力・候補・サンプル・話題の銘柄から共通） */
+  const startNewSearch = useCallback(
+    async (query: string) => {
+      setShowSuggestions(false);
+      setActiveSuggestion(-1);
+      clearSuggestions();
+      resetAnalysisState();
+      staleSearchResultRef.current = searchResult;
+      // 失敗したら前の銘柄の画面も消し、検索欄の下にエラーだけを出す
+      await searchCompany(query, chartPeriod, { clearOnError: true });
+    },
+    [
+      chartPeriod,
+      searchCompany,
+      searchResult,
+      clearSuggestions,
+      resetAnalysisState,
+    ]
+  );
+
+  const handleSearchAndAnalyze = useCallback(async () => {
+    const queryToUse = searchQuery.trim();
+    if (!queryToUse) return;
+    await startNewSearch(queryToUse);
+  }, [searchQuery, startNewSearch]);
+
+  /**
+   * ロゴ・「銘柄分析」から一面（検索前の画面）に戻る。
+   * 同じ "/" へのリンクでは画面が切り替わらず、初回検索後は一面に戻る手段が無かった
+   */
+  const resetToFrontPage = useCallback(() => {
+    resetAnalysisState();
+    clearSearch();
+    staleSearchResultRef.current = null;
+    setSearchQuery("");
+    setShowSuggestions(false);
+    setActiveSuggestion(-1);
+    clearSuggestions();
+    window.scrollTo({ top: 0 });
+  }, [resetAnalysisState, clearSearch, clearSuggestions]);
+
+  const handleHomeLinkClick = useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>) => {
+      // 新しいタブで開く操作（Ctrl/⌘+クリック等）はブラウザに任せる
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.button !== 0
+      )
+        return;
+      event.preventDefault();
+      resetToFrontPage();
+    },
+    [resetToFrontPage]
+  );
 
   const handleInputChange = useCallback(
     (value: string) => {
@@ -242,23 +316,9 @@ export default function HomePage() {
   const handleSelectSuggestion = useCallback(
     async (symbol: string, displayText?: string) => {
       setSearchQuery(displayText || symbol);
-      setShowSuggestions(false);
-      clearSuggestions();
-      clearAiAnalysis();
-      clearNewsAnalysis();
-      clearFinancialEval();
-      autoAnalyzedSymbolRef.current = null;
-      autoExtraAnalyzedSymbolRef.current = null;
-      await searchCompany(symbol, chartPeriod);
+      await startNewSearch(symbol);
     },
-    [
-      chartPeriod,
-      searchCompany,
-      clearSuggestions,
-      clearAiAnalysis,
-      clearNewsAnalysis,
-      clearFinancialEval,
-    ]
+    [startNewSearch]
   );
 
   const renderHighlighted = useCallback((text: string, query: string) => {
@@ -295,7 +355,6 @@ export default function HomePage() {
     async (question: string) => {
       if (!searchResult) return;
       if (!canUseFeature) return;
-      incrementUsage();
       setAiReferenceLabels(buildAiReferenceLabels(searchResult));
       const edinetExtras =
         searchResult.ratios != null || searchResult.financialHistory != null
@@ -305,19 +364,27 @@ export default function HomePage() {
               accountingStandard: searchResult.accountingStandard ?? undefined,
             }
           : undefined;
-      await analyzeStock(
+      const succeeded = await analyzeStock(
         searchResult.companyInfo,
         searchResult.stockData,
         searchResult.newsData,
         edinetExtras,
         question
       );
+      // 無料回数は分析が成功してから数える（失敗・中断した分は減らさない）
+      if (succeeded) incrementUsage();
     },
     [searchResult, analyzeStock, canUseFeature, incrementUsage]
   );
 
+  const handleRetryAnalysis = useCallback(async () => {
+    const succeeded = await retryAnalysis();
+    if (succeeded) incrementUsage();
+  }, [retryAnalysis, incrementUsage]);
+
   useEffect(() => {
     if (!searchResult) return;
+    if (searchResult === staleSearchResultRef.current) return;
     if (isAnalyzing) return;
     if (!canUseFeature) return;
 
@@ -332,6 +399,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!searchResult) return;
+    if (searchResult === staleSearchResultRef.current) return;
     if (isAnalyzing) return;
     if (!analysisResult) return;
     if (!bundleTokens?.financial || !bundleTokens?.news) return;
@@ -372,10 +440,20 @@ export default function HomePage() {
     analyzeNews,
   ]);
 
-  const getCurrencySymbol = useMemo(() => {
-    if (!searchResult) return "$";
-    return searchResult.companyInfo.market === "TYO" ? "¥" : "$";
+  // 日本株は market が "TYO" のほか、J-Quants 経由だと「プライム」等の市場区分に
+  // なることがあるため、証券コード（7203 / 130A 形式）でも判定する
+  const isJapanStock = useMemo(() => {
+    if (!searchResult) return false;
+    const { market, symbol } = searchResult.companyInfo;
+    return market === "TYO" || /^\d{3}[0-9A-Z]$/.test(symbol);
   }, [searchResult]);
+
+  const getCurrencySymbol = isJapanStock ? "¥" : "$";
+
+  const companyProfile = useMemo(
+    () => getCompanyProfileView(searchResult?.companyInfo.description),
+    [searchResult]
+  );
 
   const handleChartPeriodChange = useCallback(
     async (period: string) => {
@@ -424,25 +502,39 @@ export default function HomePage() {
   const handlePickSelect = useCallback(
     async (query: string) => {
       setSearchQuery(query);
-      setShowSuggestions(false);
-      setActiveSuggestion(-1);
-      clearSuggestions();
-      clearAiAnalysis();
-      clearNewsAnalysis();
-      clearFinancialEval();
-      autoAnalyzedSymbolRef.current = null;
-      autoExtraAnalyzedSymbolRef.current = null;
-      await searchCompany(query, chartPeriod);
+      await startNewSearch(query);
     },
-    [
-      chartPeriod,
-      searchCompany,
-      clearSuggestions,
-      clearAiAnalysis,
-      clearNewsAnalysis,
-      clearFinancialEval,
-    ]
+    [startNewSearch]
   );
+
+  /**
+   * 財務評価・ニュース分析はメインAI分析の完了後に自動で始まる。
+   * メイン分析が失敗・上限到達・結果なしで終わったときは「完了後に表示します」と
+   * 出し続けず、表示されない理由を伝える
+   */
+  const followUpUnavailableMessage = useMemo(() => {
+    if (!searchResult) return null;
+    if (analysisStatus === "error") {
+      return "総合AI分析を完了できなかったため表示できません。上の「AI分析を再試行」からやり直せます。";
+    }
+    if (
+      analysisStatus === "done" &&
+      !(analysisResult && bundleTokens?.financial && bundleTokens?.news)
+    ) {
+      return "総合AI分析の結果を読み取れなかったため表示できません。時間をおいて、もう一度検索してください。";
+    }
+    if (analysisStatus === "idle" && !isAnalyzing && !canUseFeature) {
+      return "本日の無料AI分析の回数を使い切ったため表示できません。明日以降、またはプレミアムプランでご利用いただけます。";
+    }
+    return null;
+  }, [
+    searchResult,
+    analysisStatus,
+    analysisResult,
+    bundleTokens,
+    isAnalyzing,
+    canUseFeature,
+  ]);
 
   const handleFrontPageIdeaSelect = useCallback(
     (item: TradingValueItem) => {
@@ -468,6 +560,13 @@ export default function HomePage() {
       onInputChange={handleInputChange}
       onSelectSuggestion={handleSelectSuggestion}
       renderHighlighted={renderHighlighted}
+      error={error}
+      // 「見つかりませんでした」は同じ語で再検索しても結果が変わらないため出さない
+      onRetry={
+        error && error !== NOT_FOUND_MESSAGE
+          ? () => void retrySearch()
+          : undefined
+      }
     />
   );
 
@@ -515,16 +614,25 @@ export default function HomePage() {
       error={rankingError}
       warning={rankingWarning}
       onSelect={handlePickSelect}
+      onRetry={() => void refreshRanking()}
     />
   );
 
   return (
     <div className="min-h-screen bg-background relative overflow-x-hidden">
       {/* ヘッダー */}
-      <header className="sticky top-0 z-50 border-b border-border bg-card/80 backdrop-blur-md">
+      {/* iOS アプリ（viewportFit: cover）でステータスバーの下に潜らないよう、
+          セーフエリア分だけ上を空ける（/signals と同じ考え方） */}
+      <header className="sticky top-0 z-50 border-b border-border bg-card/80 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="container mx-auto px-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="order-1 flex items-center space-x-3">
+            {/* ロゴは一面（検索前の画面）に戻る導線を兼ねる */}
+            <Link
+              href="/"
+              onClick={handleHomeLinkClick}
+              aria-label={`${APP_NAME} トップへ戻る`}
+              className="order-1 flex items-center space-x-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
               <div className="relative">
                 <TrendingUp className="h-8 w-8 text-primary drop-shadow-[0_0_18px_hsl(var(--primary)/0.45)]" />
               </div>
@@ -536,10 +644,10 @@ export default function HomePage() {
                   AIで株式分析と市場シグナルを 30 秒で
                 </p>
               </div>
-            </div>
+            </Link>
             {/* スマホではロゴと操作ボタンを1行目、ナビを2行目に置いてヘッダーの高さを抑える */}
             <div className="order-3 w-full sm:order-2 sm:w-auto">
-              <SignalsNav active="home" />
+              <SignalsNav active="home" onHomeClick={handleHomeLinkClick} />
             </div>
             <div className="order-2 flex items-center space-x-2 sm:order-3 sm:space-x-4">
               <ThemeToggle />
@@ -592,6 +700,8 @@ export default function HomePage() {
             stockIdeas={tradingRanking}
             isStockIdeasLoading={isRankingLoading}
             warning={rankingWarning}
+            stockIdeasError={rankingError}
+            onRetryStockIdeas={() => void refreshRanking()}
             remainingUses={remainingUses}
             dailyLimit={dailyLimit}
             isPremium={isPremium}
@@ -622,6 +732,23 @@ export default function HomePage() {
                   }
                 }}
               />
+              {/* ★を押した結果（無料プランの上限など）は★のすぐ下に出す。
+                  ウォッチリスト欄は画面のずっと下にあり、気付けなかった */}
+              {user && watchlist.error && (
+                <div
+                  role="alert"
+                  className="mt-2 flex items-start justify-between gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+                >
+                  <span className="py-1">{watchlist.error}</span>
+                  <button
+                    type="button"
+                    onClick={watchlist.clearError}
+                    className="-my-1 min-h-11 shrink-0 px-2 text-xs underline"
+                  >
+                    閉じる
+                  </button>
+                </div>
+              )}
             </div>
 
             <DataStatusCard
@@ -661,36 +788,26 @@ export default function HomePage() {
           </>
         )}
 
-        {/* エラー表示（検索・メインAI分析のみ） */}
-        {(error || analysisError) && (
+        {/* メインAI分析のエラー（検索のエラーは検索欄の直下に出す） */}
+        {searchResult && analysisError && (
           <Card className="mb-6 border-destructive bg-destructive/5">
             <CardContent className="pt-6">
-              <div className="flex items-start gap-3 text-destructive">
+              <div
+                role="alert"
+                className="flex items-start gap-3 text-destructive"
+              >
                 <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold">
-                    {error
-                      ? "検索できませんでした"
-                      : "AI分析を完了できませんでした"}
-                  </p>
-                  <p className="text-sm mt-1">{error || analysisError}</p>
+                  <p className="font-semibold">AI分析を完了できませんでした</p>
+                  <p className="text-sm mt-1">{analysisError}</p>
                   <div className="flex gap-2 mt-3">
-                    {error && (
-                      <button
-                        onClick={() => void retrySearch()}
-                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        もう一度検索
-                      </button>
-                    )}
-                    {analysisError && (
-                      <button
-                        onClick={retryAnalysis}
-                        className="min-h-9 text-xs px-3 py-1.5 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
-                      >
-                        AI分析を再試行
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => void handleRetryAnalysis()}
+                      className="min-h-11 text-sm px-4 py-2 bg-destructive/10 hover:bg-destructive/20 rounded-md transition-colors"
+                    >
+                      AI分析を再試行
+                    </button>
                   </div>
                 </div>
               </div>
@@ -723,42 +840,56 @@ export default function HomePage() {
                   data={searchResult.chartData}
                   isLoading={isLoading}
                   currency={getCurrencySymbol}
+                  period={chartPeriod}
+                  isJapanStock={isJapanStock}
                   onPeriodChange={handleChartPeriodChange}
                 />
 
-                {/* 会社概要セクション */}
-                {searchResult.companyInfo.description && (
+                {/* 会社概要セクション（日本株は「プライム / 輸送用機器」のような
+                    市場・業種だけのことが多いので、その場合は見出しを変え、
+                    押しても何も変わらない「続きを読む」は出さない） */}
+                {companyProfile && (
                   <Card>
                     <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">会社概要</CardTitle>
-                        <button
-                          onClick={() =>
-                            setIsDescriptionExpanded(!isDescriptionExpanded)
-                          }
-                          className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          {isDescriptionExpanded ? (
-                            <>
-                              <ChevronUp className="h-3 w-3" />
-                              折りたたむ
-                            </>
-                          ) : (
-                            <>
-                              <ChevronDown className="h-3 w-3" />
-                              続きを読む
-                            </>
-                          )}
-                        </button>
+                      <div className="flex items-center justify-between gap-2">
+                        <CardTitle className="text-base">
+                          {companyProfile.title}
+                        </CardTitle>
+                        {companyProfile.collapsible && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setIsDescriptionExpanded(!isDescriptionExpanded)
+                            }
+                            aria-expanded={isDescriptionExpanded}
+                            aria-controls="company-description"
+                            className="-my-2 flex min-h-11 items-center gap-1 px-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            {isDescriptionExpanded ? (
+                              <>
+                                <ChevronUp className="h-3 w-3" />
+                                折りたたむ
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="h-3 w-3" />
+                                続きを読む
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </CardHeader>
                     <CardContent>
                       <p
+                        id="company-description"
                         className={`text-sm text-muted-foreground leading-relaxed ${
-                          isDescriptionExpanded ? "" : "line-clamp-10"
+                          companyProfile.collapsible && !isDescriptionExpanded
+                            ? "line-clamp-10"
+                            : ""
                         }`}
                       >
-                        {searchResult.companyInfo.description}
+                        {companyProfile.text}
                       </p>
                     </CardContent>
                   </Card>
@@ -782,6 +913,7 @@ export default function HomePage() {
                   financialEval={financialEval}
                   isFinancialLoading={isFinancialLoading}
                   financialError={financialError}
+                  unavailableMessage={followUpUnavailableMessage}
                   onRetry={retryFinancialEval}
                   getScoreLabel={getScoreLabel}
                   getScoreColor={getScoreColor}
@@ -795,6 +927,7 @@ export default function HomePage() {
                   isNewsAnalyzing={isNewsAnalyzing}
                   newsError={newsError}
                   newsEmpty={newsEmpty}
+                  unavailableMessage={followUpUnavailableMessage}
                   onRetryNews={retryNewsAnalysis}
                 />
               </div>

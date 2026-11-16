@@ -1,5 +1,6 @@
 "use client";
 
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
@@ -16,6 +17,8 @@ interface TopTradingValueSectionProps {
   error: string | null;
   warning?: string | null;
   onSelect: (symbol: string) => void;
+  /** 取得に失敗したときの再読み込み */
+  onRetry?: () => void;
 }
 
 function attentionBadgeClassName(confidence: number): string {
@@ -58,6 +61,7 @@ export function TopTradingValueSection({
   error,
   warning,
   onSelect,
+  onRetry,
 }: TopTradingValueSectionProps) {
   const showAttentionScore = shouldShowAttentionScore(
     items.map(item => item.confidence)
@@ -81,9 +85,24 @@ export function TopTradingValueSection({
             </span>
           </div>
           {error && !isLoading && (
-            <p className="mt-2 text-xs text-red-600">
-              データの取得に失敗しました: {error}
-            </p>
+            <div
+              role="alert"
+              className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200"
+            >
+              <span>{error}</span>
+              {onRetry && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-11 bg-background"
+                  onClick={onRetry}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  再読み込み
+                </Button>
+              )}
+            </div>
           )}
           {!error && warning && !isLoading && (
             <p className="mt-2 text-xs text-muted-foreground">{warning}</p>
@@ -125,7 +144,7 @@ export function TopTradingValueSection({
                             </span>
                           )}
                           {item.signalLabel && (
-                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+                            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                               {item.signalLabel}
                             </span>
                           )}
@@ -143,7 +162,7 @@ export function TopTradingValueSection({
                             href={item.sourceLinks[0]}
                             target="_blank"
                             rel="noreferrer"
-                            className="mt-1 inline-block text-[11px] text-blue-600 hover:underline"
+                            className="-my-2 inline-flex min-h-11 items-center text-[11px] text-blue-600 hover:underline dark:text-blue-400"
                           >
                             根拠を見る
                           </a>
@@ -161,6 +180,7 @@ export function TopTradingValueSection({
                       <Button
                         variant="outline"
                         size="sm"
+                        className="min-h-11"
                         onClick={() => handleSelect(item)}
                       >
                         分析

@@ -10,13 +10,19 @@ import {
 } from "@/lib/api/edinetdb";
 import { searchSchema } from "@/lib/validation/schemas";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
-import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+import {
+  optionalWithTimeout,
+  withTimeout,
+} from "@/lib/utils/optionalTimeout";
+export const dynamic = "force-dynamic";
 
 const SEARCH_OPTIONAL_TIMEOUT_MS = 2200;
 const NEWS_OPTIONAL_TIMEOUT_MS = 1800;
 const EDINET_SEARCH_TIMEOUT_MS = 8000;
+/** EDINET の詳細3本（企業・財務・指標）それぞれのタイムアウト */
+const EDINET_DETAIL_TIMEOUT_MS = 8000;
+/** 高速一括取得のタイムアウト（超えたら後段のフォールバックへ進む） */
+const FAST_SEARCH_TIMEOUT_MS = 8000;
 
 async function measureSearchStep<T>(
   timings: Record<string, number>,
@@ -37,18 +43,13 @@ async function searchHandler(request: NextRequest) {
   }
   try {
     // 入力データの検証
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
     const validationResult = searchSchema.safeParse(body);
 
     if (!validationResult.success) {
+      // zod の issues（英語の型エラー文など）はそのまま返さない
       return NextResponse.json(
-        {
-          error: "入力データが無効です",
-          details: validationResult.error.errors.map(err => ({
-            field: err.path.join("."),
-            message: err.message,
-          })),
-        },
+        { error: "入力データが無効です" },
         { status: 400 }
       );
     }
@@ -209,7 +210,12 @@ async function searchHandler(request: NextRequest) {
         const fastResult = await measureSearchStep(
           timings,
           "market.fast_search",
-          () => marketApi.getFastSearchResult(effectiveQuery, chartPeriod)
+          () =>
+            optionalWithTimeout(
+              marketApi.getFastSearchResult(effectiveQuery, chartPeriod),
+              FAST_SEARCH_TIMEOUT_MS,
+              "market.getFastSearchResult"
+            )
         );
 
         if (fastResult) {
@@ -412,9 +418,21 @@ async function searchHandler(request: NextRequest) {
           const edinetDetailsStartedAt = Date.now();
           const [detail, financialsData, ratiosData] = await Promise.allSettled(
             [
-              edinetApi.getCompany(company.edinet_code),
-              edinetApi.getFinancials(company.edinet_code),
-              edinetApi.getRatios(company.edinet_code),
+              withTimeout(
+                edinetApi.getCompany(company.edinet_code),
+                EDINET_DETAIL_TIMEOUT_MS,
+                "edinet.getCompany"
+              ),
+              withTimeout(
+                edinetApi.getFinancials(company.edinet_code),
+                EDINET_DETAIL_TIMEOUT_MS,
+                "edinet.getFinancials"
+              ),
+              withTimeout(
+                edinetApi.getRatios(company.edinet_code),
+                EDINET_DETAIL_TIMEOUT_MS,
+                "edinet.getRatios"
+              ),
             ]
           );
           timings["edinet.details"] = Date.now() - edinetDetailsStartedAt;

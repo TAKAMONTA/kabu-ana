@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { OpenRouterClient } from "@/lib/api/openrouter";
+import {
+  AI_SERVICE_UNAVAILABLE_MESSAGE,
+  getOpenRouterApiKey,
+} from "@/lib/api/openrouterConfig";
+import { sanitizeError } from "@/lib/utils/logSanitizer";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
 import { FreeNewsClient } from "@/lib/api/freeNews";
 import { createBundledSkip } from "@/lib/utils/aiBundleToken";
-import { withDailyLimit } from "@/lib/utils/dailyUsageLimiter";
+import {
+  markNotCountable,
+  withDailyLimit,
+} from "@/lib/utils/dailyUsageLimiter";
 import { withRateLimit } from "@/lib/utils/rateLimiter";
 import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
 
@@ -14,8 +22,7 @@ export interface NewsAnalysisResult {
   keyPoints: string[];
   recommendations: string[];
 }
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 // getComprehensiveNews は内部で Yahoo Finance・Google News RSS の
 // 2ソースを Promise.allSettled で並列に取得し、各呼び出し自体は
@@ -53,15 +60,20 @@ async function newsAnalysisHandler(request: NextRequest) {
       );
     }
 
-    const openRouterApiKey = process.env.OPENROUTER_API_KEY;
-
-    if (
-      !openRouterApiKey ||
-      openRouterApiKey === "your_openrouter_api_key_here"
-    ) {
+    // 銘柄・企業名は AI プロンプトと外部検索に入るので長さを制限する
+    if (symbol.length > 20 || companyName.length > 200) {
       return NextResponse.json(
-        { error: "OPENROUTER_API_KEYが設定されていません" },
+        { error: "シンボルと企業名が必要です" },
         { status: 400 }
+      );
+    }
+
+    const openRouterApiKey = getOpenRouterApiKey();
+    if (!openRouterApiKey) {
+      console.error("news-analysis: OpenRouter APIキーが未設定です");
+      return NextResponse.json(
+        { error: AI_SERVICE_UNAVAILABLE_MESSAGE },
+        { status: 503 }
       );
     }
 
@@ -103,11 +115,14 @@ async function newsAnalysisHandler(request: NextRequest) {
     }
 
     if (!newsData || newsData.length === 0) {
-      return NextResponse.json({
-        newsData: [],
-        analysis: null,
-        empty: true,
-      });
+      // ニュースが無くAIを呼んでいないので、無料枠を消費させない
+      return markNotCountable(
+        NextResponse.json({
+          newsData: [],
+          analysis: null,
+          empty: true,
+        })
+      );
     }
 
     // AIによるニュース分析
@@ -117,14 +132,19 @@ async function newsAnalysisHandler(request: NextRequest) {
       newsData
     );
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       newsData,
       analysis: analysisResult,
     });
-  } catch (error: any) {
-    console.error("ニュース分析エラー:", error.message || "Unknown error");
+    // AI応答を読み取れなかった（呼び出し失敗を含む）結果は無料枠を消費させない
+    return analysisResult.parseFailed ? markNotCountable(response) : response;
+  } catch (error: unknown) {
+    console.error(`ニュース分析エラー: ${sanitizeError(error)}`);
     return NextResponse.json(
-      { error: error.message || "ニュース分析中にエラーが発生しました" },
+      {
+        error:
+          "ニュース分析中にエラーが発生しました。時間をおいて再度お試しください。",
+      },
       { status: 500 }
     );
   }

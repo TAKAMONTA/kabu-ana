@@ -5,8 +5,7 @@ import { optionalWithTimeout } from "@/lib/utils/optionalTimeout";
 import { parseCodesParam } from "@/lib/watchlist/codes";
 import { QuotesCache, type WatchlistQuote } from "@/lib/watchlist/quotesCache";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /** 1リクエストで取得できるコード数の上限 */
 const MAX_CODES = 20;

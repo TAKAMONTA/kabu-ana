@@ -76,3 +76,21 @@ describe("TwelveDataClient", () => {
     expect(await c.getStockData("AAPL")).toBeNull();
   });
 });
+
+describe("tdWindow chart periods", () => {
+  it("maps 1W and 3M instead of silently falling back to 1M", async () => {
+    const { tdWindow } = await import("../twelveData");
+    expect(tdWindow("1W")).toEqual({ interval: "1h", outputsize: 35 });
+    expect(tdWindow("3M")).toEqual({ interval: "1day", outputsize: 65 });
+    expect(tdWindow("1M")).toEqual({ interval: "1day", outputsize: 23 });
+  });
+});
+
+describe("TwelveDataClient timeouts", () => {
+  it("passes a timeout signal to every request", async () => {
+    fetchMock.mockResolvedValueOnce({ json: async () => ({ close: "1", symbol: "AAPL" }) });
+    const { TwelveDataClient } = await import("../twelveData");
+    await new TwelveDataClient("k").getStockData("AAPL");
+    expect(fetchMock.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+});

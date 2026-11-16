@@ -9,6 +9,7 @@ import {
   OpenRouterClient,
   type OpenRouterResponse,
 } from "@/lib/api/openrouter";
+import { getOpenRouterApiKey } from "@/lib/api/openrouterConfig";
 import { getAdminApp, isAuthError, verifyAuth } from "@/lib/auth/verifyAuth";
 import { APP_NAME, APP_URL } from "@/lib/constants";
 import { createMarketDataClient } from "@/lib/api/marketDataClient";
@@ -19,8 +20,7 @@ import { jstDateId } from "@/lib/digest/dateId";
 import { buildDigestPrompt, type DigestStockInput } from "@/lib/digest/prompt";
 import { parseDigestResponse } from "@/lib/digest/schema";
 
-export const dynamic =
-  process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 /** 要約対象の銘柄数上限（超過分は対象外） */
 const MAX_DIGEST_STOCKS = 10;
@@ -41,13 +41,9 @@ type Acquisition =
   | { kind: "acquired"; attempts: number };
 
 async function generateWithAi(prompt: string) {
-  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
-  // 未設定と .env.example のプレースホルダー値をどちらも弾く（claude-brief と同じ）
-  if (
-    !apiKey ||
-    apiKey === "your_openrouter_api_key_here" ||
-    apiKey === "your_openrouter_key_here"
-  ) {
+  // 未設定と .env.example のプレースホルダー値をどちらも弾く（全ルート共通の判定）
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) {
     throw new Error("OPENROUTER_API_KEYが設定されていません");
   }
   const client = new OpenRouterClient(apiKey) as unknown as {

@@ -101,6 +101,16 @@ function decodeEntities(value: string): string {
     .trim();
 }
 
+/** 1フィードあたりの取得タイムアウト */
+export const RSS_FETCH_TIMEOUT_MS = 8_000;
+
+/** 日付文字列を ISO にする。読めない・無い場合は null（例外にしない） */
+function parsePublishedAt(raw: string): string | null {
+  if (!raw) return null;
+  const time = Date.parse(raw);
+  return Number.isFinite(time) ? new Date(time).toISOString() : null;
+}
+
 function tagValue(xml: string, tag: string): string {
   const match = xml.match(
     new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i")
@@ -108,11 +118,18 @@ function tagValue(xml: string, tag: string): string {
   return decodeEntities(match?.[1] ?? "");
 }
 
+/**
+ * RSS/Atom を記事の配列にする。
+ * - 日付が読めない記事が1件あっても、フィード全体を落とさない
+ *   （以前は new Date(raw).toISOString() の RangeError でフィードごと捨てていた）
+ * - 日付の無い・読めない記事は除外する。取得時刻で埋めると、取得のたびに
+ *   「直近24時間の記事」として数え直され、リスク計算に永遠に残るため
+ */
 export function parseRssFeed(xml: string, source: RssSource): EnergyNewsItem[] {
   const itemMatches =
     xml.match(/<item[\s\S]*?<\/item>|<entry[\s\S]*?<\/entry>/gi) ?? [];
   return itemMatches
-    .map((itemXml, index) => {
+    .map((itemXml, index): EnergyNewsItem | null => {
       const title = tagValue(itemXml, "title");
       const link =
         tagValue(itemXml, "link") ||
@@ -126,9 +143,8 @@ export function parseRssFeed(xml: string, source: RssSource): EnergyNewsItem[] {
         tagValue(itemXml, "description") ||
         tagValue(itemXml, "summary") ||
         tagValue(itemXml, "content:encoded");
-      const publishedAt = publishedRaw
-        ? new Date(publishedRaw).toISOString()
-        : new Date().toISOString();
+      const publishedAt = parsePublishedAt(publishedRaw);
+      if (!publishedAt) return null;
       const text = `${title} ${summary}`;
       const keywordWeight = calculateKeywordWeight(text);
       const score = Math.round(source.weight * keywordWeight * 10) / 10;
@@ -150,7 +166,7 @@ export function parseRssFeed(xml: string, source: RssSource): EnergyNewsItem[] {
         matchedKeywords: findKeywordMatches(text).map(match => match.keyword),
       };
     })
-    .filter(item => item.title);
+    .filter((item): item is EnergyNewsItem => item !== null && Boolean(item.title));
 }
 
 export async function fetchEnergyNews(): Promise<EnergyNewsItem[]> {
@@ -159,12 +175,21 @@ export async function fetchEnergyNews(): Promise<EnergyNewsItem[]> {
       const init: RequestInit = source.noCache
         ? { cache: "no-store" }
         : { next: { revalidate: 900 } };
-      const response = await fetch(source.url, init);
+      const response = await fetch(source.url, {
+        ...init,
+        signal: AbortSignal.timeout(RSS_FETCH_TIMEOUT_MS),
+      });
       if (!response.ok)
         throw new Error(`${source.name} RSS failed: ${response.status}`);
       return parseRssFeed(await response.text(), source);
     })
   );
+
+  if (settled.every(result => result.status === "rejected")) {
+    // 全フィードの失敗を「ニュース0件」として保存すると、当日分と前回成功分
+    // （previous）の両方を空で上書きしてしまうため、失敗として扱う
+    throw new Error("All RSS sources failed");
+  }
 
   return settled
     .flatMap(result => (result.status === "fulfilled" ? result.value : []))

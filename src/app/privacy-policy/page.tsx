@@ -1,9 +1,21 @@
+import type { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BackToHomeLink } from "@/components/BackToHomeLink";
 import { APP_NAME } from "@/lib/constants";
+
+export const metadata: Metadata = {
+  title: "プライバシーポリシー",
+  description:
+    "kabuana のプライバシーポリシーです。収集する情報と利用目的、保存期間、第三者との共有（広告配信を含む）、お問い合わせ先について説明しています。",
+  alternates: { canonical: "/privacy-policy" },
+};
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    // iOS アプリ（viewportFit: cover）でノッチ・ステータスバーに隠れないよう上端を空ける
+    <div className="container mx-auto px-4 pb-8 pt-[calc(env(safe-area-inset-top)+1rem)] max-w-4xl">
+      {/* このページへはアプリ内のリンクから来るため、戻る手段を置く */}
+      <BackToHomeLink className="mb-3 -ml-2" />
       <Card>
         <CardHeader>
           <CardTitle className="text-2xl font-bold text-center">
@@ -240,6 +252,7 @@ export default function PrivacyPolicyPage() {
           </div>
         </CardContent>
       </Card>
+      <BackToHomeLink className="mt-4 -ml-2" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import type { TradingValueItem } from "@/hooks/useTopTradingValue";
 import { shouldShowAttentionScore } from "@/lib/attentionScore";
 import { APP_NAME } from "@/lib/constants";
@@ -19,20 +19,36 @@ interface MarketFrontPageProps {
   stockIdeas?: TradingValueItem[];
   isStockIdeasLoading: boolean;
   warning?: string | null;
+  stockIdeasError?: string | null;
+  onRetryStockIdeas?: () => void;
   remainingUses: number;
   dailyLimit: number;
   isPremium: boolean;
   onSelectIdea: (item: TradingValueItem) => void;
 }
 
+const MARKET_DATE_FORMAT = new Intl.DateTimeFormat("ja-JP", {
+  timeZone: "Asia/Tokyo",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+  weekday: "short",
+});
+
 function formatMarketDate() {
-  return new Intl.DateTimeFormat("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    weekday: "short",
-  }).format(new Date());
+  return MARKET_DATE_FORMAT.format(new Date());
+}
+
+const subscribeNoop = () => () => {};
+
+/**
+ * 今日の日付（JST）。このページはビルド時にプリレンダーされるため、描画中に
+ * new Date() を整形するとビルド日の日付が HTML に焼き込まれ、翌日以降は
+ * hydration の不一致になる。サーバー（プリレンダー）では null を返し、
+ * ブラウザでだけ日付を出す
+ */
+function useMarketDate(): string | null {
+  return useSyncExternalStore(subscribeNoop, formatMarketDate, () => null);
 }
 
 export function MarketFrontPage({
@@ -46,12 +62,14 @@ export function MarketFrontPage({
   stockIdeas = [],
   isStockIdeasLoading,
   warning,
+  stockIdeasError,
+  onRetryStockIdeas,
   remainingUses,
   dailyLimit,
   isPremium,
   onSelectIdea,
 }: MarketFrontPageProps) {
-  const marketDate = formatMarketDate();
+  const marketDate = useMarketDate();
   const showAttentionScore = shouldShowAttentionScore(
     stockIdeas.map(item => item.confidence)
   );
@@ -70,7 +88,10 @@ export function MarketFrontPage({
                   今日の市場一面
                 </h2>
               </div>
-              <p className="text-xs text-muted-foreground">{marketDate}</p>
+              {/* 日付が出るまで高さが変わらないよう、空白で場所を確保する */}
+              <p className="min-w-[9em] text-xs text-muted-foreground">
+                {marketDate ?? "\u00a0"}
+              </p>
             </div>
 
             {/* 初見でも迷わないよう、検索とサンプル銘柄を一面の最上部に置く */}
@@ -83,6 +104,8 @@ export function MarketFrontPage({
                 idea={topIdea}
                 isLoading={isStockIdeasLoading}
                 warning={warning}
+                error={stockIdeasError}
+                onRetry={onRetryStockIdeas}
                 showAttentionScore={showAttentionScore}
                 onSelectIdea={onSelectIdea}
               />
@@ -96,6 +119,7 @@ export function MarketFrontPage({
             <FrontPageMarketGrid
               topIdea={topIdea}
               isLoading={isStockIdeasLoading}
+              hasError={Boolean(stockIdeasError)}
               remainingUses={remainingUses}
               dailyLimit={dailyLimit}
               isPremium={isPremium}

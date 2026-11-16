@@ -13,7 +13,14 @@ export { getAdminApp };
  *   2026-08-16、設定漏れが401に偽装され長期間気づかれなかった障害の再発防止）
  */
 export async function verifyAuth(
-  request: NextRequest
+  request: NextRequest,
+  options: {
+    /**
+     * true なら失効・無効化・削除済みユーザーのトークンも拒否する
+     * （verifyIdToken の checkRevoked。Auth への問い合わせが1回増えるので課金系のみで使う）
+     */
+    checkRevoked?: boolean;
+  } = {}
 ): Promise<DecodedIdToken | NextResponse> {
   const authHeader = request.headers.get("Authorization");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -43,7 +50,10 @@ export async function verifyAuth(
   }
 
   try {
-    const decoded = await getAuth(app).verifyIdToken(token);
+    const decoded = await getAuth(app).verifyIdToken(
+      token,
+      options.checkRevoked === true
+    );
     return decoded;
   } catch {
     return NextResponse.json(

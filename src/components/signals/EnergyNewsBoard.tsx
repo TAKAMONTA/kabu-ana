@@ -22,7 +22,12 @@ export function EnergyNewsBoard() {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {isLoading ? <PanelLoading rows={5} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : (
+        {isLoading ? <PanelLoading rows={5} /> : error && !data ? <PanelError error={error} onRetry={refresh} /> : items.length === 0 ? (
+          // 0件のときにカードが真っ白にならないよう、状況を短く伝える
+          <p className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
+            いま表示できるニュースはありません。時間をおいて再度ご確認ください。
+          </p>
+        ) : (
           <div className="space-y-2">
             {items.slice(0, 12).map((item) => {
               const isCritical = item.label === "Critical";

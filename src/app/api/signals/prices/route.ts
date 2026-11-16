@@ -1,15 +1,18 @@
 import { NextResponse } from "next/server";
 import {
   fail,
+  logSignalError,
   ok,
   readSignalDocWithFallback,
+  SIGNAL_FETCH_FAILED_MESSAGE,
+  SIGNAL_NOT_CONFIGURED_MESSAGE,
   todayId,
   writeSignalDocWithFallback,
 } from "@/lib/signals/cache";
 import { fetchEiaPriceStrip, type SignalPricePoint } from "@/lib/signals/sources/eia";
 import { fetchFredPriceStrip } from "@/lib/signals/sources/fred";
 
-export const dynamic = process.env.EXPORT_STATIC === "true" ? "force-static" : "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface PriceStripPayload {
   prices: SignalPricePoint[];
@@ -24,12 +27,18 @@ export async function GET() {
   const cached = await readSignalDocWithFallback<PriceStripPayload>(
     "signals_prices",
     todayId()
-  );
+  ).catch(() => null);
   try {
     const eiaKey = process.env.EIA_API_KEY;
     const fredKey = process.env.FRED_API_KEY;
     if (!eiaKey || !fredKey) {
-      return NextResponse.json(fail<PriceStripPayload>("EIA_API_KEY または FRED_API_KEY が未設定です", cached?.fetchedAt, cached));
+      // どのキーが無いかはログにだけ出す（応答に環境変数名を載せない）
+      console.error(
+        `signals/prices: APIキーが未設定です (EIA=${Boolean(eiaKey)}, FRED=${Boolean(fredKey)})`
+      );
+      return NextResponse.json(
+        fail<PriceStripPayload>(SIGNAL_NOT_CONFIGURED_MESSAGE, cached?.fetchedAt, cached)
+      );
     }
 
     const [eia, fred] = await Promise.all([fetchEiaPriceStrip(eiaKey), fetchFredPriceStrip(fredKey)]);
@@ -39,8 +48,9 @@ export async function GET() {
       headers: { "Cache-Control": "s-maxage=300, stale-while-revalidate=900" },
     });
   } catch (error) {
+    logSignalError("signals/prices: 価格取得に失敗しました", error);
     return NextResponse.json(
-      fail<PriceStripPayload>(error instanceof Error ? error.message : "価格取得に失敗しました", cached?.fetchedAt, cached)
+      fail<PriceStripPayload>(SIGNAL_FETCH_FAILED_MESSAGE, cached?.fetchedAt, cached)
     );
   }
 }
