@@ -4,15 +4,20 @@
  */
 
 /**
+ * Capacitor のネイティブアプリ（iOS / Android）内で動いているかどうか。
+ * サーバー側（window なし）では常に false。
+ */
+export function isNativeAppRuntime(): boolean {
+    return typeof window !== "undefined" &&
+        (((window as any).Capacitor?.isNativePlatform?.() === true) ||
+            window.location?.protocol === 'capacitor:');
+}
+
+/**
  * APIのベースURLを取得
  */
 export function getApiBaseUrl(): string {
-    // Capacitor環境かどうかをチェック
-    const isCapacitor = typeof window !== "undefined" &&
-        (((window as any).Capacitor?.isNativePlatform?.() === true) ||
-            window.location.protocol === 'capacitor:');
-
-    if (isCapacitor) {
+    if (isNativeAppRuntime()) {
         // Capacitorアプリの場合は本番環境のURLを使用
         // ビルド時に環境変数が埋め込まれる
         return "https://kabu-ana.com";
