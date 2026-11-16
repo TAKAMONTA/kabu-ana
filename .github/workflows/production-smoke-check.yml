@@ -1,7 +1,35 @@
 name: Production Smoke Check
 
+# 起動のきっかけ（どれか1つでも本番 https://kabu-ana.com を読み取り専用で確認する）
+#
+# - deployment_status:   Vercel が GitHub の Deployments API に送る状態通知。
+#                        2026-09-03 以降、本番デプロイのたびに skipped しか出なくなった
+#                        （環境名か送られる state が変わったとみられるが未確認）。
+#                        そこで判定を「state が success かつ環境名が production で始まる
+#                        （大文字小文字は区別しない。例: "Production", "Production – kabu-ana"）」
+#                        に緩め、preview を含む名前は除外する。
+#                        実際の値は report-deployment-event ジョブのログで確認できる。
+# - repository_dispatch: Vercel の現行ドキュメントが案内する方式（vercel.deployment.success）。
+#                        Vercel 側で repository dispatch が有効なときだけ届く。
+#                        client_payload.environment があれば production で始まるものに限る。
+# - push (master):       Vercel の通知に依存しない予備。対象コミットの本番デプロイが
+#                        完了するまで GitHub の Deployments / コミットステータスを最大12分
+#                        待ってから確認する（待ちきれなくてもそのまま確認する）。
+# - schedule:            毎朝 07:10 JST の定期確認。
+# - workflow_dispatch:   手動実行。
+#
+# smoke ジョブは同じ concurrency グループで直列化する（実行中1件＋待ち1件まで。
+# 待ちの古いものは新しいものに置き換わる）。push と Vercel 通知が両方来ると
+# 2回確認することがあるが、読み取り専用なので許容する。
+
 on:
   deployment_status:
+  repository_dispatch:
+    types:
+      - vercel.deployment.success
+  push:
+    branches:
+      - master
   workflow_dispatch:
   schedule:
     # 07:10 JST. This catches overnight breakage and refreshes the morning brief path.
@@ -11,21 +39,108 @@ permissions:
   contents: read
 
 jobs:
+  # Vercel から届いたイベントの中身（状態と環境名だけ）を毎回ログに残す。
+  # URL やトークンは出さない。
+  report-deployment-event:
+    name: Report deployment event
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'deployment_status' ||
+      github.event_name == 'repository_dispatch'
+    timeout-minutes: 2
+    steps:
+      - name: Show deployment state and environment
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DEPLOYMENT_STATE: ${{ github.event.deployment_status.state }}
+          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment }}
+          DISPATCH_ACTION: ${{ github.event.action }}
+          DISPATCH_ENVIRONMENT: ${{ github.event.client_payload.environment }}
+        run: |
+          echo "event_name=${EVENT_NAME}"
+          if [ "${EVENT_NAME}" = "deployment_status" ]; then
+            echo "deployment_status.state=${DEPLOYMENT_STATE}"
+            echo "deployment.environment=${DEPLOYMENT_ENVIRONMENT}"
+          else
+            echo "repository_dispatch.action=${DISPATCH_ACTION}"
+            echo "client_payload.environment=${DISPATCH_ENVIRONMENT}"
+          fi
+
   smoke:
     name: Check kabu-ana.com
     runs-on: ubuntu-latest
+    # startsWith / contains は大文字小文字を区別しない。
+    # 存在しないプロパティは null になり、startsWith(null, ...) は false。
     if: >-
-      github.event_name != 'deployment_status' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'push' ||
       (
-        github.event.deployment_status.state == 'success' &&
+        github.event_name == 'repository_dispatch' &&
         (
-          github.event.deployment.environment == 'Production' ||
-          github.event.deployment.environment == 'production'
+          github.event.client_payload.environment == null ||
+          (
+            startsWith(github.event.client_payload.environment, 'production') &&
+            !contains(github.event.client_payload.environment, 'preview')
+          )
         )
+      ) ||
+      (
+        github.event_name == 'deployment_status' &&
+        github.event.deployment_status.state == 'success' &&
+        startsWith(github.event.deployment.environment, 'production') &&
+        !contains(github.event.deployment.environment, 'preview')
       )
-    timeout-minutes: 8
+    timeout-minutes: 20
+    concurrency:
+      group: production-smoke-check
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      deployments: read
+      statuses: read
 
     steps:
+      - name: Wait for the production deployment of this commit
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          # 最大12分（20秒 × 36回）待つ。完了を確認できなくても失敗にはせず、
+          # 次のステップで本番を確認する（古い版が見えていれば、その結果が出る）。
+          for attempt in $(seq 1 36); do
+            ready=""
+            # GitHub Deployments（Vercel が作成）: 環境名と最新の state を表示する
+            for id_env in $(gh api "repos/${REPO}/deployments?sha=${SHA}&per_page=20" \
+                --jq '.[] | "\(.id)|\(.environment)"' 2>/dev/null | tr ' ' '_'); do
+              id="${id_env%%|*}"
+              environment="${id_env#*|}"
+              state=$(gh api "repos/${REPO}/deployments/${id}/statuses?per_page=1" \
+                --jq '.[0].state // "none"' 2>/dev/null || echo "unknown")
+              echo "attempt ${attempt}: deployment environment=${environment} state=${state}"
+              env_lower=$(echo "${environment}" | tr '[:upper:]' '[:lower:]')
+              case "${env_lower}" in
+                *preview*) ;;
+                production*) [ "${state}" = "success" ] && ready="deployment" ;;
+              esac
+            done
+            # コミットステータス（Vercel の "Vercel" チェック）も見る
+            vercel_state=$(gh api "repos/${REPO}/commits/${SHA}/status" \
+              --jq '[.statuses[] | select(.context | test("^vercel"; "i")) | .state] | first // "none"' \
+              2>/dev/null || echo "unknown")
+            echo "attempt ${attempt}: vercel commit status=${vercel_state}"
+            [ "${vercel_state}" = "success" ] && ready="${ready:-commit-status}"
+            if [ -n "${ready}" ]; then
+              echo "Production deployment is ready (${ready}). Waiting 30s for the CDN."
+              sleep 30
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::warning::本番デプロイの完了を12分以内に確認できませんでした。現在の本番をそのまま確認します。"
+
       - name: Checkout
         uses: actions/checkout@v4
 
