@@ -66,7 +66,8 @@ export default function RootLayout({
         >
           <ErrorBoundary>{children}</ErrorBoundary>
         </ThemeProvider>
-        <VercelAnalytics />
+        {/* 静的エクスポート（Capacitor アプリ）には解析スクリプトが無いので出さない */}
+        {process.env.EXPORT_STATIC !== "true" && <VercelAnalytics />}
       </body>
     </html>
   );

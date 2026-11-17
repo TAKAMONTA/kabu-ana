@@ -25,6 +25,13 @@ const eslintConfig = defineConfig([
       "react-hooks/static-components": "warn",
     },
   },
+  {
+    // Playwright のフィクスチャ引数 `use` を React の use() フックと誤検知するため
+    files: ["e2e/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
+  },
   globalIgnores([
     ".next/**",
     "out/**",
@@ -33,6 +40,8 @@ const eslintConfig = defineConfig([
     "android/**",
     "ios/**",
     "backend/**",
+    "playwright-report/**",
+    "test-results/**",
     // Claude Code のローカル作業領域（.gitignore 済みの git worktree 等）を lint 対象に含めない
     ".claude/**",
   ]),

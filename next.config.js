@@ -11,6 +11,13 @@ const nextConfig = {
         // 環境変数での force-static / force-dynamic 切替ができなくなったため。
         // ページ・レイアウトは .tsx のみなので影響しない（.ts のルートファイルを追加する場合は注意）。
         pageExtensions: ["tsx", "jsx", "js"],
+        // Vercel Web Analytics はアプリでは使えない（解析スクリプトが無く 404 になる）ため、
+        // 解析コードごと空の実装に差し替えて同梱しない。
+        turbopack: {
+          resolveAlias: {
+            "@vercel/analytics/next": "./src/lib/stubs/vercel-analytics-next.tsx",
+          },
+        },
       }
     : {
         async headers() {
