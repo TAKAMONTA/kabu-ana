@@ -40,9 +40,20 @@ export function purchaseOwnerKey(verified: VerifiedNativePurchase): string {
     verified.platform === "ios"
       ? verified.originalTransactionId || verified.purchaseToken
       : verified.purchaseToken;
+  return purchaseOwnerKeyFor(verified.platform, stableId);
+}
+
+/**
+ * プラットフォームと不変な購入ID（iOS: originalTransactionId / Android: purchaseToken）
+ * から所有記録のキーを作る。ストア通知（検証前）から所有者を引くときに使う。
+ */
+export function purchaseOwnerKeyFor(
+  platform: VerifiedNativePurchase["platform"],
+  stableId: string
+): string {
   return crypto
     .createHash("sha256")
-    .update(`${verified.platform}:${stableId}`)
+    .update(`${platform}:${stableId}`)
     .digest("hex");
 }
 
